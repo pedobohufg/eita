@@ -1,0 +1,14 @@
+{
+  "name": "plataforma-eita",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma EITA — sistema integrado de próteses e órteses do Lab.EITA/UFG (núcleo comum + módulos).",
+  "type": "module",
+  "license": "UNLICENSED",
+  "author": "Pedro Henrique Gonçalves — Lab.EITA/UFG",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test \"testes/*.test.mjs\"",
+    "montar": "node ferramentas/montar.mjs"
+  }
+}

@@ -1,0 +1,72 @@
+{
+ "frontal": {
+  "claro_A": {
+   "k": 10,
+   "ref": "anel cinza",
+   "fonte_papila": "refinada",
+   "areola_maior_mm": 41.9354,
+   "areola_menor_mm": 37.9419,
+   "angulo_graus": 19.981,
+   "papila_mm": 12.0006,
+   "paleta": {
+    "areola": "#a2715d",
+    "papila": "#945e50",
+    "pele": "#d1ab92"
+   }
+  },
+  "escuro": {
+   "k": 10,
+   "ref": "anel cinza",
+   "fonte_papila": "refinada",
+   "areola_maior_mm": 44.8705,
+   "areola_menor_mm": 39.9218,
+   "angulo_graus": 134.906,
+   "papila_mm": 13.0011,
+   "paleta": {
+    "areola": "#4d3428",
+    "papila": "#412b22",
+    "pele": "#7f5c45"
+   }
+  },
+  "cor_quente_v2_anel_cinza": {
+   "k": 10,
+   "ref": "anel cinza",
+   "fonte_papila": "refinada",
+   "areola_maior_mm": 41.9214,
+   "areola_menor_mm": 37.9399,
+   "angulo_graus": 20.052,
+   "papila_mm": 11.9523,
+   "paleta": {
+    "areola": "#a3725e",
+    "papila": "#945f50",
+    "pele": "#d2ab93"
+   }
+  }
+ },
+ "lateral": {
+  "projecao_mm": 5.97,
+  "largura_base_mm": 12.8,
+  "forma_n": 3,
+  "raio_ajuste_mm": 6.27,
+  "avisos": []
+ },
+ "malhas": {
+  "n": 235,
+  "volume_ml": 1.90006,
+  "papila_proj_mm": 5.97,
+  "stl_sha256": {
+   "protese_referencia.stl": "8316426e06cb2d4aedcf4e8fadef039187651ae338e106a806028c27b811fbf4",
+   "molde_frontal.stl": "705b94fc79413c4771d4115e9acfc87b655f284c5783b89fcbb72e7c92df9c4a",
+   "contramolde.stl": "3ffe0a07c15269b66327261f0ff200586faa287dd7afd27be7cdbded56eebc90"
+  }
+ },
+ "corpo_de_prova": {
+  "volume_ml": 2.21958,
+  "stl_sha256": {
+   "protese_referencia.stl": "9ee52934e8e54afe1e9294b867cd29aeb7096d86ec3b6a066f23f8a5f677a085",
+   "molde_frontal.stl": "c0b080f00e70877895796bd57829ad226535444e884c35e36f9b28c30e9a902f",
+   "contramolde.stl": "b38ba1adb8b03462f620ffd3a70893bbf51895155e88f01704759bf718b3babd"
+  }
+ },
+ "_gerado_com": "EITA! MAMILO web 0.2 (nucleo.js original, antes da extração do núcleo)"
+}

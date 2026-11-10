@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<!--
+  EITA! MAMILO
+  © 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás (Lab.EITA/UFG).
+  Autor: Pedro Henrique Gonçalves.
+  Todos os direitos reservados. É proibido copiar, modificar, redistribuir ou usar este código, no todo ou em parte,
+  sem autorização por escrito do Lab.EITA/UFG.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="EITA! MAMILO — ferramenta do Lab.EITA/UFG para gerar a prótese externa de aréola e papila e seus moldes a partir de fotografias.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<title>EITA! MAMILO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F2F9;--surface:#FFFFFF;--surface-2:#ECE8F6;--ink:#1C1730;--muted:#5B5573;--line:#E1DCEC;--line-strong:#A79FBF;--accent:#6B3FD6;--accent-2:#8656F5;--brand:#9560FD;--accent-soft:#EFE8FF;--ufg:#0075BE;--warn:#B04E0C;--ok:#25774F;--areola:#1fae63;--papila:#2f6fdb;--marc:#d99a00;--f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--r:10px;--shadow:0 1px 2px rgba(40,22,90,.06),0 4px 16px rgba(60,30,130,.07)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{margin:0;height:100%;font-family:var(--f-body);color:var(--ink);background:var(--bg);font-size:14px}
+#app{display:grid;grid-template-rows:64px 1fr;grid-template-columns:384px 1fr;grid-template-areas:"top top" "panel view";height:100vh}
+#top{grid-area:top;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;min-width:0}
+#top:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent) 45%,transparent 100%)}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.logo img{height:44px;width:auto;display:block}
+.ttl h1{font:800 23px/1 var(--f-body);margin:0;letter-spacing:-.02em}.ttl h1 em{font-style:normal;color:var(--brand)}
+.ttl .sub{font:600 11.5px var(--f-body);color:#2a2438;margin-top:4px}
+#stepper{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+#stepper button{display:flex;align-items:center;gap:7px;border:1px solid transparent;background:transparent;border-radius:999px;padding:6px 11px 6px 6px;font:500 12.5px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+#stepper button .n{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font:600 11px var(--f-mono);color:var(--muted);background:var(--surface)}
+#stepper button.done .n{background:var(--accent);border-color:var(--accent);color:#fff}
+#stepper button.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.vsep{width:1px;height:34px;background:var(--line)}
+.logo.sec img{height:34px}
+#panel{grid-area:panel;background:var(--bg);border-right:1px solid var(--line);overflow-y:auto;padding:14px 14px 28px;display:flex;flex-direction:column;gap:10px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+section>h2{margin:0;display:flex;align-items:center;gap:10px;padding:12px 14px;font:600 13.5px var(--f-body);cursor:pointer;user-select:none}
+section>h2 .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 11.5px var(--f-mono);flex:none}
+section>h2 .n.ext{background:var(--surface-2);color:var(--accent)}
+section>h2:after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--line-strong);border-bottom:2px solid var(--line-strong);transform:rotate(45deg);transition:transform .2s}
+section.collapsed>h2:after{transform:rotate(-45deg)}
+section .bd{padding:0 14px 14px}section.collapsed .bd{display:none}
+section.off{opacity:.5}section.off .bd{pointer-events:none}section.off>h2 .n{background:var(--line-strong)}
+.grp{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:8px 4px 0}
+button{font:500 13px var(--f-body);border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 13px;cursor:pointer;color:var(--ink)}
+button:hover{background:var(--surface-2)}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.primary:hover{background:var(--accent-2)}
+button:disabled{opacity:.5;cursor:default}button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--r);padding:20px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--bg)}
+.drop:hover,.drop.hover{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}.drop b{display:block;font-size:14px;color:var(--ink);margin-bottom:4px}
+label.ctl{display:grid;grid-template-columns:1fr 78px;gap:4px 8px;align-items:center;font-size:13px;margin:10px 0 2px}
+label.ctl:has(select){grid-template-columns:1fr 150px}
+label.ctl:has(input[type=text]){grid-template-columns:1fr 150px}
+label.ctl input[type=number]{width:78px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);text-align:right;background:var(--bg);color:var(--ink)}
+label.ctl input[type=text]{width:150px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);background:var(--bg);color:var(--ink)}
+label.ctl select{width:150px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
+label.ctl input[type=range]{grid-column:1/-1;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
+.chk{font-size:13px;display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}.chk input{accent-color:var(--accent);width:15px;height:15px}
+.sub-h{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 4px}
+table.m{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}table.m td{padding:5px 2px;border-bottom:1px solid var(--surface-2)}
+table.m td:last-child{text-align:right;font:500 13px var(--f-mono)}
+.warnbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fbebdd;color:var(--warn);font-size:12px;line-height:1.45}
+.okbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#e1f1e8;color:var(--ok);font-size:12px;line-height:1.45}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;flex:1;padding:7px 8px;font-size:12.5px}.seg button+button{border-left:1px solid var(--line-strong)}
+.sw{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sw div{font:500 11.5px var(--f-mono);color:var(--muted)}.sw i{display:block;height:30px;border-radius:7px;border:1px solid var(--line);margin-bottom:4px}
+.marc{display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:6px}.marc svg{width:150px;height:auto;background:#fff}
+#cvCorpo{width:100%;aspect-ratio:1;display:block;border-radius:8px;border:1px solid var(--line);margin-top:6px}
+.credit{margin-top:auto;padding:16px 4px 0;font-size:11.5px;color:var(--muted);line-height:1.5;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
+.credit img{height:58px;width:auto;flex:none}.credit b{color:var(--ink)}
+#view{grid-area:view;position:relative;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#FBFAFE 0%,var(--bg) 70%)}
+#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#pc{cursor:grab}#pc.alca{cursor:pointer}
+#tabs{position:absolute;top:14px;left:14px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2}
+#tabs button{padding:6px 12px;font:500 12.5px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}
+#tabs button.cur{background:var(--accent-soft);color:var(--accent)}
+#tabs button:disabled{opacity:.4}
+.tools{position:absolute;top:14px;right:14px;display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2;flex-wrap:wrap;align-items:center}
+.tools button{padding:6px 10px;font:500 12px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}.tools button:hover{background:var(--accent-soft);color:var(--ink)}
+.tools button.cur{background:var(--accent-soft);color:var(--accent)}
+.tools .vs{width:1px;height:20px;background:var(--line);margin:0 3px}
+.tools label{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;padding:0 6px}.tools input{accent-color:var(--accent)}
+#legend{position:absolute;right:14px;bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px 11px;font:500 12px var(--f-mono);z-index:2;line-height:1.6}
+#legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+#status{position:absolute;bottom:14px;left:14px;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 30px;max-width:min(640px,calc(100% - 28px));box-shadow:var(--shadow);line-height:1.45;z-index:2}
+#status:before{content:"";position:absolute;left:12px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+#status.warn:before{background:var(--warn)}
+#empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;pointer-events:none}
+#empty b{display:block;font-size:18px;color:var(--ink);margin-bottom:6px}
+#busy{position:absolute;inset:0;display:none;place-items:center;background:#f4f2f98c;z-index:3}
+#busy>div{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;box-shadow:var(--shadow);font-weight:600}
+#busy>div:before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);animation:sp .8s linear infinite}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}.pgrid .w2{grid-column:1/-1}
+.pf{display:flex;flex-direction:column;font:500 11.5px var(--f-body);color:var(--muted);gap:3px;min-width:0}
+.pf input,.pf select,.pf textarea{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:13px var(--f-body);color:var(--ink);background:var(--bg);box-sizing:border-box}.pf textarea{resize:vertical}
+section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+.pname{font:500 11px var(--f-mono);color:var(--accent);margin-left:6px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.frow>div{flex:1;min-width:0}
+.frow small{display:block;color:var(--muted);font:11px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.frow button{padding:4px 9px;font-size:12px}.frow button.del{color:var(--warn)}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:auto 50vh 1fr;grid-template-areas:"top" "view" "panel";height:auto;min-height:100%}#stepper{display:none}#top{padding:10px 14px}}
+</style>
+</head>
+<body>
+<div id="app">
+<header id="top">
+  <div class="brand">
+    <span class="logo"><img src="assets/eita-mamilo-simbolo.png" alt="EITA! MAMILO"></span>
+    <div class="ttl"><h1>EITA! <em>MAMILO</em></h1><div class="sub">Prótese externa de aréola e papila a partir da fotografia · protótipo v0.2</div></div>
+  </div>
+  <nav id="stepper" aria-label="Etapas"></nav>
+  <span class="vsep"></span>
+  <span class="logo sec" title="Universidade Federal de Goiás"><img src="assets/logo-ufg.png" alt="UFG"></span>
+</header>
+
+<aside id="panel">
+<section id="s0" class="pac collapsed">
+  <h2><span class="n"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.8-3.8 3.9-6 7.5-6s6.7 2.2 7.5 6"/></svg></span>Ficha da paciente<span class="pname" id="pBadge"></span></h2>
+  <div class="bd">
+    <div class="pgrid">
+      <label class="pf w2">Nome<input type="text" id="pName" placeholder="ex.: Maria S." autocomplete="off"></label>
+      <label class="pf">Prontuário / código<input type="text" id="pId" placeholder="ex.: M-012" autocomplete="off"></label>
+      <label class="pf">Nascimento<input type="date" id="pBirth"></label>
+      <label class="pf">Mama da prótese<select id="pLado"><option value="">pela etapa 5</option><option value="D">Direita</option><option value="E">Esquerda</option></select></label>
+      <label class="pf">Fototipo (Fitzpatrick)<select id="pFoto"><option value="">—</option><option>I</option><option>II</option><option>III</option><option>IV</option><option>V</option><option>VI</option></select></label>
+      <label class="pf w2">Diagnóstico / cirurgia<input type="text" id="pDiag" placeholder="ex.: mastectomia D por CDI, 2024"></label>
+      <label class="pf">Reconstrução<select id="pRecon"><option value="">—</option><option value="nenhuma">Sem reconstrução</option><option value="implante">Implante / expansor</option><option value="retalho">Retalho autólogo</option><option value="nipple-sparing">Mastectomia poupadora</option><option value="outra">Outra</option></select></label>
+      <label class="pf">Radioterapia<select id="pRadio"><option value="">—</option><option value="nao">Não fez</option><option value="concluida">Concluída há 6 meses ou mais</option><option value="recente">Concluída há menos de 6 meses</option><option value="curso">Em curso</option></select></label>
+      <label class="pf w2">Alergias / sensibilidade da pele<input type="text" id="pAlerg" placeholder="ex.: esparadrapo, látex"></label>
+      <label class="pf w2">Objetivo / indicação<input type="text" id="pGoal" placeholder="ex.: prótese definitiva, uso diário"></label>
+      <label class="pf w2">Profissional responsável<input type="text" id="pProf" placeholder="nome e registro"></label>
+      <label class="pf w2">Observações<textarea id="pNotes" rows="2"></textarea></label>
+    </div>
+    <div class="note" id="pAge"></div>
+    <div class="row" style="margin-top:8px"><button class="primary" id="fSave" type="button">Salvar ficha</button><button id="fExp" type="button">Exportar</button><button id="fImpB" type="button">Abrir arquivo</button><input type="file" id="fImp" accept=".json" hidden></div>
+    <div class="note">A ficha guarda os dados da paciente, os contornos, as medidas da foto lateral e os parâmetros da prótese. As fotos não são guardadas. As fichas ficam neste navegador; exporte o arquivo para levar a outro computador.</div>
+    <div class="sub-h">Fichas salvas</div><div id="fList"></div>
+    <div class="sub-h">Base do laboratório</div>
+    <div class="row"><button id="dbExp" type="button">Exportar base</button><button id="dbImpB" type="button">Importar base</button><input type="file" id="dbImp" accept=".json" hidden></div>
+    <div class="note">Um único arquivo com todas as fichas deste navegador. Guarde na pasta do laboratório com acesso restrito à equipe, porque contém dados de pacientes. Ao importar em outro computador, as fichas são mescladas e prevalece a versão mais recente de cada uma.</div>
+  </div>
+</section>
+
+<section id="s1">
+  <h2><span class="n">1</span>Fotografia frontal</h2>
+  <div class="bd">
+    <div class="drop" id="drop1" role="button" tabindex="0"><b>Arraste a foto da aréola aqui</b>ou clique para escolher · JPG ou PNG</div>
+    <input type="file" id="file1" accept="image/*" hidden>
+    <div class="row"><button id="demo1" type="button">Usar foto de exemplo (sintética)</button></div>
+    <label class="ctl">Mama fotografada<select id="photoSide"><option value="D">Direita da paciente</option><option value="E" selected>Esquerda da paciente</option></select></label>
+    <div class="note">Para uma boa foto: marcador v2 colado a cerca de 1 cm da aréola, celular paralelo à pele a 20–30 cm, luz difusa e sem flash. Em mastectomia unilateral, fotografe a mama preservada.</div>
+    <div class="note" id="imgInfo"></div>
+  </div>
+</section>
+
+<section id="s2" class="off collapsed">
+  <h2><span class="n">2</span>Aréola e papila</h2>
+  <div class="bd">
+    <div class="row"><button class="primary" id="detect" type="button">Detectar automaticamente</button></div>
+    <div class="note">Confira os contornos na foto. Arraste o anel central para mover a aréola, a alça cheia para o eixo maior e o giro, e a alça vazada para o eixo menor. <b style="color:var(--areola)">Verde</b> = aréola, <b style="color:var(--papila)">azul</b> = papila. A linha tracejada mostra a margem da prótese. Roda do mouse dá zoom; arraste o fundo para mover a foto.</div>
+    <label class="ctl">Aréola: eixo maior (mm)<input type="number" id="cMaior" step="0.1" min="5" max="90"></label>
+    <label class="ctl">Aréola: eixo menor (mm)<input type="number" id="cMenor" step="0.1" min="5" max="90"></label>
+    <label class="ctl">Aréola: ângulo (°)<input type="number" id="cAng" step="1" min="0" max="179"></label>
+    <label class="ctl">Papila: diâmetro (mm)<input type="number" id="cPap" step="0.1" min="2" max="30"></label>
+    <table class="m" id="segTab"></table>
+  </div>
+</section>
+
+<section id="s3" class="off collapsed">
+  <h2><span class="n">3</span>Escala e cor</h2>
+  <div class="bd">
+    <div class="sub-h">Escala</div>
+    <label class="ctl">Lado do quadrado preto (mm)<input type="number" id="marcMM" value="20" step="0.1" min="5" max="100"></label>
+    <div class="row"><button id="marcBtn" type="button">Ajustar cantos do marcador</button></div>
+    <div class="note">A escala vem do marcador v2. Se ele não for detectado, arraste os quatro cantos <b style="color:var(--marc)">amarelos</b> sobre o quadrado preto.</div>
+    <table class="m" id="scaleTab"></table>
+    <div class="sub-h">Cor</div>
+    <div class="note" style="margin-top:0">A cor é corrigida pelo preto da tinta e pelo anel cinza do marcador.</div>
+    <div class="sw" id="sw"></div>
+    <div id="corInfo"></div>
+  </div>
+</section>
+
+<section id="s4" class="off collapsed">
+  <h2><span class="n">4</span>Fotografia lateral</h2>
+  <div class="bd">
+    <div class="drop" id="drop3" role="button" tabindex="0"><b>Arraste a foto de perfil aqui</b>opcional · fundo liso escuro, marcador no plano do perfil</div>
+    <input type="file" id="file3" accept="image/*" hidden>
+    <div class="row"><button id="demo3" type="button">Usar exemplo</button><button id="sem3" type="button">Sem foto lateral</button></div>
+    <label class="ctl">Projeção da papila (mm)<input type="number" id="cProj" value="6" step="0.1" min="0" max="20"></label>
+    <label class="ctl">Forma da papila<input type="number" id="cForma" value="4" step="0.1" min="1.2" max="10"></label>
+    <div class="note" id="latNota">Sem foto lateral, vale o valor digitado. Forma 4 = cilindro de topo arredondado; 2 = cúpula.</div>
+    <table class="m" id="latTab"></table>
+    <div id="latInfo"></div>
+  </div>
+</section>
+
+<section id="s5" class="off collapsed">
+  <h2><span class="n">5</span>Prótese</h2>
+  <div class="bd">
+    <label class="ctl">Prótese para a mama<select id="protSide"><option value="D" selected>Direita da paciente</option><option value="E">Esquerda da paciente</option></select></label>
+    <div class="note" id="mirrorNote"></div>
+    <div class="sub-h">Espessura</div>
+    <label class="ctl">Centro da aréola (mm)<input type="number" id="pCentro" step="0.05" min="0.6" max="2.5"><input type="range" id="pCentroR" min="0.6" max="2.5" step="0.05"></label>
+    <label class="ctl">Borda afinada (mm)<input type="number" id="pBorda" step="0.01" min="0.08" max="0.5"><input type="range" id="pBordaR" min="0.08" max="0.5" step="0.01"></label>
+    <label class="ctl">Margem além da aréola (mm)<input type="number" id="pMargem" step="0.5" min="0" max="6"><input type="range" id="pMargemR" min="0" max="6" step="0.5"></label>
+    <div class="note">A borda fina faz a prótese "sumir" na pele. Na literatura, espessura e textura foram os itens menos satisfatórios para as pacientes.</div>
+    <div class="sub-h">Superfície</div>
+    <label class="ctl">Microrrelevo da foto (mm)<input type="number" id="pRelevo" step="0.05" min="0" max="0.6"><input type="range" id="pRelevoR" min="0" max="0.6" step="0.05"></label>
+    <label class="chk"><input type="checkbox" id="pInv"> Inverter (escuro sobe, claro afunda)</label>
+    <label class="ctl">Curvatura da mama: raio (mm)<input type="number" id="pRaio" step="5" min="40" max="200"><input type="range" id="pRaioR" min="40" max="200" step="5"></label>
+    <div class="note">O verso da prótese acompanha uma calota esférica com este raio. Mamas mais planas pedem raios maiores.</div>
+    <div class="sub-h">Textura da papila</div>
+    <label class="chk"><input type="checkbox" id="txOn" checked> Textura anatômica (a papila não é lisa)</label>
+    <div id="txBox">
+      <label class="ctl">Intensidade<input type="number" id="txInt" step="0.1" min="0" max="2"><input type="range" id="txIntR" min="0" max="2" step="0.1"></label>
+      <label class="ctl">Lóbulos do topo (mm)<input type="number" id="txLob" step="0.1" min="0.6" max="2.5"><input type="range" id="txLobR" min="0.6" max="2.5" step="0.1"></label>
+      <label class="ctl">Profundidade dos sulcos (mm)<input type="number" id="txSul" step="0.01" min="0" max="0.3"><input type="range" id="txSulR" min="0" max="0.3" step="0.01"></label>
+      <label class="ctl">Óstios dos ductos (nº)<input type="number" id="txOst" step="1" min="0" max="18"><input type="range" id="txOstR" min="0" max="18" step="1"></label>
+      <label class="ctl">Rugas da parede (mm)<input type="number" id="txRug" step="0.01" min="0" max="0.15"><input type="range" id="txRugR" min="0" max="0.15" step="0.01"></label>
+      <label class="ctl">Sulco na base (mm)<input type="number" id="txBas" step="0.01" min="0" max="0.4"><input type="range" id="txBasR" min="0" max="0.4" step="0.01"></label>
+      <div class="row"><button id="txVar" type="button">Outra variação</button><button id="txZoom" type="button">Ver papila de perto</button></div>
+      <div class="note">Baseado na anatomia descrita na literatura: topo "em paralelepípedo", cruzado por sulcos rasos, com 5 a 12 óstios no fundo dos sulcos; sulco papilar raso na base; rugas circulares na parede pela musculatura de Sappey (Petrović et al., 2022). O número de óstios varia de 4 a 18 (Ramsay et al., 2005). Para reproduzir os óstios, exporte em resolução alta (0,10 mm).</div>
+    </div>
+  </div>
+</section>
+
+<section id="s6" class="off collapsed">
+  <h2><span class="n">6</span>Exportar</h2>
+  <div class="bd">
+    <label class="ctl">Resolução da malha<select id="res"><option value="0.1" selected>Alta (0,10 mm)</option><option value="0.15">Normal (0,15 mm)</option><option value="0.2">Rápida (0,20 mm)</option></select></label>
+    <label class="ctl">Código nos arquivos<input type="text" id="caso" placeholder="da ficha"></label>
+    <div class="note">Vazio = prontuário da ficha ou iniciais. Os nomes dos arquivos nunca levam o nome completo.</div>
+    <div class="row"><button class="primary" id="exp" type="button">Baixar pacote (.zip)</button><button id="expPdf" type="button">Relatório (PDF)</button></div>
+    <div class="note">O pacote traz <b>molde_frontal.stl</b> (cavidade com o relevo), <b>contramolde.stl</b> (pinos de registro e canal de transbordo), <b>protese_referencia.stl</b>, o relatório em PDF e JSON e os contornos editáveis.</div>
+    <div id="expInfo"></div>
+  </div>
+</section>
+
+<div class="grp">Ferramentas do laboratório</div>
+<section id="sMarc" class="collapsed">
+  <h2><span class="n ext">M</span>Marcador v2 para imprimir</h2>
+  <div class="bd">
+    <div class="marc" id="marcVista"></div>
+    <div class="row"><button class="primary" id="marcDl" type="button">Baixar marcador (.svg)</button></div>
+    <div class="note">Imprima em 100%, sem "ajustar à página", e confira com régua: o quadrado preto mede 20,0 mm. Recorte e cole na pele a cerca de 1 cm da aréola. Para a foto lateral, use fundo liso escuro e o marcador no mesmo plano do perfil.</div>
+  </div>
+</section>
+<section id="sCorpo" class="collapsed">
+  <h2><span class="n ext">C</span>Corpo de prova dos moldes</h2>
+  <div class="bd">
+    <div class="note" style="margin-top:0">Disco de Ø45 mm para comparar moldes em FDM e em resina. Bossas de 0,1 a 0,5 mm, ranhuras de 0,1 a 0,5 mm, borda de 0,10 / 0,15 / 0,20 / 0,30 mm por quadrante e papila de Ø12 × 6 mm.</div>
+    <canvas id="cvCorpo" aria-label="Mapa do corpo de prova"></canvas>
+    <div class="row"><button class="primary" id="corpoDl" type="button">Baixar moldes (.zip)</button></div>
+  </div>
+</section>
+
+<div class="credit"><img src="assets/logo-labeita.png" alt="Lab.EITA"><div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Protótipo de pesquisa. As fotos são processadas neste navegador e não são enviadas a servidor. Não substitui a avaliação de profissional habilitado.</div></div>
+</aside>
+
+<main id="view">
+  <canvas id="pc" aria-label="Foto frontal com contornos"></canvas>
+  <canvas id="lc" aria-label="Perfil lateral" hidden></canvas>
+  <canvas id="gl" aria-label="Visualização 3D" hidden></canvas>
+  <div id="empty"><div><b>Carregue a foto frontal da aréola</b>A aréola e a papila serão medidas e transformadas em prótese e molde 3D.</div></div>
+  <div id="tabs"><button data-t="photo" class="cur" type="button">Foto</button><button data-t="lat" type="button">Lateral</button><button data-t="3d" type="button">3D</button></div>
+  <div class="tools" id="toolsFoto" hidden><button id="fitAr" class="cur" type="button">Aréola</button><button id="fitAll" type="button">Foto inteira</button></div>
+  <div class="tools" id="tools3d" hidden>
+    <button data-m="prot" class="cur" type="button">Prótese</button><button data-m="molde" type="button">Molde aberto</button><button data-m="corte" type="button">Corte</button>
+    <span class="vs"></span>
+    <button data-v="front" type="button">Frente</button><button data-v="three" type="button">3/4</button><button data-v="side" type="button">Lado</button><button data-v="pap" type="button">Papila</button>
+    <label><input type="checkbox" id="vC" checked>Cor</label><label><input type="checkbox" id="vPele" checked>Pele</label>
+  </div>
+  <div id="legend" hidden></div>
+  <div id="status">Comece carregando a fotografia frontal (etapa 1).</div>
+  <div id="busy"><div id="busyT">Processando…</div></div>
+</main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

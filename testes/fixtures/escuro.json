@@ -1,0 +1,25 @@
+{
+ "px_por_mm": 10.0,
+ "areola_eixo_maior_mm": 45,
+ "areola_eixo_menor_mm": 40,
+ "angulo_graus": 135,
+ "papila_diam_mm": 13,
+ "cor_areola_bgr": [
+  40,
+  52,
+  78
+ ],
+ "cor_papila_bgr": [
+  33,
+  42,
+  65
+ ],
+ "cor_pele_bgr": [
+  70,
+  95,
+  130
+ ],
+ "_largura": 1200,
+ "_altura": 900,
+ "_origem": "fantoma sintético escuro (v0.2), reduzido 2x"
+}

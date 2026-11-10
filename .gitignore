@@ -1,0 +1,7 @@
+dist/
+node_modules/
+*.log
+.DS_Store
+# dados de pacientes nunca entram no repositório
+fichas/
+base_EITA_*.json

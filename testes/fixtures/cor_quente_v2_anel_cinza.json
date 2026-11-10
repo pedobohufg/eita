@@ -1,0 +1,25 @@
+{
+ "px_por_mm": 10.0,
+ "areola_eixo_maior_mm": 42,
+ "areola_eixo_menor_mm": 38,
+ "angulo_graus": 20,
+ "papila_diam_mm": 12,
+ "cor_areola_bgr": [
+  95,
+  115,
+  165
+ ],
+ "cor_papila_bgr": [
+  80,
+  95,
+  150
+ ],
+ "cor_pele_bgr": [
+  150,
+  175,
+  215
+ ],
+ "_largura": 1200,
+ "_altura": 900,
+ "_origem": "fantoma sintético cor_quente_v2_anel_cinza (v0.2), reduzido 2x"
+}
