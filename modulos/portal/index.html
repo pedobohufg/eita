@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<!--
+  Plataforma EITA
+  © 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás (Lab.EITA/UFG).
+  Autor: Pedro Henrique Gonçalves.
+  Todos os direitos reservados. É proibido copiar, modificar, redistribuir ou usar este código, no todo ou em parte,
+  sem autorização por escrito do Lab.EITA/UFG.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Plataforma EITA — pacientes e próteses do Lab.EITA/UFG: EITA! AFO, EITA! OLHO e EITA! MAMILO.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<title>Plataforma EITA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F2F9;--surface:#FFFFFF;--surface-2:#ECE8F6;--ink:#1C1730;--muted:#5B5573;--line:#E1DCEC;--line-strong:#A79FBF;--accent:#6B3FD6;--accent-2:#8656F5;--brand:#9560FD;--accent-soft:#EFE8FF;--ufg:#0075BE;--warn:#B04E0C;--ok:#25774F;--areola:#1fae63;--papila:#2f6fdb;--marc:#d99a00;--f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--r:10px;--shadow:0 1px 2px rgba(40,22,90,.06),0 4px 16px rgba(60,30,130,.07)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{margin:0;height:100%;font-family:var(--f-body);color:var(--ink);background:var(--bg);font-size:14px}
+#app{display:grid;grid-template-rows:64px 1fr;grid-template-columns:384px 1fr;grid-template-areas:"top top" "panel view";height:100vh}
+#top{grid-area:top;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;min-width:0}
+#top:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent) 45%,transparent 100%)}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.logo img{height:44px;width:auto;display:block}
+.ttl h1{font:800 23px/1 var(--f-body);margin:0;letter-spacing:-.02em}.ttl h1 em{font-style:normal;color:var(--brand)}
+.ttl .sub{font:600 11.5px var(--f-body);color:#2a2438;margin-top:4px}
+#stepper{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+#stepper button{display:flex;align-items:center;gap:7px;border:1px solid transparent;background:transparent;border-radius:999px;padding:6px 11px 6px 6px;font:500 12.5px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+#stepper button .n{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font:600 11px var(--f-mono);color:var(--muted);background:var(--surface)}
+#stepper button.done .n{background:var(--accent);border-color:var(--accent);color:#fff}
+#stepper button.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.vsep{width:1px;height:34px;background:var(--line)}
+.logo.sec img{height:34px}
+#panel{grid-area:panel;background:var(--bg);border-right:1px solid var(--line);overflow-y:auto;padding:14px 14px 28px;display:flex;flex-direction:column;gap:10px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+section>h2{margin:0;display:flex;align-items:center;gap:10px;padding:12px 14px;font:600 13.5px var(--f-body);cursor:pointer;user-select:none}
+section>h2 .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 11.5px var(--f-mono);flex:none}
+section>h2 .n.ext{background:var(--surface-2);color:var(--accent)}
+section>h2:after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--line-strong);border-bottom:2px solid var(--line-strong);transform:rotate(45deg);transition:transform .2s}
+section.collapsed>h2:after{transform:rotate(-45deg)}
+section .bd{padding:0 14px 14px}section.collapsed .bd{display:none}
+section.off{opacity:.5}section.off .bd{pointer-events:none}section.off>h2 .n{background:var(--line-strong)}
+.grp{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:8px 4px 0}
+button{font:500 13px var(--f-body);border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 13px;cursor:pointer;color:var(--ink)}
+button:hover{background:var(--surface-2)}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.primary:hover{background:var(--accent-2)}
+button:disabled{opacity:.5;cursor:default}button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--r);padding:20px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--bg)}
+.drop:hover,.drop.hover{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}.drop b{display:block;font-size:14px;color:var(--ink);margin-bottom:4px}
+label.ctl{display:grid;grid-template-columns:1fr 78px;gap:4px 8px;align-items:center;font-size:13px;margin:10px 0 2px}
+label.ctl:has(select){grid-template-columns:1fr 150px}
+label.ctl:has(input[type=text]){grid-template-columns:1fr 150px}
+label.ctl input[type=number]{width:78px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);text-align:right;background:var(--bg);color:var(--ink)}
+label.ctl input[type=text]{width:150px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);background:var(--bg);color:var(--ink)}
+label.ctl select{width:150px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
+label.ctl input[type=range]{grid-column:1/-1;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
+.chk{font-size:13px;display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}.chk input{accent-color:var(--accent);width:15px;height:15px}
+.sub-h{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 4px}
+table.m{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}table.m td{padding:5px 2px;border-bottom:1px solid var(--surface-2)}
+table.m td:last-child{text-align:right;font:500 13px var(--f-mono)}
+.warnbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fbebdd;color:var(--warn);font-size:12px;line-height:1.45}
+.okbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#e1f1e8;color:var(--ok);font-size:12px;line-height:1.45}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;flex:1;padding:7px 8px;font-size:12.5px}.seg button+button{border-left:1px solid var(--line-strong)}
+.sw{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sw div{font:500 11.5px var(--f-mono);color:var(--muted)}.sw i{display:block;height:30px;border-radius:7px;border:1px solid var(--line);margin-bottom:4px}
+.marc{display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:6px}.marc svg{width:150px;height:auto;background:#fff}
+#cvCorpo{width:100%;aspect-ratio:1;display:block;border-radius:8px;border:1px solid var(--line);margin-top:6px}
+.credit{margin-top:auto;padding:16px 4px 0;font-size:11.5px;color:var(--muted);line-height:1.5;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
+.credit img{height:58px;width:auto;flex:none}.credit b{color:var(--ink)}
+#view{grid-area:view;position:relative;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#FBFAFE 0%,var(--bg) 70%)}
+#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#pc{cursor:grab}#pc.alca{cursor:pointer}
+#tabs{position:absolute;top:14px;left:14px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2}
+#tabs button{padding:6px 12px;font:500 12.5px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}
+#tabs button.cur{background:var(--accent-soft);color:var(--accent)}
+#tabs button:disabled{opacity:.4}
+.tools{position:absolute;top:14px;right:14px;display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2;flex-wrap:wrap;align-items:center}
+.tools button{padding:6px 10px;font:500 12px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}.tools button:hover{background:var(--accent-soft);color:var(--ink)}
+.tools button.cur{background:var(--accent-soft);color:var(--accent)}
+.tools .vs{width:1px;height:20px;background:var(--line);margin:0 3px}
+.tools label{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;padding:0 6px}.tools input{accent-color:var(--accent)}
+#legend{position:absolute;right:14px;bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px 11px;font:500 12px var(--f-mono);z-index:2;line-height:1.6}
+#legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+#status{position:absolute;bottom:14px;left:14px;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 30px;max-width:min(640px,calc(100% - 28px));box-shadow:var(--shadow);line-height:1.45;z-index:2}
+#status:before{content:"";position:absolute;left:12px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+#status.warn:before{background:var(--warn)}
+#empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;pointer-events:none}
+#empty b{display:block;font-size:18px;color:var(--ink);margin-bottom:6px}
+#busy{position:absolute;inset:0;display:none;place-items:center;background:#f4f2f98c;z-index:3}
+#busy>div{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;box-shadow:var(--shadow);font-weight:600}
+#busy>div:before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);animation:sp .8s linear infinite}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}.pgrid .w2{grid-column:1/-1}
+.pf{display:flex;flex-direction:column;font:500 11.5px var(--f-body);color:var(--muted);gap:3px;min-width:0}
+.pf input,.pf select,.pf textarea{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:13px var(--f-body);color:var(--ink);background:var(--bg);box-sizing:border-box}.pf textarea{resize:vertical}
+section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+.pname{font:500 11px var(--f-mono);color:var(--accent);margin-left:6px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.frow>div{flex:1;min-width:0}
+.frow small{display:block;color:var(--muted);font:11px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.frow button{padding:4px 9px;font-size:12px}.frow button.del{color:var(--warn)}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:auto 50vh 1fr;grid-template-areas:"top" "view" "panel";height:auto;min-height:100%}#stepper{display:none}#top{padding:10px 14px}}
+
+/* ---- portal */
+#app{grid-template-columns:360px 1fr}
+#top .grow{margin-left:auto}
+.busca{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;font:inherit;background:var(--bg);color:var(--ink);margin:4px 0 6px}
+.lista{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.pac{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid transparent;background:transparent;border-radius:8px;padding:8px 9px}
+.pac:hover{background:var(--surface-2)}.pac.cur{border-color:var(--accent);background:var(--accent-soft)}
+.pac .ini{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--surface-2);color:var(--accent);font:600 12px var(--f-mono);flex:none}
+.pac .tx{min-width:0;flex:1}.pac b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pac small{display:block;color:var(--muted);font:500 11.5px var(--f-mono);margin-top:2px}
+.pac .mods{display:flex;gap:2px;flex:none}.pac .mods img{width:18px;height:18px}
+.conta{font:500 11.5px var(--f-mono);color:var(--muted);margin-left:auto}
+#detalhe{position:absolute;inset:0;overflow-y:auto;padding:28px 32px 90px}
+.cartao{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin:0 auto 16px;max-width:940px}
+.cartao h3{margin:0 0 12px;font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+.cab{display:flex;align-items:center;gap:16px}
+.cab .ini{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;background:var(--accent);color:#fff;font:600 19px var(--f-mono);flex:none}
+.cab h2{margin:0;font:700 24px/1.15 var(--f-body);letter-spacing:-.01em}.cab .meta{color:var(--muted);font:500 12.5px var(--f-mono);margin-top:5px}
+.campos{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 14px}
+.campos label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.campos .w2{grid-column:span 2}.campos .w4{grid-column:1/-1}
+.campos input,.campos select,.campos textarea{padding:7px 9px;border:1px solid var(--line-strong);border-radius:7px;font:500 13.5px var(--f-body);background:var(--bg);color:var(--ink)}
+.campos textarea{resize:vertical;min-height:54px}
+.prots{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:10px}
+.prot{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--bg)}
+.prot img{width:40px;height:40px;flex:none}.prot .tx{flex:1;min-width:0}
+.prot b{display:block}.prot small{display:block;color:var(--muted);font:500 11.5px var(--f-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.novos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.novos button{display:flex;align-items:center;gap:8px}.novos img{width:22px;height:22px}
+.mods3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mod{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border:1px solid var(--line);border-radius:12px;padding:18px 12px;background:var(--bg)}
+.mod img{width:58px;height:58px}.mod b{font-size:15px}.mod small{color:var(--muted);font-size:12px;line-height:1.4;min-height:34px}
+.boas h2{margin:0 0 6px;font:700 22px var(--f-body)}.boas p{margin:0 0 6px;color:var(--muted);line-height:1.5}
+.perigo{color:var(--warn);border-color:#e3b38f}.perigo.armado{background:var(--warn);color:#fff;border-color:var(--warn)}
+.vazio{color:var(--muted);font-size:13px;padding:6px 0}
+a.ext{display:inline-flex;align-items:center;gap:8px;font:500 13px var(--f-body);border:1px dashed var(--line-strong);border-radius:8px;padding:8px 13px;color:var(--accent);text-decoration:none;background:var(--surface)}a.ext:hover{background:var(--accent-soft)}a.ext img{width:22px;height:22px}
+@media (max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:64px auto 1fr;grid-template-areas:"top" "panel" "view";height:auto;min-height:100vh}#view{min-height:70vh}.campos{grid-template-columns:1fr 1fr}.mods3{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+<header id="top">
+  <div class="brand">
+    <span class="logo"><img src="assets/logo-labeita-simbolo.png" alt="Lab.EITA"></span>
+    <div class="ttl"><h1>Plataforma <em>EITA</em></h1><div class="sub">Pacientes e próteses do Lab.EITA · AFO · OLHO · MAMILO · protótipo v0.3</div></div>
+  </div>
+  <span class="grow"></span>
+  <span class="vsep"></span>
+  <span class="logo sec" title="Universidade Federal de Goiás"><img src="assets/logo-ufg.png" alt="UFG"></span>
+</header>
+<aside id="panel">
+  <section id="sPac">
+    <h2><span class="n ext">P</span>Pacientes<span class="conta" id="conta"></span></h2>
+    <div class="bd">
+      <input class="busca" id="busca" type="search" placeholder="Buscar por nome ou prontuário" autocomplete="off">
+      <div class="row" style="margin:2px 0 8px"><button class="primary" id="novo" type="button">Novo paciente</button></div>
+      <div class="lista" id="lista"></div>
+    </div>
+  </section>
+  <section id="sBase" class="collapsed">
+    <h2><span class="n ext">B</span>Base do laboratório</h2>
+    <div class="bd">
+      <div class="note">As fichas ficam <b>só neste navegador</b>. Para levar a outro computador, ou para ter uma cópia de segurança, exporte a base e guarde o arquivo num lugar seguro: ele tem dados de pacientes.</div>
+      <div class="row"><button class="primary" id="exp" type="button">Exportar base</button><button id="impB" type="button">Importar arquivos</button></div>
+      <input type="file" id="imp" accept=".json,application/json" multiple hidden>
+      <div class="drop" id="drop" tabindex="0" role="button"><b>Solte aqui bases ou fichas</b>Base única da plataforma, bases e fichas antigas do EITA! AFO, OLHO e MAMILO.</div>
+      <div id="impInfo"></div>
+    </div>
+  </section>
+  <div class="credit">
+    <img src="assets/logo-labeita.png" alt="Lab.EITA">
+    <div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Protótipo de pesquisa: não substitui a avaliação da equipe de saúde.<br>© 2026 Lab.EITA/UFG · Autor: Pedro Henrique Gonçalves</div>
+  </div>
+</aside>
+<main id="view">
+  <div id="detalhe"></div>
+  <div id="status">Escolha um paciente na lista, ou crie um novo.</div>
+  <div id="busy"><div id="busyT">Processando…</div></div>
+</main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

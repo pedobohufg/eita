@@ -2,7 +2,7 @@
 
 Sistema integrado do **Lab.EITA — Laboratório de Estudos Inventivos em Tecnologias Assistivas (UFG)** para projetar próteses e órteses a partir de fotografias e escaneamentos: órtese AFO, prótese ocular, prótese de aréola e papila e, em seguida, nariz, orelha e face.
 
-Todos os módulos compartilham um **núcleo comum** (imagem, calibração, malhas, saída de arquivos) e, a partir da etapa E3, uma **ficha única do paciente**. Os dados dos pacientes ficam só no navegador de quem usa o app; nada vai para servidores.
+Todos os módulos compartilham um **núcleo comum** (imagem, calibração, malhas, saída de arquivos) e uma **ficha única do paciente**: a plataforma é um só app, com o portal de pacientes na entrada e cada módulo numa subpasta. Os dados dos pacientes ficam só no navegador de quem usa o app; nada vai para servidores.
 
 ## Estrutura
 
@@ -21,6 +21,7 @@ nucleo/                 processamento comum (ES modules, sem dependências)
 modulos/
   mamilo/               EITA! MAMILO (processamento, interface, página e imagens)
   olho/                 EITA! OLHO (idem)
+  portal/               portal de pacientes (ficha única) e ponte.js para as páginas dos módulos
 ferramentas/montar.mjs  gera dist/<modulo>/ (app.js único, pronto para publicar)
 testes/                 testes automáticos (npm test) e fixtures sintéticas
 legado/                 apps publicados antes da plataforma (referência para a migração)
@@ -33,9 +34,11 @@ Requer Node.js 20 ou mais novo. Não há dependências para instalar.
 
 ```bash
 npm test                 # testes do núcleo e dos módulos
-npm run montar           # gera dist/mamilo/ e dist/olho/ (abrir o index.html por um servidor local)
+npm run montar           # gera dist/mamilo/, dist/olho/ e dist/plataforma/ (abrir o index.html por um servidor local)
+node ferramentas/montar.mjs plataforma-sem-legado   # plataforma para publicar (sem o AFO legado)
 python3 testes/navegador/teste_mamilo.py   # opcional: teste no navegador (Playwright + Chrome)
 python3 testes/navegador/teste_olho.py     # idem, OLHO
+python3 testes/navegador/teste_plataforma.py   # portal de pacientes de ponta a ponta
 python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens (MAMILO)
 python3 testes/navegador/comparar_olho.py ANTES/ dist/olho/       # idem, OLHO (ANTES pode ser legado/olho + assets)
 ```

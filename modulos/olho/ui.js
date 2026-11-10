@@ -424,7 +424,7 @@ const PREV = { nenhuma: "nenhuma (primeira prótese)", conformador: "conformador
 const FICHAS = E.criarArmazemFichas({ chave: "eitaOLHO.fichas.v1", formatoFicha: "EITA! OLHO ficha", formatoBase: "EITA! OLHO base", rotulo: "EITA! OLHO",
   nomeBase: (d) => `eita-olho_base_${d.toISOString().slice(0, 10)}.json` });
 const esc = E.escaparHTML, ageText = (d) => E.idadeTexto(d, new Date(), { meses: true });
-let pendingFicha = null;
+let pendingFicha = null, delPend = null;
 
 function readPatient() { const o = {}; PAT_IDS.forEach((id) => { o[id] = $(id).value.trim(); }); return o; }
 function writePatient(p) {
@@ -499,12 +499,13 @@ function autoUpdateFicha() { // ao exportar, atualiza a ficha se ela já existe
 function renderFichas() {
   const box = $("fList"), l = FICHAS.listar(), cur = S.patient && S.patient.id;
   if (!l.length) { box.innerHTML = '<div class="note">Nenhuma ficha salva neste navegador.</div>'; return; }
-  box.innerHTML = l.map((f, i) => `<div class="frow${f.id === cur ? " cur" : ""}">${f.miniatura ? `<img src="${f.miniatura}" alt="">` : '<img alt="">'}<div><b>${esc(f.nome || "(sem nome)")}</b><small>${f.olho === "E" ? "OE" : "OD"} · ${new Date(f.atualizado).toLocaleDateString("pt-BR")}${f.foto && f.foto.nome ? " · " + esc(f.foto.nome) : ""}</small></div><button type="button" data-open="${i}">Abrir</button><button type="button" data-del="${i}" title="Excluir">×</button></div>`).join("");
+  box.innerHTML = l.map((f, i) => `<div class="frow${f.id === cur ? " cur" : ""}">${f.miniatura ? `<img src="${f.miniatura}" alt="">` : '<img alt="">'}<div><b>${esc(f.nome || "(sem nome)")}</b><small>${f.olho === "E" ? "OE" : "OD"} · ${new Date(f.atualizado).toLocaleDateString("pt-BR")}${f.foto && f.foto.nome ? " · " + esc(f.foto.nome) : ""}</small></div><button type="button" data-open="${i}">Abrir</button><button type="button" data-del="${i}" title="Excluir">${delPend === f.id ? "Confirmar" : "×"}</button></div>`).join("");
   box.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openFicha(FICHAS.listar()[+b.dataset.open]));
   box.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => {
+    // confirmação em dois cliques: dentro do claude.ai a página não pode abrir caixas de diálogo (confirm)
     const f = FICHAS.listar()[+b.dataset.del];
-    if (!confirm(`Excluir a ficha "${f.nome || ""}" deste navegador?`)) return;
-    FICHAS.excluir(+b.dataset.del); renderFichas();
+    if (delPend !== f.id) { delPend = f.id; renderFichas(); status(`Clique em "Confirmar" para excluir a ficha "${esc(f.nome || "")}" deste navegador.`); setTimeout(() => { if (delPend === f.id) { delPend = null; renderFichas(); } }, 5000); return; }
+    FICHAS.excluir(+b.dataset.del); delPend = null; renderFichas(); status("Ficha excluída deste navegador.");
   });
 }
 function openFicha(f) {
