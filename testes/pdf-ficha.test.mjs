@@ -85,7 +85,7 @@ test("ficha: salvar, substituir, excluir, exportar e importar base", () => {
   const base = JSON.parse(b.conteudo); assert.equal(base.formato, "EITA! TESTE base"); assert.equal(base.fichas.length, 2);
   const B = armazemDeTeste(); B.salvar(f("a", 5, "A mais nova")); B.salvar(f("c", 4, "C"));
   const r = B.importarBase({ formato: "EITA! TESTE base", fichas: [...base.fichas, { formato: "outro", id: "z" }, null] });
-  assert.deepEqual(r, { novas: 1, atualizadas: 0 });
+  assert.deepEqual(r, { novas: 1, atualizadas: 0, gravou: true });
   assert.deepEqual(B.listar().map((x) => x.nome), ["A mais nova", "C", "B"]);
   assert.throws(() => B.importarBase({ formato: "EITA! AFO base" }), /não é uma base do EITA! TESTE/);
   B.excluir(1); assert.deepEqual(B.listar().map((x) => x.id), ["a", "b"]);

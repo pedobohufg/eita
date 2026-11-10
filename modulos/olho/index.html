@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<!--
+  EITA! OLHO
+  © 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás (Lab.EITA/UFG).
+  Autor: Pedro Henrique Gonçalves.
+  Todos os direitos reservados. É proibido copiar, modificar, redistribuir ou usar este código, no todo ou em parte,
+  sem autorização por escrito do Lab.EITA/UFG.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="EITA! OLHO — ferramenta do Lab.EITA/UFG para gerar a íris e a prótese ocular a partir da fotografia do olho contralateral.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<title>EITA! OLHO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F2F9;--surface:#FFFFFF;--surface-2:#ECE8F6;--ink:#1C1730;--muted:#5B5573;--line:#E1DCEC;--line-strong:#A79FBF;--accent:#6B3FD6;--accent-2:#8656F5;--brand:#9560FD;--accent-soft:#EFE8FF;--ufg:#0075BE;--warn:#B04E0C;--ok:#25774F;--iris:#2f6fdb;--pup:#e2483d;--f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--r:10px;--shadow:0 1px 2px rgba(40,22,90,.06),0 4px 16px rgba(60,30,130,.07)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{margin:0;height:100%;font-family:var(--f-body);color:var(--ink);background:var(--bg);font-size:14px}
+#app{display:grid;grid-template-rows:64px 1fr;grid-template-columns:384px 1fr;grid-template-areas:"top top" "panel view";height:100vh}
+#top{grid-area:top;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;min-width:0}
+#top:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent) 45%,transparent 100%)}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.logo img{height:44px;width:auto;display:block}
+.ttl h1{font:800 23px/1 var(--f-body);margin:0;letter-spacing:-.02em}.ttl h1 em{font-style:normal;color:var(--brand)}
+.ttl .sub{font:600 11.5px var(--f-body);color:#2a2438;margin-top:4px}
+#stepper{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+#stepper button{display:flex;align-items:center;gap:7px;border:1px solid transparent;background:transparent;border-radius:999px;padding:6px 11px 6px 6px;font:500 12.5px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+#stepper button .n{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font:600 11px var(--f-mono);color:var(--muted);background:var(--surface)}
+#stepper button.done .n{background:var(--accent);border-color:var(--accent);color:#fff}
+#stepper button.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.vsep{width:1px;height:34px;background:var(--line)}
+.logo.sec img{height:34px}
+#panel{grid-area:panel;background:var(--bg);border-right:1px solid var(--line);overflow-y:auto;padding:14px 14px 28px;display:flex;flex-direction:column;gap:10px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+section>h2{margin:0;display:flex;align-items:center;gap:10px;padding:12px 14px;font:600 13.5px var(--f-body);cursor:pointer;user-select:none}
+section>h2 .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 11.5px var(--f-mono);flex:none}
+section>h2:after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--line-strong);border-bottom:2px solid var(--line-strong);transform:rotate(45deg);transition:transform .2s}
+section.collapsed>h2:after{transform:rotate(-45deg)}
+section .bd{padding:0 14px 14px}section.collapsed .bd{display:none}
+section.off{opacity:.5}section.off .bd{pointer-events:none}section.off>h2 .n{background:var(--line-strong)}
+button{font:500 13px var(--f-body);border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 13px;cursor:pointer;color:var(--ink)}
+button:hover{background:var(--surface-2)}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.primary:hover{background:var(--accent-2)}
+button:disabled{opacity:.5;cursor:default}button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--r);padding:20px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--bg)}
+.drop:hover,.drop.hover{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}.drop b{display:block;font-size:14px;color:var(--ink);margin-bottom:4px}
+label.ctl{display:grid;grid-template-columns:1fr 78px;gap:4px 8px;align-items:center;font-size:13px;margin:10px 0 2px}
+label.ctl:has(select){grid-template-columns:1fr 150px}
+label.ctl input[type=number]{width:78px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);text-align:right;background:var(--bg);color:var(--ink)}
+label.ctl select{width:150px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
+label.ctl input[type=range]{grid-column:1/-1;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
+.chk{font-size:13px;display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}.chk input{accent-color:var(--accent);width:15px;height:15px}
+.sub-h{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 4px}
+table.m{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}table.m td{padding:5px 2px;border-bottom:1px solid var(--surface-2)}
+table.m td:last-child{text-align:right;font:500 13px var(--f-mono)}
+.warnbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fbebdd;color:var(--warn);font-size:12px;line-height:1.45}
+.okbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#e1f1e8;color:var(--ok);font-size:12px}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;flex:1;padding:7px 8px;font-size:12.5px}.seg button+button{border-left:1px solid var(--line-strong)}
+.credit{margin-top:auto;padding:16px 4px 0;font-size:11.5px;color:var(--muted);line-height:1.5;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
+.credit img{height:58px;width:auto;flex:none}.credit b{color:var(--ink)}
+#view{grid-area:view;position:relative;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#FBFAFE 0%,var(--bg) 70%)}
+#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#pc{cursor:grab}#pc.pick{cursor:crosshair}
+#tabs{position:absolute;top:14px;left:14px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2}
+#tabs button{padding:6px 12px;font:500 12.5px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}
+#tabs button.cur{background:var(--accent-soft);color:var(--accent)}
+#tools3d{position:absolute;top:14px;right:14px;display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2;flex-wrap:wrap;align-items:center}
+#tools3d button{padding:6px 10px;font:500 12px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}#tools3d button:hover{background:var(--accent-soft);color:var(--ink)}
+#tools3d label{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;padding:0 6px}#tools3d input{accent-color:var(--accent)}
+#status{position:absolute;bottom:14px;left:14px;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 30px;max-width:min(640px,calc(100% - 28px));box-shadow:var(--shadow);line-height:1.45;z-index:2}
+#status:before{content:"";position:absolute;left:12px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+#empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;pointer-events:none}
+#empty b{display:block;font-size:18px;color:var(--ink);margin-bottom:6px}
+#busy{position:absolute;inset:0;display:none;place-items:center;background:#f4f2f98c;z-index:3}
+#busy>div{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;box-shadow:var(--shadow);font-weight:600}
+#busy>div:before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media(max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:auto 50vh 1fr;grid-template-areas:"top" "view" "panel"}#stepper{display:none}}
+section.pac>h2 .n{background:var(--brand)}
+.pname{font:500 11px var(--f-mono);color:var(--accent);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}.pgrid .w2{grid-column:1/-1}
+.pf{display:flex;flex-direction:column;font:500 11.5px var(--f-body);color:var(--muted);gap:3px;min-width:0}
+.pf input,.pf select,.pf textarea{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:13px var(--f-body);color:var(--ink);background:var(--bg);box-sizing:border-box}
+.pf textarea{resize:vertical}
+.frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.frow>div{flex:1;min-width:0}.frow small{display:block;color:var(--muted);font:11px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow button{padding:4px 9px;font-size:12px}.frow img{width:30px;height:30px;border-radius:50%;flex:none;border:1px solid var(--line);background:#ece6dc}
+.frow.cur b{color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+<header id="top">
+  <div class="brand">
+    <span class="logo"><img src="assets/eita-olho-simbolo.png" alt="EITA! OLHO"></span>
+    <div class="ttl"><h1>EITA! <em>OLHO</em></h1><div class="sub">Íris e prótese ocular a partir da fotografia · protótipo v0.2</div></div>
+  </div>
+  <nav id="stepper" aria-label="Etapas"></nav>
+  <span class="vsep"></span>
+  <span class="logo sec" title="Universidade Federal de Goiás"><img src="assets/logo-ufg.png" alt="UFG"></span>
+</header>
+
+<aside id="panel">
+<section id="s0" class="pac collapsed">
+  <h2><span class="n"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.8-3.8 3.9-6 7.5-6s6.7 2.2 7.5 6"/></svg></span>Ficha do paciente<span class="pname" id="pBadge"></span></h2>
+  <div class="bd">
+    <div class="pgrid">
+      <label class="pf w2">Nome<input type="text" id="pName" placeholder="ex.: Maria S."></label>
+      <label class="pf">Prontuário / código<input type="text" id="pId" placeholder="ex.: OC-012"></label>
+      <label class="pf">Nascimento<input type="date" id="pBirth"></label>
+      <label class="pf">Sexo<select id="pSex"><option value="">—</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select></label>
+      <label class="pf">Olho da prótese<select id="pEye"><option value="D">Direito</option><option value="E">Esquerdo</option></select></label>
+      <label class="pf">Cavidade<select id="pSurg"><option value="">—</option><option value="enucleacao">Enucleação</option><option value="evisceracao">Evisceração</option><option value="exenteracao">Exenteração</option><option value="congenita">Anoftalmia / microftalmia congênita</option><option value="phthisis">Olho atrófico (phthisis bulbi)</option><option value="outra">Outra</option></select></label>
+      <label class="pf">Data da cirurgia<input type="date" id="pSurgDate"></label>
+      <label class="pf w2">Causa da perda / diagnóstico<input type="text" id="pDiag" placeholder="ex.: trauma, retinoblastoma, glaucoma absoluto"></label>
+      <label class="pf">Implante orbital<input type="text" id="pImpl" placeholder="ex.: esfera PMMA 18 mm"></label>
+      <label class="pf">Prótese anterior<select id="pPrev"><option value="">—</option><option value="nenhuma">Nenhuma (primeira)</option><option value="conformador">Conformador</option><option value="pre">Pré-fabricada</option><option value="medida">Sob medida (PMMA)</option><option value="outra">Outra</option></select></label>
+      <label class="pf w2">Ocularista / profissional responsável<input type="text" id="pProf" placeholder="nome e registro"></label>
+      <label class="pf w2">Observações<textarea id="pNotes" rows="2" placeholder="ex.: motilidade, secreção, queixas com a prótese atual"></textarea></label>
+    </div>
+    <div class="note" id="pAge"></div>
+    <div class="row"><button class="primary" id="fSave" type="button">Salvar ficha</button><button id="fNew" type="button">Nova</button><button id="fExp" type="button">Exportar</button><button id="fImpB" type="button">Abrir arquivo</button><input type="file" id="fImp" accept=".json" hidden></div>
+    <div class="note">A ficha guarda os dados do paciente, os círculos da íris e da pupila, a escala, o balanço de branco e todos os ajustes da prótese — não guarda a foto. Ao abrir uma ficha, carregue a mesma foto para restaurar tudo. As fichas ficam neste navegador; exporte o arquivo para levar a outro computador.</div>
+    <div class="sub-h">Fichas salvas</div><div id="fList"></div>
+    <div class="sub-h">Base do laboratório</div>
+    <div class="row"><button id="dbExp" type="button">Exportar base</button><button id="dbImpB" type="button">Importar base</button><input type="file" id="dbImp" accept=".json" hidden></div>
+    <div class="note">Um único arquivo com todas as fichas deste navegador. Guarde-o na pasta compartilhada do laboratório (com acesso restrito à equipe, por conter dados de pacientes) e importe nos outros computadores: as fichas são mescladas e a versão mais recente de cada uma prevalece.</div>
+  </div>
+</section>
+<section id="s1">
+  <h2><span class="n">1</span>Fotografia do olho</h2>
+  <div class="bd">
+    <div class="drop" id="drop"><b>Arraste a foto do olho saudável aqui</b>ou clique para escolher · JPG ou PNG</div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <div class="row"><button id="demo" type="button">Usar foto de exemplo (sintética)</button></div>
+    <label class="ctl">Olho fotografado<select id="photoSide"><option value="D">Direito do paciente</option><option value="E" selected>Esquerdo do paciente</option></select></label>
+    <div class="note">Para uma boa foto: olho bem aberto e olhando para a lente, câmera paralela ao rosto, luz difusa e sem flash direto. Se possível, coloque uma régua milimetrada ou um cartão de cor junto ao olho, no mesmo plano.</div>
+    <div class="note" id="imgInfo"></div>
+  </div>
+</section>
+
+<section id="s2" class="off collapsed">
+  <h2><span class="n">2</span>Íris e pupila</h2>
+  <div class="bd">
+    <div class="row"><button class="primary" id="detect" type="button">Detectar automaticamente</button></div>
+    <div class="note">Confira os dois círculos na foto. Arraste o centro (+) para mover e a borda para mudar o raio: <b style="color:var(--iris)">azul</b> = íris (limbo), <b style="color:var(--pup)">vermelho</b> = pupila. Duplo clique na foto detecta a partir daquele ponto. Roda do mouse dá zoom; arraste o fundo para mover a foto.</div>
+    <label class="chk"><input type="checkbox" id="concentric"> Manter pupila no centro da íris</label>
+    <table class="m" id="circTab"></table>
+  </div>
+</section>
+
+<section id="s3" class="off collapsed">
+  <h2><span class="n">3</span>Escala e cor</h2>
+  <div class="bd">
+    <div class="sub-h">Escala</div>
+    <div class="seg" id="scaleMode"><button data-v="hvid" class="on" type="button">Diâmetro da íris</button><button data-v="ruler" type="button">Régua na foto</button></div>
+    <div id="hvidBox">
+      <label class="ctl">Diâmetro horizontal da íris (mm)<input type="number" id="hvid" value="11.7" step="0.1" min="9" max="14"></label>
+      <div class="note">Sem régua na foto, a escala vem do diâmetro da íris. A média em adultos é cerca de 11,7 mm; meça com paquímetro ou régua no paciente se puder.</div>
+    </div>
+    <div id="rulerBox" hidden>
+      <div class="row"><button id="rulerBtn" type="button">Marcar 2 pontos na régua</button></div>
+      <label class="ctl">Distância entre os pontos (mm)<input type="number" id="rulerMM" value="10" step="0.5" min="1" max="100"></label>
+      <div class="note">A régua precisa estar no mesmo plano do olho.</div>
+    </div>
+    <table class="m" id="scaleTab"></table>
+    <div class="sub-h">Balanço de branco</div>
+    <div class="row"><button id="wbBtn" type="button">Clicar numa área branca ou cinza</button><button id="wbReset" type="button">Zerar</button></div>
+    <div class="note" id="wbInfo">Clique no cartão cinza/branco ou numa região da esclera sem vasos para corrigir a cor da luz.</div>
+  </div>
+</section>
+
+<section id="s4" class="off collapsed">
+  <h2><span class="n">4</span>Limpeza da íris</h2>
+  <div class="bd">
+    <label class="chk"><input type="checkbox" id="specOn" checked> Remover reflexos de luz</label>
+    <label class="ctl">Limiar do reflexo<input type="number" id="specThr" value="0.72" step="0.01" min="0.4" max="1"><input type="range" id="specThrR" min="0.4" max="1" step="0.01" value="0.72"></label>
+    <div class="note">Pontos mais claros que o limiar (na escala de 0 a 1) são preenchidos com a íris vizinha.</div>
+    <div class="sub-h">Pálpebras e cílios</div>
+    <label class="chk"><input type="checkbox" id="upOn"> Substituir setor superior (copia a parte de baixo)</label>
+    <label class="ctl">Setor superior: início / fim (°)<span style="display:flex;gap:4px"><input type="number" id="upA" value="45" step="5" min="0" max="180" style="width:37px;padding:5px 3px"><input type="number" id="upB" value="135" step="5" min="0" max="180" style="width:37px;padding:5px 3px"></span></label>
+    <label class="chk"><input type="checkbox" id="loOn"> Substituir setor inferior (copia a parte de cima)</label>
+    <label class="ctl">Setor inferior: início / fim (°)<span style="display:flex;gap:4px"><input type="number" id="loA" value="225" step="5" min="180" max="360" style="width:37px;padding:5px 3px"><input type="number" id="loB" value="315" step="5" min="180" max="360" style="width:37px;padding:5px 3px"></span></label>
+    <div class="note">Ângulos na foto: 0° à direita, 90° em cima. Use quando a pálpebra ou os cílios cobrem parte da íris; os setores aparecem em laranja na foto.</div>
+    <div class="sub-h">Cor</div>
+    <label class="ctl">Brilho<input type="number" id="cBri" value="0" step="0.02" min="-0.3" max="0.3"><input type="range" id="cBriR" min="-0.3" max="0.3" step="0.02" value="0"></label>
+    <label class="ctl">Contraste<input type="number" id="cCon" value="1" step="0.05" min="0.5" max="1.8"><input type="range" id="cConR" min="0.5" max="1.8" step="0.05" value="1"></label>
+    <label class="ctl">Saturação<input type="number" id="cSat" value="1" step="0.05" min="0" max="2"><input type="range" id="cSatR" min="0" max="2" step="0.05" value="1"></label>
+  </div>
+</section>
+
+<section id="s5" class="off collapsed">
+  <h2><span class="n">5</span>Relevo da íris</h2>
+  <div class="bd">
+    <div class="note" style="margin-top:0">O relevo sai do claro e escuro da própria íris: fibras claras viram cristas e criptas escuras viram depressões.</div>
+    <label class="ctl">Altura base da íris (mm)<input type="number" id="hBase" value="0.30" step="0.05" min="0.05" max="1.5"></label>
+    <label class="ctl">Profundidade do relevo (mm)<input type="number" id="hDepth" value="0.15" step="0.01" min="0" max="0.6"><input type="range" id="hDepthR" min="0" max="0.6" step="0.01" value="0.15"></label>
+    <label class="ctl">Tamanho dos detalhes (mm)<input type="number" id="hDetail" value="0.50" step="0.05" min="0.15" max="2"><input type="range" id="hDetailR" min="0.15" max="2" step="0.05" value="0.5"></label>
+    <label class="ctl">Suavização (mm)<input type="number" id="hSmooth" value="0.03" step="0.01" min="0" max="0.2"></label>
+    <label class="chk"><input type="checkbox" id="hInv"> Inverter (claro afunda, escuro sobe)</label>
+    <label class="ctl">Transição esclera → íris (mm)<input type="number" id="hTrans" value="1.0" step="0.1" min="0" max="3"><input type="range" id="hTransR" min="0" max="3" step="0.1" value="1"></label>
+    <div class="note">A íris "nasce" da esclera: na borda (limbo) ela começa no nível da esclera, sem degrau, e sobe até a altura base ao longo desta faixa. Com 0 fica o degrau.</div>
+    <label class="chk"><input type="checkbox" id="hLimbus"> Anel do limbo em relevo</label>
+    <div class="sub-h">Pupila</div>
+    <label class="ctl">Formato<select id="pupMode"><option value="dome" selected>Cúpula lisa</option><option value="flat">Plana</option><option value="sunk">Rebaixada</option></select></label>
+    <label class="ctl">Altura da cúpula (mm)<input type="number" id="pupH" value="0.25" step="0.05" min="0" max="1"></label>
+  </div>
+</section>
+
+<section id="s6" class="off collapsed">
+  <h2><span class="n">6</span>Prótese</h2>
+  <div class="bd">
+    <label class="ctl">Prótese para o olho<select id="protSide"><option value="D" selected>Direito do paciente</option><option value="E">Esquerdo do paciente</option></select></label>
+    <div class="note" id="mirrorNote"></div>
+    <label class="ctl">Diâmetro da íris (mm)<input type="number" id="pIris" value="11.7" step="0.1" min="8" max="15"></label>
+    <label class="chk"><input type="checkbox" id="pIrisAuto" checked> Usar o medido na foto</label>
+    <label class="ctl">Diâmetro da pupila (mm)<input type="number" id="pPup" value="4.0" step="0.1" min="1.5" max="8"></label>
+    <label class="chk"><input type="checkbox" id="pPupAuto" checked> Usar o medido na foto</label>
+    <div class="sub-h">Casca (esclera)</div>
+    <label class="ctl">Largura (mm)<input type="number" id="sW" value="22" step="0.5" min="14" max="34"></label>
+    <label class="ctl">Altura (mm)<input type="number" id="sH" value="20" step="0.5" min="12" max="30"></label>
+    <label class="ctl">Verso<select id="sMode"><option value="shell" selected>Casca (espessura constante)</option><option value="solid">Maciça (calota esférica)</option></select></label>
+    <label class="ctl">Raio da face anterior (mm)<input type="number" id="sRF" value="16" step="0.5" min="9" max="25"></label>
+    <div id="shellBox">
+      <label class="ctl">Espessura da casca (mm)<input type="number" id="sShell" value="1.5" step="0.1" min="0.8" max="5"><input type="range" id="sShellR" min="0.8" max="5" step="0.1" value="1.5"></label>
+      <div class="note">O verso acompanha a frente, como nas próteses em casca: a espessura é a mesma em toda a peça.</div>
+    </div>
+    <div id="solidBox" hidden>
+      <label class="ctl">Espessura no centro (mm)<input type="number" id="sT" value="4.5" step="0.1" min="1.5" max="10"></label>
+      <label class="ctl">Raio da face posterior (mm)<input type="number" id="sRB" value="22" step="0.5" min="10" max="60"></label>
+    </div>
+    <label class="ctl">Encaixe da íris (mm)<input type="number" id="sIns" value="0.8" step="0.1" min="0.3" max="2"></label>
+    <label class="ctl">Íris deslocada: nasal (+) (mm)<input type="number" id="sDx" value="0" step="0.5" min="-6" max="6"></label>
+    <label class="ctl">Íris deslocada: para cima (+) (mm)<input type="number" id="sDy" value="0.5" step="0.5" min="-6" max="6"></label>
+    <div class="note">Contorno genérico em triângulo arredondado. Numa próxima etapa o verso poderá vir do molde da cavidade escaneado.</div>
+    <div id="shellWarn"></div>
+    <div class="row"><button class="primary" id="build" type="button">Gerar modelo 3D</button></div>
+  </div>
+</section>
+
+<section id="s7" class="off collapsed">
+  <h2><span class="n">7</span>Exportar</h2>
+  <div class="bd">
+    <label class="ctl">Resolução da íris<select id="res"><option value="n" selected>Normal (~0,03 mm)</option><option value="h">Alta (~0,015 mm)</option></select></label>
+    <div class="row"><button class="primary" id="exp" type="button">Baixar pacote (.zip)</button><button id="expTex" type="button">Só a textura (.png)</button><button id="expPdf" type="button">Relatório (PDF)</button></div>
+    <div class="note">O pacote traz <b>esclera.stl</b>, <b>iris.stl</b> e <b>pupila.stl</b> alinhados (para impressão multicolor ou peças pintadas), <b>protese_completa.stl</b>, a textura colorida da íris (PNG com transparência, no diâmetro real), o mapa de alturas, a íris desenrolada, os parâmetros, o <b>relatorio.pdf</b> e a <b>ficha.json</b> do paciente.</div>
+    <div id="expInfo"></div>
+  </div>
+</section>
+
+<div class="credit"><img src="assets/logo-labeita.png" alt="Lab.EITA"><div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Protótipo de pesquisa. Não substitui a avaliação e o ajuste feitos pelo ocularista.</div></div>
+</aside>
+
+<main id="view">
+  <canvas id="pc"></canvas>
+  <canvas id="ic" hidden></canvas>
+  <canvas id="gl" hidden></canvas>
+  <div id="empty"><div><b>Carregue a foto do olho saudável</b>A íris será detectada, limpa e transformada em textura e relevo 3D.</div></div>
+  <div id="tabs"><button data-t="photo" class="cur" type="button">Foto</button><button data-t="iris" type="button">Íris</button><button data-t="3d" type="button">3D</button></div>
+  <div id="tools3d" hidden>
+    <button data-v="front" type="button">Frente</button><button data-v="three" type="button">3/4</button><button data-v="side" type="button">Lado</button><button data-v="back" type="button">Verso</button>
+    <label><input type="checkbox" id="vS" checked>Esclera</label><label><input type="checkbox" id="vI" checked>Íris</label><label><input type="checkbox" id="vP" checked>Pupila</label><label><input type="checkbox" id="vC" checked>Cor</label>
+  </div>
+  <div id="status">Comece carregando a fotografia do olho saudável (etapa 1).</div>
+  <div id="busy"><div id="busyT">Processando…</div></div>
+</main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

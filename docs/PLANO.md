@@ -4,15 +4,15 @@
 
 ## 1. Inventário dos apps existentes
 
-Levantamento feito no código publicado em 10/11/2026: EITA! AFO v0.14 (~236 KB, arquivo único), EITA! OLHO v0.1 (~54 KB) e EITA! MAMILO v0.2-web (~134 KB).
+Levantamento feito no código publicado em 10/11/2026: EITA! AFO v0.14 (~236 KB, arquivo único), EITA! OLHO v0.2 (~56 KB + ~28 KB de ficha e relatório) e EITA! MAMILO v0.2-web (~134 KB). *Correção na E2: o OLHO publicado já tinha ficha, base e PDF num segundo arquivo (`ficha.js`), que tinha ficado fora do primeiro levantamento.*
 
 | Recurso | AFO | OLHO | MAMILO | Observação |
 |---|---|---|---|---|
 | Layout Lab.EITA (topo, etapas, painel de seções, status, ocupado) | ✔ | ✔ | ✔ | três cópias do mesmo CSS, com pequenas diferenças |
 | Downloads pela plataforma + zip com CRC32 | ✔ | ✔ | ✔ | três implementações; só o MAMILO comprime (deflate) |
 | STL binário | ✔ | ✔ | ✔ | |
-| Relatório PDF (gerador próprio) | ✔ | — | ✔ | o MAMILO usa uma cópia adaptada do gerador do AFO |
-| Ficha do paciente + base do laboratório | ✔ | — | ✔ | formatos diferentes ("EITA! AFO ficha" × "EITA! MAMILO ficha") |
+| Relatório PDF (gerador próprio) | ✔ | ✔ | ✔ | três cópias do mesmo gerador; o OLHO sem a troca de → ≥ ≤ |
+| Ficha do paciente + base do laboratório | ✔ | ✔ | ✔ | formatos diferentes ("EITA! AFO ficha", "EITA! OLHO ficha", "EITA! MAMILO ficha") |
 | Visualizador WebGL próprio | ✔ | ✔ | ✔ | três versões |
 | Zoom/arrasto na foto ou no modelo | ✔ | ✔ | ✔ | |
 | Escala | scan em mm | diâmetro da íris ou régua de 2 pontos | marcador ArUco v2 | candidato a um módulo único de calibração |
@@ -75,16 +75,18 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 | E0 ✔ | Decisões da seção 3; nome; projeto e repositório criados |
 | E1a ✔ | Núcleo de processamento extraído do MAMILO (`nucleo/`: base, imagem, geometria plana, calibração, malha, saída) + módulo `modulos/mamilo/` + montagem + testes (regressão byte a byte contra a v0.2) |
 | E1b ✔ | Interface comum extraída do MAMILO: `nucleo/pdf.js` (gerador + layout de relatório), `nucleo/ficha.js` (armazém de fichas e base), `nucleo/interface/` (casca, imagem no navegador, vista 3D). PDF, STL, ficha e telas 3D idênticos à E1a |
-| E2 | OLHO migrado para o núcleo (o menor), servindo de teste da migração |
+| E2 ✔ | OLHO v0.2 sobre o núcleo: `modulos/olho/` (processamento puro + interface). Núcleo ganhou gaussiano exato, escala por diâmetro/régua, balanço de branco por clique, sólidos de revolução, STL de triângulos, tabela de PDF configurável, idade em meses, blocos WebGL. Pacote, PDF, ficha e telas idênticos ao publicado em dois cenários |
 | E3 | Portal + ficha única + importadores das fichas do AFO e do MAMILO |
 | E4 | AFO migrado (sem mudar os resultados: comparar STL e PDF antes e depois) |
 | E5 | Módulo NARIZ/ORELHA: revisão de literatura, captura 3D e moldes multipartes |
 
-## 6. Situação do repositório (10/11/2026, após a E1b)
-- `nucleo/` — processamento comum, em ES modules, sem dependências: imagem, calibração, malha, zip, **PDF** (gerador + layout de relatório) e **ficha** (armazém no navegador, base do laboratório).
-- `nucleo/interface/` — partes de navegador: casca Lab.EITA (status, ocupado, downloads, etapas, área de soltar), abrir fotos/JPEG e visualizador WebGL.
+## 6. Situação do repositório (10/11/2026, após a E2)
+- `nucleo/` — processamento comum, em ES modules, sem dependências: imagem (inclui gaussiano exato), calibração (marcador v2; diâmetro de referência; régua de 2 pontos; balanço de branco por clique), malha (campos de altura, sólidos de revolução, STL), zip, **PDF** (gerador + layout de relatório) e **ficha** (armazém no navegador, base do laboratório).
+- `nucleo/interface/` — partes de navegador: casca Lab.EITA (status, ocupado, downloads, etapas, área de soltar), abrir fotos/JPEG, visualizador WebGL e seus blocos (programa, malhas, matrizes) — o OLHO monta a própria câmera sobre esses blocos.
+- `modulos/olho/` — `processamento.js` (detecção da íris/pupila, íris desenrolada e limpa, textura, relevo, casca e malhas; puro), `ui.js` (interface, ficha e relatório; antes `app.js` + `ficha.js`), `index.html` e imagens.
 - `modulos/mamilo/` — processamento específico (`processamento.js`), interface (`ui.js`, 880 → 650 linhas: ficou só o que é do MAMILO — editor da foto, perfil lateral, cena 3D, conteúdo do relatório, checagens), `index.html` e imagens.
 - `ferramentas/montar.mjs` — gera `dist/<modulo>/` com um `app.js` único, pronto para publicar como artefato.
-- `testes/` — `npm test`: 21 testes (núcleo, PDF/ficha e MAMILO). O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py` (fumaça) e `comparar_saidas.py` (duas montagens → PDF, STL, ficha e telas idênticos).
-- Próximo: **E2**, OLHO sobre o núcleo. Pontos de atenção: a calibração do OLHO (diâmetro da íris ou régua de 2 pontos, cor por clique) entra em `nucleo/calibracao.js`; o OLHO ainda não tem ficha nem PDF e passa a ganhar os do núcleo.
+- `testes/` — `npm test`: 29 testes (núcleo, PDF/ficha, MAMILO e OLHO). OLHO: detecção, medidas, esclera e pupila idênticas à v0.2 publicada (STL byte a byte); a íris tem referência própria no Node porque, no navegador, a textura volta do canvas com alfa pré-multiplicado na borda do limbo. O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py` e `teste_olho.py` (fumaça), `comparar_saidas.py` e `comparar_olho.py` (duas montagens → arquivos e telas idênticos).
+- Mudanças de comportamento do OLHO na E2 (os arquivos gerados não mudam): o download funciona também fora do claude.ai (link comum, como no MAMILO); o pacote .zip passa a ser comprimido (deflate); no PDF, os símbolos → ≥ ≤ ⚠ ≈ viram -> >= <= ! ~ em vez de "?"; a base exportada continua com o mesmo formato e nome.
+- Próximo: **E3**, portal + ficha única ("EITA ficha v1") com importadores das fichas do AFO, OLHO e MAMILO. Depois **E4**, AFO.
 - `legado/` — código dos apps publicados (AFO v0.14, OLHO v0.1, MAMILO v0.2) como referência para a migração.

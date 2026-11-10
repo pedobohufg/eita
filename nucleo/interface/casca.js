@@ -16,6 +16,7 @@ export function criarCasca({ ids = {}, documento = globalThis.document } = {}) {
   let dl = null;
   try { const w = globalThis.window; if (w && w.claude && w.claude.use) w.claude.use("downloads").then((ns) => { dl = ns; }).catch(() => {}); } catch (e) {}
   async function salvar(nome, dados) {
+    if (!dl) { try { const w = globalThis.window; if (w && w.claude && w.claude.use) dl = await w.claude.use("downloads"); } catch (e) {} }
     if (dl) {
       try { await dl.save({ filename: nome, data: dados }); status(`Arquivo entregue: <b>${nome}</b>`); return true; }
       catch (e) {
@@ -37,7 +38,8 @@ export function criarCasca({ ids = {}, documento = globalThis.document } = {}) {
 // Barra de etapas + painel de seções recolhíveis. etapas: [[idSecao, nome], …].
 // aoAbrir(id, semVista) é chamado depois de abrir uma seção (o módulo troca a vista ali).
 // bloqueada: mensagem quando a seção ainda está desativada (classe "off").
-export function criarEtapas({ etapas, aoAbrir = () => {}, bloqueada, status, ids = {}, documento = globalThis.document }) {
+// rolagem: "smooth" ou "auto" ao trazer a seção para a vista.
+export function criarEtapas({ etapas, aoAbrir = () => {}, bloqueada, status, rolagem = "smooth", ids = {}, documento = globalThis.document }) {
   const I = Object.assign({ etapas: "stepper", painel: "panel" }, ids);
   const $ = (id) => documento.getElementById(id), barra = $(I.etapas), feitas = new Set(), validas = new Set(etapas.map((e) => e[0]));
   const marcarAtual = (id) => barra.querySelectorAll("button").forEach((b) => b.classList.toggle("cur", b.dataset.s === id));
@@ -46,10 +48,10 @@ export function criarEtapas({ etapas, aoAbrir = () => {}, bloqueada, status, ids
     barra.querySelectorAll("button").forEach((b) => (b.onclick = () => abrir(b.dataset.s)));
   }
   function abrir(id, semVista) {
-    const sec = $(id); if (sec.classList.contains("off")) { status(bloqueada, true); return; }
+    const sec = $(id); if (sec.classList.contains("off")) { if (bloqueada) status(bloqueada, true); return; }
     documento.querySelectorAll(`#${I.painel} section`).forEach((s) => s.classList.toggle("collapsed", s.id !== id));
     marcarAtual(id);
-    sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    sec.scrollIntoView(rolagem === "smooth" ? { block: "nearest", behavior: "smooth" } : { block: "nearest" });
     aoAbrir(id, semVista);
   }
   documento.querySelectorAll(`#${I.painel} section > h2`).forEach((h) => h.addEventListener("click", () => {
@@ -59,7 +61,14 @@ export function criarEtapas({ etapas, aoAbrir = () => {}, bloqueada, status, ids
   // marca a etapa como concluída (seções fora da barra, como a ficha, são ignoradas)
   function feito(id) { if (!validas.has(id)) return; feitas.add(id); montar(); const cur = documento.querySelector(`#${I.painel} section:not(.collapsed)`); if (cur) marcarAtual(cur.id); }
   function liberar(lista) { lista.forEach((id) => $(id).classList.remove("off")); }
-  return { montar, abrir, feito, liberar, feitas };
+  // progresso linear: libera as n primeiras seções e marca como feitas as n − 1 primeiras
+  function habilitarAte(n) {
+    etapas.forEach(([id], i) => {
+      $(id).classList.toggle("off", i >= n);
+      const b = barra.querySelector(`button[data-s=${id}]`); if (b) b.classList.toggle("done", i < n - 1);
+    });
+  }
+  return { montar, abrir, feito, liberar, habilitarAte, feitas };
 }
 
 // Área de soltar arquivo (clique, teclado, arrastar) ligada a um <input type=file>.

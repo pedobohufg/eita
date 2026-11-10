@@ -90,3 +90,27 @@ export function marcadorSVG(bits = BITS_ID7, rotulo = "Lab.EITA") {
 <text x="19" y="41" font-family="Arial, sans-serif" font-size="2.2" text-anchor="middle" fill="#333">${rotulo} · marcador v2 · quadrado preto = 20,0 mm · imprimir em 100%</text>
 </svg>`;
 };
+
+// ------------------------------------------------------------------ escala sem marcador (EITA! OLHO)
+// mm por pixel a partir de uma medida de referência conhecida (ex.: diâmetro horizontal da íris)
+export const escalaPorDiametro = (diametro_mm, raio_px) => diametro_mm / (2 * raio_px);
+// mm por pixel a partir de dois pontos de uma régua fotografada junto
+export const escalaPorRegua = (p0, p1, distancia_mm) => distancia_mm / Math.hypot(p1.x - p0.x, p1.y - p0.y);
+
+// ------------------------------------------------------------------ balanço de branco por clique
+// ganhos R/G/B (0,5–2,5) que tornam neutra a média de uma janela (2·raio+1)² em torno de (x, y)
+export function ganhosBranco(px, W, H, x, y, raio = 5) {
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let j = -raio; j <= raio; j++) for (let i = -raio; i <= raio; i++) {
+    const xx = Math.max(0, Math.min(W - 1, Math.round(x + i))), yy = Math.max(0, Math.min(H - 1, Math.round(y + j))), o = (yy * W + xx) * 4;
+    r += px[o]; g += px[o + 1]; b += px[o + 2]; n++;
+  }
+  r /= n; g /= n; b /= n; const m = Math.max(r, g, b);
+  return [m / Math.max(r, 1), m / Math.max(g, 1), m / Math.max(b, 1)].map((v) => Math.max(0.5, Math.min(2.5, v)));
+}
+// aplica os ganhos a uma imagem RGBA → nova RGBA opaca
+export function aplicarGanhos(px, ganhos) {
+  const d = new Uint8ClampedArray(px.length);
+  for (let i = 0; i < d.length; i += 4) { d[i] = Math.min(255, px[i] * ganhos[0]); d[i + 1] = Math.min(255, px[i + 1] * ganhos[1]); d[i + 2] = Math.min(255, px[i + 2] * ganhos[2]); d[i + 3] = 255; }
+  return d;
+}

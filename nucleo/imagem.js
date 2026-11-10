@@ -200,3 +200,29 @@ export function medianaCanais(img, idx) {
   idx.forEach((i, k) => { r[k] = d[4 * i]; g[k] = d[4 * i + 1]; b[k] = d[4 * i + 2]; });
   return [mediana(r), mediana(g), mediana(b)];
 }
+
+// ------------------------------------------------------------------ gaussiano exato (EITA! OLHO)
+// Convolução gaussiana separável com núcleo truncado em 3σ. Diferente de desfocar() (que aproxima σ grande
+// por caixas), é exata em qualquer σ e aceita borda circular em x — útil em imagens desenroladas (0°–360°).
+export function desfocarGauss(src, w, h, s, circularX = false) {
+  if (s < 0.3) return src.slice();
+  const r = Math.ceil(s * 3), ker = new Float32Array(2 * r + 1); let sum = 0;
+  for (let i = -r; i <= r; i++) { ker[i + r] = Math.exp(-i * i / (2 * s * s)); sum += ker[i + r]; }
+  for (let i = 0; i < ker.length; i++) ker[i] /= sum;
+  const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let a = 0; for (let i = -r; i <= r; i++) { let xx = x + i; xx = circularX ? ((xx % w) + w) % w : clamp(xx, 0, w - 1); a += src[y * w + xx] * ker[i + r]; }
+    tmp[y * w + x] = a;
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let a = 0; for (let i = -r; i <= r; i++) { const yy = clamp(y + i, 0, h - 1); a += tmp[yy * w + x] * ker[i + r]; }
+    out[y * w + x] = a;
+  }
+  return out;
+}
+// bilinear interpolando primeiro nas linhas (mesma ordem de operações do EITA! OLHO v0.2)
+export function bilinearLinhas(g, w, h, x, y) {
+  x = clamp(x, 0, w - 1.001); y = clamp(y, 0, h - 1.001);
+  const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0, i = y0 * w + x0;
+  return (g[i] * (1 - fx) + g[i + 1] * fx) * (1 - fy) + (g[i + w] * (1 - fx) + g[i + w + 1] * fx) * fy;
+}

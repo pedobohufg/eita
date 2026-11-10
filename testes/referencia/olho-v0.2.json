@@ -1,0 +1,55 @@
+{
+ "_gerado_com": "EITA! OLHO v0.2 publicado (Chrome), foto de exemplo, parâmetros padrão",
+ "foto": {
+  "largura": 1200,
+  "altura": 800,
+  "iris_px": {
+   "x": 611.4285714285714,
+   "y": 402.8571428571429,
+   "r": 150.05714285714285
+  },
+  "pupila_px": {
+   "x": 612.8571428571429,
+   "y": 404.28571428571433,
+   "r": 50.40548571428572
+  },
+  "regua_px": null,
+  "balanco_branco": [
+   1,
+   1,
+   1
+  ]
+ },
+ "medidas_mm": {
+  "iris": 11.7,
+  "pup": 3.930130693069307,
+  "k": 0.038985148514851485
+ },
+ "pIris": 11.7,
+ "pPup": 3.93,
+ "altura_max_mapa_mm": 0.44999998807907104,
+ "triangulos": {
+  "esclera": 50400,
+  "iris": 201600,
+  "pupila": 22800
+ },
+ "volume_mm3": {
+  "esclera": 474.48350699270213,
+  "iris": 103.27318280502855,
+  "pupila": 15.396424244058766
+ },
+ "stl": {
+  "protese_completa.stl": "6f4223fe7c611152b584acfc914b14b8fe0ba3d04146ba327567296e872411ad",
+  "esclera.stl": "18dcc0a201b1b13b975b2f4ed54d8871c511141f3cfccd611af1b06844821b11",
+  "iris.stl": "3ddf0354824514e7cb312afd0b0c742a5fac68884c3965c81192d59ccdf37552",
+  "pupila.stl": "c04c0a51d8335f7d5ebcda8dcc691e0bd6409a0bf7381b3bcc6adab93046de4c"
+ },
+ "node": {
+  "_nota": "No navegador a textura volta do canvas com alfa pré-multiplicado na borda do limbo; no Node não. Por isso a íris (e a prótese completa) têm referência própria no Node. A equivalência com o navegador é conferida por testes/navegador/comparar_olho.py.",
+  "volume_iris_mm3": 103.27318652597837,
+  "stl": {
+   "iris.stl": "feb5a9d3f77e8d56d138d9e4c2e80c9216e58766c12d2bc6d8d96ef1670ad378",
+   "protese_completa.stl": "8cd2557171b25d6787d54b8f65ecbe0cfd899a35afd06787d529062f42da5473"
+  }
+ }
+}

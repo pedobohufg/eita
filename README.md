@@ -20,6 +20,7 @@ nucleo/                 processamento comum (ES modules, sem dependências)
                         abrir fotos e JPEG, visualizador WebGL
 modulos/
   mamilo/               EITA! MAMILO (processamento, interface, página e imagens)
+  olho/                 EITA! OLHO (idem)
 ferramentas/montar.mjs  gera dist/<modulo>/ (app.js único, pronto para publicar)
 testes/                 testes automáticos (npm test) e fixtures sintéticas
 legado/                 apps publicados antes da plataforma (referência para a migração)
@@ -32,14 +33,16 @@ Requer Node.js 20 ou mais novo. Não há dependências para instalar.
 
 ```bash
 npm test                 # testes do núcleo e dos módulos
-npm run montar           # gera dist/mamilo/ (abrir dist/mamilo/index.html por um servidor local)
+npm run montar           # gera dist/mamilo/ e dist/olho/ (abrir o index.html por um servidor local)
 python3 testes/navegador/teste_mamilo.py   # opcional: teste no navegador (Playwright + Chrome)
-python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens
+python3 testes/navegador/teste_olho.py     # idem, OLHO
+python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens (MAMILO)
+python3 testes/navegador/comparar_olho.py ANTES/ dist/olho/       # idem, OLHO (ANTES pode ser legado/olho + assets)
 ```
 
 ## Regras do projeto
 
-- **Resultados não mudam sem querer.** Cada módulo tem um teste de regressão que compara as medidas e os STL (byte a byte) com uma referência guardada em `testes/referencia/`. Mudança intencional de algoritmo → regenerar a referência no mesmo commit e explicar no histórico.
+- **Resultados não mudam sem querer.** Cada módulo tem um teste de regressão que compara as medidas e os STL (byte a byte) com uma referência guardada em `testes/referencia/`, tirada do app publicado. Mudança intencional de algoritmo → regenerar a referência no mesmo commit e explicar no histórico.
 - **Nenhum dado de paciente no repositório** (fichas, fotos clínicas, bases). As fixtures de teste são fantomas sintéticas.
 - **Nomes de arquivo gerados** usam o código do paciente ou as iniciais, nunca o nome completo.
 

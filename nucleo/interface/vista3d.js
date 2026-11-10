@@ -12,7 +12,25 @@ export function olharPara(e, c, u) {
   const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
   return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]), -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]), -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1]);
 }
+export const identidade4 = () => new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+export function rotacaoX(a) { const o = identidade4(), c = Math.cos(a), s = Math.sin(a); o[5] = c; o[6] = s; o[9] = -s; o[10] = c; return o; }
+export function rotacaoY(a) { const o = identidade4(), c = Math.cos(a), s = Math.sin(a); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; }
+export function translacao(x, y, z) { const o = identidade4(); o[12] = x; o[13] = y; o[14] = z; return o; }
 export const hexParaRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
+
+// ------------------------------------------------------------------ blocos WebGL (atributos p, n, c: vec3)
+export function compilarPrograma(gl, vs, fs) {
+  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr);
+  return pr;
+}
+// posições, normais e cores (Float32Array, 3 por vértice, triângulos soltos) → malha na GPU
+export function enviarMalha(gl, pos, nor, cor) { const b = (d) => { const x = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, x); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); return x; }; return { p: b(pos), n: b(nor), c: b(cor), cont: pos.length / 3 }; }
+export function apagarMalha(gl, m) { gl.deleteBuffer(m.p); gl.deleteBuffer(m.n); gl.deleteBuffer(m.c); }
+export function desenharMalha(gl, pr, m) {
+  for (const [nome, buf] of [["p", m.p], ["n", m.n], ["c", m.c]]) { const loc = gl.getAttribLocation(pr, nome); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); }
+  gl.drawArrays(gl.TRIANGLES, 0, m.cont);
+}
 
 const VS = "attribute vec3 p;attribute vec3 n;attribute vec3 c;uniform mat4 mvp;varying vec3 vn;varying vec3 vc;void main(){vn=n;vc=c;gl_Position=mvp*vec4(p,1.0);}";
 const FS = "precision mediump float;varying vec3 vn;varying vec3 vc;uniform vec3 l1;uniform vec3 l2;void main(){vec3 n=normalize(vn);float d=max(dot(n,l1),0.0)*0.72+max(dot(n,l2),0.0)*0.28+0.26;float s=pow(max(dot(n,normalize(l1+vec3(0.0,0.0,1.0))),0.0),28.0)*0.16;gl_FragColor=vec4(vc*d+s,1.0);}";
@@ -26,9 +44,7 @@ export function criarVista3D(cv, { visivel = () => true, aoFalhar = () => {}, ca
     if (V.ok !== null) return V.ok;
     const gl = cv.getContext("webgl", { antialias: true, preserveDrawingBuffer: true, alpha: true });
     if (!gl) { V.ok = false; aoFalhar(); return false; }
-    const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); return s; };
-    const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
-    V.gl = gl; V.prog = pr; V.ok = true;
+    V.gl = gl; V.prog = compilarPrograma(gl, VS, FS); V.ok = true;
     let arr = null; const pts = new Map();
     cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); arr = [e.clientX, e.clientY]; });
     cv.addEventListener("pointermove", (e) => {
@@ -43,7 +59,7 @@ export function criarVista3D(cv, { visivel = () => true, aoFalhar = () => {}, ca
   };
 
   // posições, normais e cores (Float32Array, 3 por vértice, triângulos soltos) → malha na GPU
-  V.malha = (pos, nor, cor) => { const gl = V.gl, b = (d) => { const x = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, x); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); return x; }; return { p: b(pos), n: b(nor), c: b(cor), cont: pos.length / 3 }; };
+  V.malha = (pos, nor, cor) => enviarMalha(V.gl, pos, nor, cor);
   // sólido { V, F } com normais por face; corDe(ponto) → [r,g,b]; dz desloca em z; corte esconde a metade y > 0
   V.triangulos = (sol, corDe, dz, corte) => {
     const { V: Vs, F } = sol, pos = [], nor = [], col = [];
@@ -67,7 +83,7 @@ export function criarVista3D(cv, { visivel = () => true, aoFalhar = () => {}, ca
     }
     return V.malha(new Float32Array(pos), new Float32Array(nor), new Float32Array(col));
   };
-  V.limpar = () => { const gl = V.gl; for (const m of V.malhas) { gl.deleteBuffer(m.p); gl.deleteBuffer(m.n); gl.deleteBuffer(m.c); } V.malhas = []; };
+  V.limpar = () => { for (const m of V.malhas) apagarMalha(V.gl, m); V.malhas = []; };
 
   V.desenhar = () => {
     if (!V.ok || !visivel()) return;
@@ -80,7 +96,7 @@ export function criarVista3D(cv, { visivel = () => true, aoFalhar = () => {}, ca
     gl.uniformMatrix4fv(gl.getUniformLocation(pr, "mvp"), false, multiplicar4(perspectiva(0.62, W / H, 0.5, 1000), olharPara(e, V.alvo, up)));
     const nz = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
     gl.uniform3fv(gl.getUniformLocation(pr, "l1"), nz([0.35, -0.55, 0.78])); gl.uniform3fv(gl.getUniformLocation(pr, "l2"), nz([-0.6, 0.45, 0.35]));
-    for (const m of V.malhas) { for (const [nome, buf] of [["p", m.p], ["n", m.n], ["c", m.c]]) { const loc = gl.getAttribLocation(pr, nome); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); } gl.drawArrays(gl.TRIANGLES, 0, m.cont); }
+    for (const m of V.malhas) desenharMalha(gl, pr, m);
   };
   return V;
 }

@@ -13,6 +13,8 @@ const COPYRIGHT = "/* © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. To
 // módulo → { entrada (ES module que publica window.EITA), scripts de interface (clássicos), estáticos }
 export const MODULOS = {
   mamilo: { titulo: "EITA! MAMILO", entrada: "modulos/mamilo/global.js", interface: ["modulos/mamilo/ui.js"], estaticos: ["modulos/mamilo/index.html", "modulos/mamilo/assets"] },
+  // escopo: a interface é um script de topo; a montagem a envolve numa função própria (modo estrito, sem globais)
+  olho: { titulo: "EITA! OLHO", entrada: "modulos/olho/global.js", interface: ["modulos/olho/ui.js"], estaticos: ["modulos/olho/index.html", "modulos/olho/assets"], escopo: true },
 };
 
 const RE_IMPORT = /^import\s+(.+?)\s+from\s+"(.+?)";?\s*$/gm;
@@ -44,6 +46,8 @@ export function empacotar(entrada) {
     });
     s = s.replace(RE_EXPORT_ALL, (_, rel) => { reexporta.push(dep(m, rel)); return ""; });
     s = s.replace(/^export\s+default\s+/m, () => { exportados.push("default: __padrao"); return "const __padrao = "; });
+    const multipla = s.match(/^export\s+(?:const|let)\s+[A-Za-z_$][\w$]*\s*=\s*[-\w.$"']+\s*,\s*[A-Za-z_$][\w$]*\s*=/m);
+    if (multipla) throw new Error(`export com várias declarações não suportado em ${path.relative(RAIZ, m.abs)}: ${multipla[0]}`);
     s = s.replace(/^export\s+((?:async\s+)?function\*?|const|let|class)\s+([A-Za-z_$][\w$]*)/gm, (_, tipo, nome) => { exportados.push(nome); return `${tipo} ${nome}`; });
     if (/^\s*export\s/m.test(s)) throw new Error(`forma de export não suportada em ${path.relative(RAIZ, m.abs)}`);
     const obj = `Object.assign({}, ${reexporta.concat([`{ ${exportados.join(", ")} }`]).join(", ")})`;
@@ -56,7 +60,8 @@ export function montar(nome, destinoBase = path.join(RAIZ, "dist")) {
   const cfg = MODULOS[nome]; if (!cfg) throw new Error("módulo desconhecido: " + nome);
   const destino = path.join(destinoBase, nome);
   fs.rmSync(destino, { recursive: true, force: true }); fs.mkdirSync(destino, { recursive: true });
-  const ui = cfg.interface.map((f) => fs.readFileSync(path.join(RAIZ, f), "utf8")).join("\n");
+  let ui = cfg.interface.map((f) => fs.readFileSync(path.join(RAIZ, f), "utf8")).join("\n");
+  if (cfg.escopo) ui = `(function () {\n${ui}\n})();\n`;
   const js = `/* ${cfg.titulo} — montado pela Plataforma EITA (ferramentas/montar.mjs). Não editar: edite nucleo/ e modulos/${nome}/. */\n${COPYRIGHT}\n${empacotar(cfg.entrada)}\n${ui}`;
   fs.writeFileSync(path.join(destino, "app.js"), js);
   for (const e of cfg.estaticos) fs.cpSync(path.join(RAIZ, e), path.join(destino, path.basename(e)), { recursive: true });

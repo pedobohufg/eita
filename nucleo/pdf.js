@@ -57,6 +57,14 @@ export function montarPDF(pages, imgs) {
 }
 
 // ------------------------------------------------------------------ layout de relatório Lab.EITA
+// Tabela de duas colunas (rótulo à esquerda, valor em negrito alinhado à direita) com título e filete,
+// 255 pt de largura. Devolve o y abaixo da última linha. tam/passo/largValor: corpo, entrelinha e largura do valor.
+export function tabelaPDF(pg, x, y, titulo, linhas, { tam = 8.8, passo = 13.2, largValor = 140 } = {}) {
+  const C = CORES_PDF; let yy = y; pg.text(x, yy, 10.5, titulo, true, C.roxo); yy -= 6; pg.line(x, yy, x + 255, yy, C.linha); yy -= 13;
+  for (const [a, b] of linhas) { pg.text(x, yy, tam, cortarTexto(a, tam, 150), false, C.sutil); const s = cortarTexto(String(b), tam, largValor); pg.text(x + 255 - larguraTexto(s, tam), yy, tam, s, true, C.tinta); yy -= passo; }
+  return yy;
+}
+
 // Relatório de várias páginas com cabeçalho, seções, tabelas em duas colunas, checagem de segurança e rodapé.
 // app: ["EITA!", "MAMILO"]; subtitulo; dataTexto; pacienteTexto (nome ou código, no cabeçalho);
 // pacienteContinuacao (nas páginas seguintes; padrão = pacienteTexto); logo: nome da imagem ou null.
@@ -74,7 +82,7 @@ export function criarRelatorioPDF({ app, subtitulo, dataTexto, pacienteTexto, pa
   R.secao = (tit, x = 36, x2 = 559) => { R.pg.text(x, R.y, 10.5, tit, true, C.roxo); R.y -= 6; R.pg.line(x, R.y, x2, R.y, C.linha); R.y -= 13; };
   // campo rotulado (rótulo pequeno em cima, valor em negrito embaixo), na linha atual
   R.campo = (x, w, rot, val) => { const v = val && String(val).trim() ? String(val).trim() : "—"; R.pg.text(x, R.y, 7.6, rot, false, C.sutil); R.pg.text(x, R.y - 10, 9, cortarTexto(v, 9, w - 6), true, C.tinta); };
-  const tabela = (x, tit, linhas) => { const pg = R.pg; let yy = R.y; pg.text(x, yy, 10.5, tit, true, C.roxo); yy -= 6; pg.line(x, yy, x + 255, yy, C.linha); yy -= 13; for (const [a, b] of linhas) { pg.text(x, yy, 8.8, cortarTexto(a, 8.8, 150), false, C.sutil); const s = cortarTexto(String(b), 8.8, 140); pg.text(x + 255 - larguraTexto(s, 8.8), yy, 8.8, s, true, C.tinta); yy -= 13.2; } return yy; };
+  const tabela = (x, tit, linhas) => tabelaPDF(R.pg, x, R.y, tit, linhas);
   // duas tabelas lado a lado (rótulo à esquerda, valor alinhado à direita); quebra a página se não couber
   R.par = (t1, l1, t2, l2) => { const h = 26 + Math.max(l1.length, l2.length) * 13.2; if (R.y - h < 50) R.novaPagina(); const a = tabela(36, t1, l1), b = tabela(304, t2, l2); R.y = Math.min(a, b) - 12; };
   // amostras de cor: [[nome, "#rrggbb"], …]
