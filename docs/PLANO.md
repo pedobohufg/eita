@@ -47,7 +47,7 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 - `paciente`: identificação, nascimento, profissional responsável, alergias, observações. São os campos comuns.
 - `proteses[]`: uma entrada por peça, com `modulo` (afo/olho/mamilo/…), `lado`/região, `versao`, `entradas` (parâmetros e pontos), `resultado` (medidas, volume, massa), `arquivos` (nomes dos scans e das fotos usados) e `data`.
 - Cada módulo acrescenta só os seus campos clínicos, como GMFCS no AFO, cavidade no olho e radioterapia no mamilo.
-- Importadores convertem as fichas antigas do AFO e do MAMILO.
+- Importadores convertem as fichas antigas do AFO, do OLHO e do MAMILO.
 
 ## Decisões tomadas (10/11/2026)
 - **Dados:** **um único app** (um artefato com o portal e todos os módulos), com as fichas guardadas só no navegador. A base do laboratório continua sendo trocada por arquivo.
@@ -76,7 +76,7 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 | E1a ✔ | Núcleo de processamento extraído do MAMILO (`nucleo/`: base, imagem, geometria plana, calibração, malha, saída) + módulo `modulos/mamilo/` + montagem + testes (regressão byte a byte contra a v0.2) |
 | E1b ✔ | Interface comum extraída do MAMILO: `nucleo/pdf.js` (gerador + layout de relatório), `nucleo/ficha.js` (armazém de fichas e base), `nucleo/interface/` (casca, imagem no navegador, vista 3D). PDF, STL, ficha e telas 3D idênticos à E1a |
 | E2 ✔ | OLHO v0.2 sobre o núcleo: `modulos/olho/` (processamento puro + interface). Núcleo ganhou gaussiano exato, escala por diâmetro/régua, balanço de branco por clique, sólidos de revolução, STL de triângulos, tabela de PDF configurável, idade em meses, blocos WebGL. Pacote, PDF, ficha e telas idênticos ao publicado em dois cenários |
-| E3 | Portal + ficha única + importadores das fichas do AFO e do MAMILO |
+| E3 | Portal + ficha única + importadores das fichas do AFO, do OLHO e do MAMILO |
 | E4 | AFO migrado (sem mudar os resultados: comparar STL e PDF antes e depois) |
 | E5 | Módulo NARIZ/ORELHA: revisão de literatura, captura 3D e moldes multipartes |
 
@@ -89,4 +89,4 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 - `testes/` — `npm test`: 29 testes (núcleo, PDF/ficha, MAMILO e OLHO). OLHO: detecção, medidas, esclera e pupila idênticas à v0.2 publicada (STL byte a byte); a íris tem referência própria no Node porque, no navegador, a textura volta do canvas com alfa pré-multiplicado na borda do limbo. O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py` e `teste_olho.py` (fumaça), `comparar_saidas.py` e `comparar_olho.py` (duas montagens → arquivos e telas idênticos).
 - Mudanças de comportamento do OLHO na E2 (os arquivos gerados não mudam): o download funciona também fora do claude.ai (link comum, como no MAMILO); o pacote .zip passa a ser comprimido (deflate); no PDF, os símbolos → ≥ ≤ ⚠ ≈ viram -> >= <= ! ~ em vez de "?"; a base exportada continua com o mesmo formato e nome.
 - Próximo: **E3**, portal + ficha única ("EITA ficha v1") com importadores das fichas do AFO, OLHO e MAMILO. Depois **E4**, AFO.
-- `legado/` — código dos apps publicados (AFO v0.14, OLHO v0.1, MAMILO v0.2) como referência para a migração.
+- `legado/` — código dos apps publicados (AFO v0.14, OLHO v0.2, MAMILO v0.2) como referência para a migração.
