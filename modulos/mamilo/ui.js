@@ -1,61 +1,22 @@
-/* EITA! MAMILO — interface (padrão visual Lab.EITA). © 2026 Lab.EITA/UFG. */
+/* EITA! MAMILO — interface (padrão visual Lab.EITA). Casca, PDF, ficha e vista 3D vêm do núcleo (window.EITA).
+   © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 (function () {
 "use strict";
 const E = window.EITA;
 const $ = (id) => document.getElementById(id);
-const fmt = (v, d = 1) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(d).replace(".", ","));
-const espera = () => new Promise((r) => setTimeout(r, 20));
+const fmt = E.ui.formatar, espera = () => E.ui.espera(20);
 const BITS_ID7 = [[1, 1, 0, 0], [0, 1, 0, 0], [1, 1, 1, 1], [0, 0, 1, 0]];
 const COR = { areola: "#1fae63", papila: "#2f6fdb", marc: "#d99a00", accent: "#6B3FD6", brand: "#9560FD", ink: "#1C1730", muted: "#5B5573", line: "#E1DCEC" };
 
 const S = { frontal: null, lateral: null, aba: "photo", p: Object.assign({}, E.PARAMETROS, { textura_papila: Object.assign({}, E.PARAMETROS.textura_papila) }), forma: 4, projForcada: false, cache: {}, prev: null, modo3d: "prot", vol: null, exemplo: false };
 
-// ------------------------------------------------------------------ status, ocupado, downloads
-function status(msg, aviso) { const s = $("status"); s.innerHTML = msg; s.classList.toggle("warn", !!aviso); }
-function ocupado(on, txt) { $("busy").style.display = on ? "grid" : "none"; if (txt) $("busyT").textContent = txt; }
-let dl = null;
-try { if (window.claude && window.claude.use) window.claude.use("downloads").then((ns) => { dl = ns; }).catch(() => {}); } catch (e) {}
-async function salvar(nome, dados) {
-  if (dl) {
-    try { await dl.save({ filename: nome, data: dados }); status(`Arquivo entregue: <b>${nome}</b>`); return true; }
-    catch (e) {
-      if (e && e.code === "declined") { status("Download cancelado."); return false; }
-      if (e && e.code === "rate_limited") { status("Já há uma confirmação de download aberta. Responda a ela e tente de novo.", true); return false; }
-    }
-  }
-  try {
-    const blob = dados instanceof Blob ? dados : new Blob([dados]);
-    const url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = nome; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    status(`Download iniciado: <b>${nome}</b>`); return true;
-  } catch (e) { status("Este visualizador bloqueou o download. Abra a página no claude.ai.", true); return false; }
-}
-async function carregarImagem(src, maxLado) {
-  const img = new Image(); img.decoding = "async";
-  await new Promise((ok, erro) => { img.onload = ok; img.onerror = () => erro(new Error("Não foi possível abrir a imagem.")); img.src = src; });
-  const f = Math.min(1, maxLado / Math.max(img.naturalWidth, img.naturalHeight));
-  const w = Math.round(img.naturalWidth * f), h = Math.round(img.naturalHeight * f);
-  const c = document.createElement("canvas"); c.width = w; c.height = h;
-  const ctx = c.getContext("2d"); ctx.drawImage(img, 0, 0, w, h);
-  const d = ctx.getImageData(0, 0, w, h);
-  return { data: d.data, width: w, height: h, canvas: c, original: [img.naturalWidth, img.naturalHeight] };
-}
-const lerArquivo = (f) => new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
-function paraCanvas(img) { const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; c.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0); return c; }
+// ------------------------------------------------------------------ casca Lab.EITA (núcleo): status, ocupado, downloads
+const UI = E.ui, CASCA = UI.criarCasca(), status = CASCA.status, ocupado = CASCA.ocupado, salvar = CASCA.salvar;
+const { carregarImagem, lerArquivo, paraCanvas } = UI;
 
 // ------------------------------------------------------------------ etapas e seções
 const ETAPAS = [["s1", "Foto"], ["s2", "Contornos"], ["s3", "Escala e cor"], ["s4", "Lateral"], ["s5", "Prótese"], ["s6", "Exportar"]];
-const feitas = new Set();
-function montarStepper() {
-  $("stepper").innerHTML = ETAPAS.map(([id, nome], i) => `<button type="button" data-s="${id}" class="${feitas.has(id) ? "done" : ""}"><span class="n">${i + 1}</span>${nome}</button>`).join("");
-  $("stepper").querySelectorAll("button").forEach((b) => (b.onclick = () => abrir(b.dataset.s)));
-}
-function abrir(id, semVista) {
-  const sec = $(id); if (sec.classList.contains("off")) { status("Carregue a foto frontal primeiro (etapa 1).", true); return; }
-  document.querySelectorAll("#panel section").forEach((s) => s.classList.toggle("collapsed", s.id !== id));
-  $("stepper").querySelectorAll("button").forEach((b) => b.classList.toggle("cur", b.dataset.s === id));
-  sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
+const ETP = E.ui.criarEtapas({ etapas: ETAPAS, status, bloqueada: "Carregue a foto frontal primeiro (etapa 1).", aoAbrir(id, semVista) {
   if (!semVista) {
     if (id === "s1" || id === "s2") { mudarAba("photo"); if (id === "s2") enquadrar("areola"); }
     if (id === "s3") { mudarAba("photo"); enquadrar("tudo"); }
@@ -63,13 +24,9 @@ function abrir(id, semVista) {
     if (id === "s5" || id === "s6") mudarAba("3d");
   }
   if (id === "sCorpo") desenharCorpo();
-}
-document.querySelectorAll("#panel section > h2").forEach((h) => h.addEventListener("click", () => {
-  const s = h.parentElement; if (s.classList.contains("off")) return;
-  if (s.classList.contains("collapsed")) abrir(s.id); else s.classList.add("collapsed");
-}));
-function feito(id) { if (id === "s0") return; feitas.add(id); montarStepper(); const cur = document.querySelector("#panel section:not(.collapsed)"); if (cur) $("stepper").querySelectorAll("button").forEach((b) => b.classList.toggle("cur", b.dataset.s === cur.id)); }
-function liberar() { ["s2", "s3", "s4", "s5", "s6"].forEach((id) => $(id).classList.remove("off")); }
+} });
+const montarStepper = ETP.montar, abrir = ETP.abrir, feito = ETP.feito;
+function liberar() { ETP.liberar(["s2", "s3", "s4", "s5", "s6"]); }
 
 // ------------------------------------------------------------------ abas da vista
 function mudarAba(t) {
@@ -100,15 +57,7 @@ function legenda() {
 }
 
 // ------------------------------------------------------------------ 1. foto frontal
-function soltavel(zona, input, fn) {
-  const z = $(zona), f = $(input);
-  z.addEventListener("click", () => f.click());
-  z.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); f.click(); } });
-  z.addEventListener("dragover", (e) => { e.preventDefault(); z.classList.add("hover"); });
-  z.addEventListener("dragleave", () => z.classList.remove("hover"));
-  z.addEventListener("drop", (e) => { e.preventDefault(); z.classList.remove("hover"); const a = e.dataTransfer.files[0]; if (a) fn(a); });
-  f.addEventListener("change", () => { const a = f.files[0]; if (a) fn(a); f.value = ""; });
-}
+const soltavel = (zona, input, fn) => E.ui.soltavel($(zona), $(input), fn);
 soltavel("drop1", "file1", async (f) => { S.exemplo = false; await processarFrontal(await lerArquivo(f), f.name); });
 $("demo1").onclick = () => carregarExemplo();
 
@@ -365,28 +314,8 @@ function atualizarTudo() {
 }
 
 // ------------------------------------------------------------------ 3D (WebGL próprio)
-const V3 = { gl: null, prog: null, malhas: [], teta: -1.2, fi: 0.95, dist: 145, alvo: [0, 0, 1], ok: null };
-function iniciar3D() {
-  if (V3.ok !== null) return V3.ok;
-  const cv = $("gl"), gl = cv.getContext("webgl", { antialias: true, preserveDrawingBuffer: true, alpha: true });
-  if (!gl) { V3.ok = false; status("Este navegador não oferece WebGL: a visualização 3D fica indisponível, mas a exportação funciona.", true); return false; }
-  const vs = "attribute vec3 p;attribute vec3 n;attribute vec3 c;uniform mat4 mvp;varying vec3 vn;varying vec3 vc;void main(){vn=n;vc=c;gl_Position=mvp*vec4(p,1.0);}";
-  const fs = "precision mediump float;varying vec3 vn;varying vec3 vc;uniform vec3 l1;uniform vec3 l2;void main(){vec3 n=normalize(vn);float d=max(dot(n,l1),0.0)*0.72+max(dot(n,l2),0.0)*0.28+0.26;float s=pow(max(dot(n,normalize(l1+vec3(0.0,0.0,1.0))),0.0),28.0)*0.16;gl_FragColor=vec4(vc*d+s,1.0);}";
-  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); return s; };
-  const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr);
-  V3.gl = gl; V3.prog = pr; V3.ok = true;
-  let arr = null; const pts = new Map();
-  cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); arr = [e.clientX, e.clientY]; });
-  cv.addEventListener("pointermove", (e) => {
-    if (!pts.has(e.pointerId)) return;
-    if (pts.size === 2) { const [a, b] = [...pts.values()]; const d0 = Math.hypot(a[0] - b[0], a[1] - b[1]); pts.set(e.pointerId, [e.clientX, e.clientY]); const [c, d] = [...pts.values()]; V3.dist = E.clamp((V3.dist * d0) / (Math.hypot(c[0] - d[0], c[1] - d[1]) || d0), 12, 400); desenhar3D(); return; }
-    pts.set(e.pointerId, [e.clientX, e.clientY]);
-    V3.teta -= (e.clientX - arr[0]) * 0.01; V3.fi = E.clamp(V3.fi - (e.clientY - arr[1]) * 0.01, 0.02, 3.1); arr = [e.clientX, e.clientY]; desenhar3D();
-  });
-  const fim = (e) => pts.delete(e.pointerId); cv.addEventListener("pointerup", fim); cv.addEventListener("pointercancel", fim);
-  cv.addEventListener("wheel", (e) => { e.preventDefault(); V3.dist = E.clamp(V3.dist * Math.exp(e.deltaY * 0.001), 12, 400); desenhar3D(); }, { passive: false });
-  return true;
-}
+const V3 = E.ui.criarVista3D($("gl"), { visivel: () => S.aba === "3d", aoFalhar: () => status("Este navegador não oferece WebGL: a visualização 3D fica indisponível, mas a exportação funciona.", true), camera: { teta: -1.2, fi: 0.95, dist: 145, alvo: [0, 0, 1] } });
+const iniciar3D = V3.iniciar, desenhar3D = V3.desenhar;
 document.querySelectorAll("#tools3d button[data-m]").forEach((b) => (b.onclick = () => { S.modo3d = b.dataset.m; document.querySelectorAll("#tools3d button[data-m]").forEach((x) => x.classList.toggle("cur", x === b)); montarCena(); legenda(); }));
 function vistaPapila() {
   const G = S.prev; if (!G) { setTimeout(vistaPapila, 300); return; }
@@ -395,34 +324,11 @@ function vistaPapila() {
 }
 document.querySelectorAll("#tools3d button[data-v]").forEach((b) => (b.onclick = () => { const v = b.dataset.v; if (v === "pap") { vistaPapila(); return; } V3.alvo = [0, 0, 1]; V3.dist = 145; if (v === "front") { V3.fi = 0.02; V3.teta = -Math.PI / 2; } else if (v === "three") { V3.fi = 0.95; V3.teta = -1.2; } else { V3.fi = 1.5; V3.teta = -Math.PI / 2; } desenhar3D(); }));
 $("vC").addEventListener("change", montarCena); $("vPele").addEventListener("change", montarCena);
-const hexRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-function malhaGL(pos, nor, cor) { const gl = V3.gl, b = (d) => { const x = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, x); gl.bufferData(gl.ARRAY_BUFFER, d, gl.STATIC_DRAW); return x; }; return { p: b(pos), n: b(nor), c: b(cor), cont: pos.length / 3 }; }
-function triangulos(sol, corDe, dz, corte) {
-  const { V, F } = sol, pos = [], nor = [], col = [];
-  for (let t = 0; t < F.length; t += 3) {
-    const P = [0, 1, 2].map((k) => [V[3 * F[t + k]], V[3 * F[t + k] + 1], V[3 * F[t + k] + 2] + dz]);
-    if (corte && P[0][1] > 0.01 && P[1][1] > 0.01 && P[2][1] > 0.01) continue;
-    const u = [P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]], w = [P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]];
-    let n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]]; const l = Math.hypot(...n) || 1; n = n.map((v) => v / l);
-    for (const q of P) { pos.push(q[0], q[1], q[2]); nor.push(...n); col.push(...corDe(q)); }
-  }
-  return malhaGL(new Float32Array(pos), new Float32Array(nor), new Float32Array(col));
-}
-// superfície visível da prótese com normais suaves por vértice (gradiente do campo de altura)
-function superficieSuave(G, corDe) {
-  const n = G.n, xs = G.xs, dx = xs[1] - xs[0], F = G.F, D = G.dentro, pos = [], nor = [], col = [];
-  const Fv = (i, j) => F[E.clamp(j, 0, n - 1) * n + E.clamp(i, 0, n - 1)];
-  const vtx = (i, j) => { const gx = (Fv(i + 1, j) - Fv(i - 1, j)) / (2 * dx), gy = (Fv(i, j + 1) - Fv(i, j - 1)) / (2 * dx), l = Math.hypot(gx, gy, 1), p = [xs[i], xs[j], Fv(i, j)]; pos.push(p[0], p[1], p[2]); nor.push(-gx / l, -gy / l, 1 / l); col.push(...corDe(p)); };
-  for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) {
-    const q = j * n + i; if (!(D[q] && D[q + 1] && D[q + n] && D[q + n + 1])) continue;
-    vtx(i, j); vtx(i + 1, j); vtx(i + 1, j + 1); vtx(i, j); vtx(i + 1, j + 1); vtx(i, j + 1);
-  }
-  return malhaGL(new Float32Array(pos), new Float32Array(nor), new Float32Array(col));
-}
+const hexRgb = E.ui.hexParaRgb, malhaGL = V3.malha, triangulos = V3.triangulos, superficieSuave = V3.superficieCampo;
 function montarCena() {
   if (!S.prev || !iniciar3D()) return;
-  const G = S.prev, fr = S.frontal, n = G.n, gl = V3.gl, idx = Array.from({ length: n }, (_, i) => i);
-  for (const m of V3.malhas) { gl.deleteBuffer(m.p); gl.deleteBuffer(m.n); gl.deleteBuffer(m.c); } V3.malhas = [];
+  const G = S.prev, fr = S.frontal, n = G.n, idx = Array.from({ length: n }, (_, i) => i);
+  V3.limpar();
   const usarCor = $("vC").checked, cA = hexRgb(fr.paleta.areola), cP = hexRgb(fr.paleta.papila), cS = hexRgb(fr.paleta.pele), neutro = [0.78, 0.74, 0.86];
   if (S.modo3d !== "molde") {
     const corte = S.modo3d === "corte", ox = G.papila_offset_mm[0], oy = G.papila_offset_mm[1], rp0 = G.papila_diam_mm / 2;
@@ -459,27 +365,6 @@ function montarCena() {
   }
   desenhar3D();
 }
-function mul(a, b) { const o = new Float32Array(16); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + j] * b[i * 4 + k]; o[i * 4 + j] = s; } return o; }
-function persp(f, asp, n, fa) { const t = 1 / Math.tan(f / 2); return new Float32Array([t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, (2 * fa * n) / (n - fa), 0]); }
-function olhar(e, c, u) {
-  const z = [e[0] - c[0], e[1] - c[1], e[2] - c[2]], zl = Math.hypot(...z); z.forEach((v, i) => (z[i] = v / zl));
-  let x = [u[1] * z[2] - u[2] * z[1], u[2] * z[0] - u[0] * z[2], u[0] * z[1] - u[1] * z[0]]; const xl = Math.hypot(...x) || 1; x = x.map((v) => v / xl);
-  const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
-  return new Float32Array([x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -(x[0] * e[0] + x[1] * e[1] + x[2] * e[2]), -(y[0] * e[0] + y[1] * e[1] + y[2] * e[2]), -(z[0] * e[0] + z[1] * e[1] + z[2] * e[2]), 1]);
-}
-function desenhar3D() {
-  if (!V3.ok || S.aba !== "3d") return;
-  const gl = V3.gl, cv = $("gl"), dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.clientWidth, H = cv.clientHeight; if (!W) return;
-  cv.width = W * dpr; cv.height = H * dpr; gl.viewport(0, 0, cv.width, cv.height);
-  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST);
-  const A = V3.alvo, e = [A[0] + V3.dist * Math.sin(V3.fi) * Math.cos(V3.teta), A[1] + V3.dist * Math.sin(V3.fi) * Math.sin(V3.teta), A[2] + V3.dist * Math.cos(V3.fi)];
-  const up = V3.fi < 0.05 ? [0, 1, 0] : [0, 0, 1];
-  const pr = V3.prog; gl.useProgram(pr);
-  gl.uniformMatrix4fv(gl.getUniformLocation(pr, "mvp"), false, mul(persp(0.62, W / H, 0.5, 1000), olhar(e, V3.alvo, up)));
-  const nz = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
-  gl.uniform3fv(gl.getUniformLocation(pr, "l1"), nz([0.35, -0.55, 0.78])); gl.uniform3fv(gl.getUniformLocation(pr, "l2"), nz([-0.6, 0.45, 0.35]));
-  for (const m of V3.malhas) { for (const [nome, buf] of [["p", m.p], ["n", m.n], ["c", m.c]]) { const loc = gl.getAttribLocation(pr, nome); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); } gl.drawArrays(gl.TRIANGLES, 0, m.cont); }
-}
 
 // ------------------------------------------------------------------ 6. exportar
 function relatorioJSON(G, vol) {
@@ -495,44 +380,6 @@ function relatorioJSON(G, vol) {
     parametros: S.p, volume_silicone_ml: vol != null ? +vol.toFixed(3) : null,
     avisos: checagens().map((c) => c.n + ": " + c.t)
   };
-}
-async function imgDe(src) { const i = new Image(); await new Promise((ok) => { i.onload = ok; i.onerror = ok; i.src = src; }); return i; }
-async function relatorioPNG(G, J) {
-  const W = 1600, H = 1000, c = document.createElement("canvas"); c.width = W; c.height = H; const x = c.getContext("2d");
-  x.fillStyle = "#F4F2F9"; x.fillRect(0, 0, W, H); x.fillStyle = "#fff"; x.fillRect(0, 0, W, 90);
-  const g = x.createLinearGradient(0, 0, W, 0); g.addColorStop(0, "#9560FD"); g.addColorStop(0.45, "#6B3FD6"); g.addColorStop(1, "rgba(107,63,214,0)"); x.fillStyle = g; x.fillRect(0, 88, W, 4);
-  const [sim, ufg] = await Promise.all([imgDe("assets/eita-mamilo-simbolo.png"), imgDe("assets/logo-ufg.png")]);
-  try { x.drawImage(sim, 24, 17, 56, 56); } catch (e) {}
-  x.fillStyle = "#1C1730"; x.font = "800 32px Instrument Sans, sans-serif"; x.fillText("EITA!", 94, 50); x.fillStyle = "#9560FD"; x.fillText("MAMILO", 94 + x.measureText("EITA! ").width, 50);
-  x.fillStyle = "#2a2438"; x.font = "600 14px Instrument Sans, sans-serif"; x.fillText("Relatório da prótese externa de aréola e papila", 94, 72);
-  x.font = "500 15px IBM Plex Mono, monospace"; x.textAlign = "right"; x.fillStyle = "#5B5573"; x.fillText(`${J.caso} · ${J.data}`, W - 110, 52); x.textAlign = "left";
-  try { x.drawImage(ufg, W - 80, 18, (54 * ufg.width) / ufg.height, 54); } catch (e) {}
-  const card = (X, Y, w, h, t) => { x.fillStyle = "#fff"; x.strokeStyle = "#E1DCEC"; x.lineWidth = 1; x.beginPath(); x.roundRect ? x.roundRect(X, Y, w, h, 10) : x.rect(X, Y, w, h); x.fill(); x.stroke(); x.fillStyle = "#6B3FD6"; x.font = "600 12px IBM Plex Mono, monospace"; x.fillText(t.toUpperCase(), X + 16, Y + 26); };
-  const fr = S.frontal, a = fr.seg.areola, r = Math.max(a.eixo_maior_px, a.eixo_menor_px) * 0.85, box = 420;
-  card(24, 110, 468, 500, "1 · Contornos"); x.save(); x.beginPath(); x.rect(48, 150, box, box); x.clip();
-  x.drawImage(fr.canvas, a.cx - r, a.cy - r, 2 * r, 2 * r, 48, 150, box, box); const esc = box / (2 * r);
-  x.translate(48 + box / 2, 150 + box / 2); x.scale(esc, esc); x.translate(-a.cx, -a.cy); x.lineWidth = 2.5 / esc;
-  x.strokeStyle = COR.areola; x.beginPath(); x.ellipse(a.cx, a.cy, a.eixo_maior_px / 2, a.eixo_menor_px / 2, (a.angulo_graus * Math.PI) / 180, 0, 7); x.stroke();
-  const p = fr.seg.papila; x.strokeStyle = COR.papila; x.beginPath(); x.arc(p.cx, p.cy, p.diam_px / 2, 0, 7); x.stroke(); x.restore();
-  const n = G.n, im = x.createImageData(n, n); let tmax = 0; for (let q = 0; q < n * n; q++) if (G.dentro[q]) tmax = Math.max(tmax, G.T[q]);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const q = (n - 1 - j) * n + i, o = 4 * (j * n + i); if (!G.dentro[q]) continue; const t = Math.pow(G.T[q] / tmax, 0.45); im.data[o] = 245 - 140 * t; im.data[o + 1] = 240 - 190 * t; im.data[o + 2] = 252 - 40 * t; im.data[o + 3] = 255; }
-  const tmp = document.createElement("canvas"); tmp.width = n; tmp.height = n; tmp.getContext("2d").putImageData(im, 0, 0);
-  card(508, 110, 468, 500, "2 · Espessura (mais escuro = mais espesso)"); x.drawImage(tmp, 532, 150, box, box);
-  card(992, 110, 584, 500, "3 · Corte central (escala vertical 3×)");
-  const j0 = (n / 2) | 0, sx = 540 / (2 * G.ext), sy = sx * 3, oy0 = 400, X0 = 1012;
-  x.strokeStyle = "#A79FBF"; x.lineWidth = 1.5; x.beginPath(); for (let i = 0; i < n; i++) { const X = X0 + (G.xs[i] + G.ext) * sx, Y = oy0 - G.S[j0 * n + i] * sy; i ? x.lineTo(X, Y) : x.moveTo(X, Y); } x.stroke();
-  x.fillStyle = fr.paleta.areola; x.beginPath(); let ini = false;
-  for (let i = 0; i < n; i++) { const q = j0 * n + i; if (!G.dentro[q]) continue; const X = X0 + (G.xs[i] + G.ext) * sx, Y = oy0 - G.F[q] * sy; ini ? x.lineTo(X, Y) : (x.moveTo(X, Y), (ini = true)); }
-  for (let i = n - 1; i >= 0; i--) { const q = j0 * n + i; if (!G.dentro[q]) continue; x.lineTo(X0 + (G.xs[i] + G.ext) * sx, oy0 - G.S[q] * sy); } x.fill();
-  card(24, 626, 952, 340, "Medidas e parâmetros");
-  const m = J.medidas; x.fillStyle = "#1C1730"; x.font = "15px IBM Plex Mono, monospace";
-  [[`Escala`, `${m.px_por_mm} px/mm (marcador ${m.marcador})`], [`Cor`, m.cor_referencia], [`Aréola`, `${m.areola_eixo_maior_mm} × ${m.areola_eixo_menor_mm} mm, ${m.areola_angulo_graus}°`], [`Papila`, `Ø ${m.papila_diam_mm} mm · projeção ${m.papila_proj_mm} mm (${m.papila_proj_fonte})`], [`Espessura`, `${S.p.esp_centro_mm} mm no centro → ${S.p.esp_borda_mm} mm na borda`], [`Margem / raio`, `${S.p.margem_mm} mm / ${S.p.raio_mama_mm} mm`], [`Lados`, `foto ${J.foto.mama} → prótese ${J.protese.mama}${J.protese.espelhada ? " (espelhada)" : ""}`], [`Silicone`, J.volume_silicone_ml != null ? `${J.volume_silicone_ml} mL` : "—"], [`Contornos`, m.contornos]]
-    .forEach(([k2, v], i) => { x.fillStyle = "#5B5573"; x.fillText(k2, 44, 680 + i * 30); x.fillStyle = "#1C1730"; x.fillText(v, 220, 680 + i * 30); });
-  card(992, 626, 584, 340, "Cores de referência");
-  [["aréola", m.cores.areola], ["papila", m.cores.papila], ["pele", m.cores.pele]].forEach(([nm, h], i) => { x.fillStyle = h; x.beginPath(); x.roundRect ? x.roundRect(1012 + i * 186, 666, 170, 70, 8) : x.rect(1012 + i * 186, 666, 170, 70); x.fill(); x.fillStyle = "#1C1730"; x.font = "14px IBM Plex Mono, monospace"; x.fillText(`${nm} ${h}`, 1012 + i * 186, 758); });
-  x.fillStyle = "#B04E0C"; x.font = "13px Instrument Sans, sans-serif"; J.avisos.slice(0, 5).forEach((t, i) => x.fillText("• " + (t.length > 80 ? t.slice(0, 78) + "…" : t), 1012, 796 + i * 22));
-  x.fillStyle = "#5B5573"; x.font = "12.5px Instrument Sans, sans-serif"; x.fillText("Lab.EITA · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás — protótipo de pesquisa, não validado clinicamente.", 24, H - 14);
-  return new Promise((ok) => c.toBlob(ok, "image/png"));
 }
 const LEIAME = `EITA! MAMILO — pacote de fabricação (Lab.EITA/UFG)
 
@@ -568,25 +415,17 @@ $("expPdf").onclick = async () => { if (!S.frontal) return; try { ocupado(true, 
 
 
 // ------------------------------------------------------------------ 0. ficha da paciente (padrão EITA! AFO)
-const FICHA_KEY = "eitaMAMILO.fichas.v1", PAT_IDS = ["pName", "pId", "pBirth", "pLado", "pFoto", "pDiag", "pRecon", "pRadio", "pAlerg", "pGoal", "pProf", "pNotes"];
+const PAT_IDS = ["pName", "pId", "pBirth", "pLado", "pFoto", "pDiag", "pRecon", "pRadio", "pAlerg", "pGoal", "pProf", "pNotes"];
+const FICHAS = E.criarArmazemFichas({ chave: "eitaMAMILO.fichas.v1", formatoFicha: "EITA! MAMILO ficha", formatoBase: "EITA! MAMILO base", versaoApp: "0.2-web", prefixoBase: "base_EITA_MAMILO", rotulo: "EITA! MAMILO" });
 let pendingFicha = null;
-const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = E.escaparHTML, ageText = (d) => E.idadeTexto(d);
 function readPatient() { const t = {}; for (const id of PAT_IDS) t[id] = $(id).value.trim(); return t; }
 function writePatient(t) { for (const id of PAT_IDS) $(id).value = (t && t[id]) || ""; updAge(); badge(); }
-function ageText(d) {
-  if (!d) return ""; const e = new Date(d + "T12:00:00"), n = new Date(); if (isNaN(e)) return "";
-  let m = (n.getFullYear() - e.getFullYear()) * 12 + n.getMonth() - e.getMonth(); if (n.getDate() < e.getDate()) m--;
-  return m < 0 ? "" : Math.floor(m / 12) + " anos";
-}
 function updAge() { const a = ageText($("pBirth").value); $("pAge").textContent = a ? "Idade: " + a : ""; }
 function badge() { const n = $("pName").value.trim(); $("pBadge").textContent = n ? "· " + n : ""; }
-function patientCode() {
-  const id = $("pId").value.trim(); if (id) return id;
-  const nm = $("pName").value.trim();
-  return nm ? nm.normalize("NFD").replace(/[̀-ͯ]/g, "").split(/\s+/).filter(Boolean).map((p) => p[0].toUpperCase()).join("").slice(0, 5) : "";
-}
-function codigoArquivo() { return (($("caso").value || patientCode() || "caso").normalize("NFD").replace(/[̀-ͯ]/g, "")).replace(/[^\w.-]+/g, "_"); }
-function fichaId() { if (!S.fichaId) S.fichaId = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); return S.fichaId; }
+function patientCode() { return E.codigoPaciente($("pId").value.trim(), $("pName").value.trim()); }
+function codigoArquivo() { return E.nomeArquivo($("caso").value || patientCode() || "caso"); }
+function fichaId() { if (!S.fichaId) S.fichaId = E.novoIdFicha("m"); return S.fichaId; }
 function collectFicha() {
   const fr = S.frontal;
   return {
@@ -602,8 +441,7 @@ function collectFicha() {
     resultado: S.vol ? { volume_ml: +S.vol.toFixed(3) } : null
   };
 }
-function fichaList() { try { return JSON.parse(localStorage.getItem(FICHA_KEY) || "[]"); } catch (e) { return []; } }
-function fichaStore(l) { try { localStorage.setItem(FICHA_KEY, JSON.stringify(l)); return true; } catch (e) { return false; } }
+const fichaList = FICHAS.listar;
 let delPend = null;
 function renderFichas() {
   const el = $("fList"), l = fichaList();
@@ -613,15 +451,14 @@ function renderFichas() {
   el.querySelectorAll("[data-del]").forEach((b) => (b.onclick = () => {
     const l2 = fichaList(), f = l2[+b.dataset.del];
     if (delPend !== f.id) { delPend = f.id; renderFichas(); status(`Clique em "Confirmar" para excluir a ficha "${esc(f.nome)}" deste navegador.`, true); setTimeout(() => { if (delPend === f.id) { delPend = null; renderFichas(); } }, 5000); return; }
-    l2.splice(+b.dataset.del, 1); fichaStore(l2); delPend = null; renderFichas(); status("Ficha excluída deste navegador.");
+    FICHAS.excluir(+b.dataset.del); delPend = null; renderFichas(); status("Ficha excluída deste navegador.");
   }));
 }
 function saveFicha() {
   const f = collectFicha();
   if (!f.nome && !f.paciente.pId) { status("Dê um nome ou prontuário à ficha antes de salvar.", true); $("pName").focus(); return; }
   if (!f.nome) f.nome = f.paciente.pId;
-  const l = fichaList(), i = l.findIndex((x) => x.id === f.id); if (i >= 0) l[i] = f; else l.unshift(f);
-  const ok = fichaStore(l);
+  const ok = FICHAS.salvar(f);
   status(ok ? `Ficha "${esc(f.nome)}" salva neste navegador. Use "Exportar" para guardar uma cópia em arquivo.` : 'Não foi possível salvar no navegador; use "Exportar".', !ok);
   renderFichas();
 }
@@ -632,7 +469,7 @@ function sincronizarControles() {
   $("txOn").checked = !!T.ativa; $("txBox").style.opacity = T.ativa ? 1 : 0.5; $("pInv").checked = !!S.p.relevo_inverter; $("marcMM").value = S.p.marcador_mm;
 }
 function openFicha(f) {
-  if (!f || f.formato !== "EITA! MAMILO ficha") { status("Arquivo de ficha não reconhecido.", true); return; }
+  if (!FICHAS.ehFicha(f)) { status("Arquivo de ficha não reconhecido.", true); return; }
   S.fichaId = f.id; writePatient(f.paciente || { pName: f.nome });
   if (f.lados) { $("photoSide").value = f.lados.foto; $("protSide").value = f.lados.protese; }
   if (f.parametros) { S.p = Object.assign({}, E.PARAMETROS, f.parametros, { textura_papila: Object.assign({}, E.PARAMETROS.textura_papila, f.parametros.textura_papila || {}) }); sincronizarControles(); }
@@ -653,18 +490,10 @@ function aplicarFicha(f) {
   S.prev = null; atualizarTudo(); desenharFoto(); agendarPrevia(); feito("s0");
   status(`Ficha "${esc(f.nome || "")}" aplicada: contornos, medidas e parâmetros restaurados.`);
 }
-async function dbExport() {
-  const l = fichaList(), d = new Date();
-  await salvar(`base_EITA_MAMILO_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}.json`, JSON.stringify({ formato: "EITA! MAMILO base", versaoApp: "0.2-web", exportado: d.toISOString(), fichas: l }));
-}
+async function dbExport() { const b = FICHAS.exportarBase(); await salvar(b.nome, b.conteudo); }
 async function dbImport(file) {
-  try {
-    const b = JSON.parse(await file.text()); if (b.formato !== "EITA! MAMILO base") throw new Error("o arquivo não é uma base do EITA! MAMILO");
-    const m = new Map(fichaList().map((f) => [f.id, f])); let novas = 0, atual = 0;
-    for (const f of b.fichas || []) { if (!f || f.formato !== "EITA! MAMILO ficha") continue; const x = m.get(f.id); if (!x) { m.set(f.id, f); novas++; } else if (new Date(f.atualizado) > new Date(x.atualizado)) { m.set(f.id, f); atual++; } }
-    fichaStore([...m.values()].sort((a, c) => new Date(c.atualizado) - new Date(a.atualizado))); renderFichas();
-    status(`Base importada: ${novas} fichas novas e ${atual} atualizadas.`);
-  } catch (e) { status("Não foi possível importar a base: " + e.message, true); }
+  try { const r = FICHAS.importarBase(JSON.parse(await file.text())); renderFichas(); status(`Base importada: ${r.novas} fichas novas e ${r.atualizadas} atualizadas.`); }
+  catch (e) { status("Não foi possível importar a base: " + e.message, true); }
 }
 $("fSave").onclick = saveFicha; $("fExp").onclick = exportFicha; $("fImpB").onclick = () => $("fImp").click();
 $("fImp").onchange = async () => { const f = $("fImp").files[0]; if (f) { try { openFicha(JSON.parse(await f.text())); } catch (e) { status("Não foi possível ler a ficha: " + e.message, true); } $("fImp").value = ""; } };
@@ -694,44 +523,9 @@ function checagens() {
   return out;
 }
 
-// ------------------------------------------------------------------ relatório em PDF (gerador próprio, mesmo do EITA! AFO)
-const CP1252 = { "€": 128, "‚": 130, "ƒ": 131, "„": 132, "…": 133, "†": 134, "‡": 135, "ˆ": 136, "‰": 137, "Š": 138, "‹": 139, "Œ": 140, "Ž": 142, "‘": 145, "’": 146, "“": 147, "”": 148, "•": 149, "–": 150, "—": 151, "˜": 152, "™": 153, "š": 154, "›": 155, "œ": 156, "ž": 158, "Ÿ": 159 };
-const SUBST = { "→": "->", "≥": ">=", "≤": "<=", "⚠": "!", "≈": "~" };
-function pdfEsc(t) { let e = ""; for (let ch of String(t)) { if (SUBST[ch]) ch = SUBST[ch]; for (const c2 of ch) { let o = c2.charCodeAt(0); if (o > 255) o = CP1252[c2] || 63; const l = String.fromCharCode(o); e += l === "(" || l === ")" || l === "\\" ? "\\" + l : l; } } return e; }
-function pdfW(t, s) { let n = 0; for (const o of String(t)) n += /[ilI.,;:'|!]/.test(o) ? 0.28 : /[mwMW@]/.test(o) ? 0.85 : /[A-Z0-9]/.test(o) ? 0.64 : 0.52; return n * s; }
-function corta(t, s, w) { t = String(t); if (pdfW(t, s) <= w) return t; while (t.length > 1 && pdfW(t + "…", s) > w) t = t.slice(0, -1); return t + "…"; }
-function quebra(t, s, w) { const pal = String(t).split(/\s+/), lin = []; let a = ""; for (const p of pal) { if (pdfW(a + " " + p, s) > w && a) { lin.push(a); a = p; } else a = a ? a + " " + p : p; } if (a) lin.push(a); return lin; }
-class PdfPage {
-  constructor() { this.c = ""; }
-  rect(x, y, w, h, c) { this.c += `${c.map((v) => v.toFixed(3)).join(" ")} rg ${x} ${y} ${w} ${h} re f\n`; }
-  line(x, y, x2, y2, c, w = 0.6) { this.c += `${c.map((v) => v.toFixed(3)).join(" ")} RG ${w} w ${x} ${y} m ${x2} ${y2} l S\n`; }
-  text(x, y, s, t, b, c = [0.11, 0.09, 0.19]) { this.c += `BT /${b ? "F2" : "F1"} ${s} Tf ${c.map((v) => v.toFixed(3)).join(" ")} rg ${x} ${y} Td (${pdfEsc(t)}) Tj ET\n`; }
-  image(n, x, y, w, h) { this.c += `q ${w} 0 0 ${h} ${x} ${y} cm /${n} Do Q\n`; }
-}
-function makePDF(pages, imgs) {
-  const bin = (s) => { const u = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i) & 255; return u; };
-  const partes = [], off = []; let pos = 0; const add = (u) => { partes.push(u); pos += u.length; };
-  add(bin("%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"));
-  const ni = imgs.length, p0 = 5 + ni, tot = 4 + ni + pages.length * 2;
-  const obj = (k, b) => { off[k] = pos; add(b instanceof Uint8Array ? b : bin(`${k} 0 obj\n${b}\nendobj\n`)); };
-  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
-  obj(2, `<< /Type /Pages /Kids [${pages.map((_, i) => p0 + i * 2 + " 0 R").join(" ")}] /Count ${pages.length} >>`);
-  obj(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
-  obj(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
-  const xo = imgs.map((m, i) => `/${m.name} ${5 + i} 0 R`).join(" ");
-  imgs.forEach((m, i) => { const k = 5 + i, a = bin(`${k} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${m.w} /Height ${m.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${m.bytes.length} >>\nstream\n`), z = bin("\nendstream\nendobj\n"), u = new Uint8Array(a.length + m.bytes.length + z.length); u.set(a); u.set(m.bytes, a.length); u.set(z, a.length + m.bytes.length); obj(k, u); });
-  pages.forEach((pg, i) => {
-    const k = p0 + i * 2, cont = bin(pg.c);
-    obj(k, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ${xo} >> >> /Contents ${k + 1} 0 R >>`);
-    const a = bin(`${k + 1} 0 obj\n<< /Length ${cont.length} >>\nstream\n`), z = bin("\nendstream\nendobj\n"), u = new Uint8Array(a.length + cont.length + z.length); u.set(a); u.set(cont, a.length); u.set(z, a.length + cont.length); obj(k + 1, u);
-  });
-  const xref = pos; let x = `xref\n0 ${tot + 1}\n0000000000 65535 f \n`;
-  for (let k = 1; k <= tot; k++) x += String(off[k]).padStart(10, "0") + " 00000 n \n";
-  add(bin(x + `trailer\n<< /Size ${tot + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`));
-  const out = new Uint8Array(pos); let o = 0; for (const p of partes) { out.set(p, o); o += p.length; } return out;
-}
-function jpegOf(c, q = 0.88) { const d = c.toDataURL("image/jpeg", q), b = atob(d.split(",")[1]), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return { bytes: u, w: c.width, h: c.height }; }
-async function logoJpeg() { try { const i = new Image(); i.src = "assets/eita-mamilo-simbolo.png"; await i.decode(); const c = document.createElement("canvas"); c.width = c.height = 160; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, 160, 160); x.drawImage(i, 0, 0, 160, 160); return jpegOf(c, 0.92); } catch (e) { return null; } }
+// ------------------------------------------------------------------ relatório em PDF (gerador e layout do núcleo: nucleo/pdf.js)
+const { jpegDe: jpegOf } = E.ui, corta = E.cortarTexto;
+const logoJpeg = () => E.ui.logoJpeg("assets/eita-mamilo-simbolo.png");
 function imgContornos() {
   const fr = S.frontal, a = fr.seg.areola, p = fr.seg.papila, r = Math.max(a.eixo_maior_px, a.eixo_menor_px) * 0.8, c = document.createElement("canvas"); c.width = c.height = 600; const x = c.getContext("2d");
   x.fillStyle = "#fff"; x.fillRect(0, 0, 600, 600); x.drawImage(fr.canvas, a.cx - r, a.cy - r, 2 * r, 2 * r, 0, 0, 600, 600);
@@ -774,60 +568,35 @@ async function gerarPDF(G, vol) {
   const fr = S.frontal, P = readPatient(), J = relatorioJSON(G, vol), m = J.medidas, T = S.p.textura_papila;
   const imgs = [Object.assign({ name: "Im1" }, imgContornos()), Object.assign({ name: "Im2" }, imgTopo(G)), Object.assign({ name: "Im3" }, imgCorte(G))];
   const lg = await logoJpeg(); if (lg) imgs.push(Object.assign({ name: "Lg" }, lg));
-  const ROXO = [0.42, 0.25, 0.84], TINTA = [0.11, 0.09, 0.19], SUT = [0.36, 0.33, 0.45], LIN = [0.88, 0.86, 0.93], d = (v, k = 1) => (v == null || isNaN(v) ? "—" : (+v).toFixed(k).replace(".", ","));
-  const v = (t) => (t && String(t).trim() ? String(t).trim() : "—");
-  const L = new PdfPage(), pags = [L];
-  L.rect(0, 792, 595, 50, [0.97, 0.96, 0.99]); L.rect(0, 790, 595, 2.5, ROXO);
-  if (lg) L.image("Lg", 36, 800, 34, 34);
-  const x0 = lg ? 78 : 36; L.text(x0, 820, 18, "EITA!", true, [0.07, 0.07, 0.07]); L.text(x0 + pdfW("EITA! ", 18), 820, 18, "MAMILO", true, [0.584, 0.376, 0.992]);
-  L.text(x0, 805, 9, "Relatório de fabricação · prótese externa de aréola e papila · Lab.EITA / UFG", false, SUT);
-  const agora = new Date(); L.text(430, 820, 9, agora.toLocaleDateString("pt-BR") + " " + agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }), false, SUT);
-  L.text(430, 806, 9, corta(P.pName || patientCode() || "paciente não identificada", 9, 128), true, TINTA);
+  const SUT = E.CORES_PDF.sutil, d = (v, k = 1) => (v == null || isNaN(v) ? "—" : (+v).toFixed(k).replace(".", ","));
+  const agora = new Date();
+  const R = E.criarRelatorioPDF({ app: ["EITA!", "MAMILO"], subtitulo: "Relatório de fabricação · prótese externa de aréola e papila · Lab.EITA / UFG", logo: lg ? "Lg" : null,
+    dataTexto: agora.toLocaleDateString("pt-BR") + " " + agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    pacienteTexto: P.pName || patientCode() || "paciente não identificada", pacienteContinuacao: P.pName || patientCode() || "" });
   // paciente
-  let y = 776; L.text(36, y, 10.5, "Paciente", true, ROXO); y -= 6; L.line(36, y, 559, y, LIN); y -= 13;
-  const campo = (x, w, rot, val) => { L.text(x, y, 7.6, rot, false, SUT); L.text(x, y - 10, 9, corta(v(val), 9, w - 6), true, TINTA); };
+  R.secao("Paciente");
   const nasc = P.pBirth ? new Date(P.pBirth + "T12:00:00").toLocaleDateString("pt-BR") : "", idade = ageText(P.pBirth);
   const RECON = { nenhuma: "sem reconstrução", implante: "implante / expansor", retalho: "retalho autólogo", "nipple-sparing": "mastectomia poupadora", outra: "outra" };
   const RADIO = { nao: "não fez", concluida: "concluída há 6 meses ou mais", recente: "concluída há menos de 6 meses", curso: "em curso" };
-  campo(36, 200, "Nome", P.pName); campo(236, 100, "Prontuário / código", P.pId); campo(336, 140, "Nascimento", nasc ? nasc + (idade ? " · " + idade : "") : ""); campo(476, 83, "Fototipo", P.pFoto); y -= 25;
-  campo(36, 200, "Mama da prótese", J.protese.mama + (J.protese.espelhada ? " (foto da " + J.foto.mama + ", espelhada)" : "")); campo(236, 323, "Diagnóstico / cirurgia", P.pDiag); y -= 25;
-  campo(36, 200, "Reconstrução", RECON[P.pRecon]); campo(236, 160, "Radioterapia", RADIO[P.pRadio]); campo(396, 163, "Alergias / sensibilidade", P.pAlerg); y -= 25;
-  campo(36, 260, "Objetivo / indicação", P.pGoal); campo(304, 255, "Profissional responsável", P.pProf); y -= 25;
-  campo(36, 523, "Observações", (P.pNotes || "").replace(/\s+/g, " ")); y -= 22;
+  R.campo(36, 200, "Nome", P.pName); R.campo(236, 100, "Prontuário / código", P.pId); R.campo(336, 140, "Nascimento", nasc ? nasc + (idade ? " · " + idade : "") : ""); R.campo(476, 83, "Fototipo", P.pFoto); R.y -= 25;
+  R.campo(36, 200, "Mama da prótese", J.protese.mama + (J.protese.espelhada ? " (foto da " + J.foto.mama + ", espelhada)" : "")); R.campo(236, 323, "Diagnóstico / cirurgia", P.pDiag); R.y -= 25;
+  R.campo(36, 200, "Reconstrução", RECON[P.pRecon]); R.campo(236, 160, "Radioterapia", RADIO[P.pRadio]); R.campo(396, 163, "Alergias / sensibilidade", P.pAlerg); R.y -= 25;
+  R.campo(36, 260, "Objetivo / indicação", P.pGoal); R.campo(304, 255, "Profissional responsável", P.pProf); R.y -= 25;
+  R.campo(36, 523, "Observações", (P.pNotes || "").replace(/\s+/g, " ")); R.y -= 22;
   // imagens
-  const iw = 160, gap = (523 - 3 * iw) / 2, iy = y - iw;
+  const L = R.pg, iw = 160, gap = (523 - 3 * iw) / 2, iy = R.y - iw;
   L.image("Im1", 36, iy, iw, iw); L.image("Im2", 36 + iw + gap, iy, iw, iw); L.image("Im3", 36 + 2 * (iw + gap), iy + (iw - (iw * 600) / 900) / 2, iw, (iw * 600) / 900);
   L.text(36, iy - 11, 7.6, "Contornos na foto calibrada", false, SUT); L.text(36 + iw + gap, iy - 11, 7.6, "Prótese, vista de frente (relevo)", false, SUT); L.text(36 + 2 * (iw + gap), iy - 11, 7.6, "Corte pela papila", false, SUT);
-  y = iy - 30;
-  let pg = L;
-  const novaPagina = () => { pg = new PdfPage(); pags.push(pg); pg.rect(0, 820, 595, 22, [0.97, 0.96, 0.99]); pg.text(36, 826, 9.5, "EITA! MAMILO · " + corta(P.pName || patientCode() || "", 9, 300) + " · continuação", true, ROXO); y = 796; };
-  const tabela = (x, tit, linhas) => { let yy = y; pg.text(x, yy, 10.5, tit, true, ROXO); yy -= 6; pg.line(x, yy, x + 255, yy, LIN); yy -= 13; for (const [a, b] of linhas) { pg.text(x, yy, 8.8, corta(a, 8.8, 150), false, SUT); const s = corta(String(b), 8.8, 140); pg.text(x + 255 - pdfW(s, 8.8), yy, 8.8, s, true, TINTA); yy -= 13.2; } return yy; };
-  const par = (t1, l1, t2, l2) => { const h = 26 + Math.max(l1.length, l2.length) * 13.2; if (y - h < 50) novaPagina(); const a = tabela(36, t1, l1), b = tabela(304, t2, l2); y = Math.min(a, b) - 12; };
-  par("Fotografia e medidas", [["Foto frontal", corta(fr.nome, 8.8, 140)], ["Escala", d(m.px_por_mm, 2) + " px/mm"], ["Marcador", m.marcador], ["Referência de cor", m.cor_referencia], ["Aréola (eixos)", d(m.areola_eixo_maior_mm) + " × " + d(m.areola_eixo_menor_mm) + " mm"], ["Ângulo da aréola", d(m.areola_angulo_graus, 0) + "°"], ["Papila, diâmetro", d(m.papila_diam_mm) + " mm"], ["Papila, projeção", d(m.papila_proj_mm) + " mm (" + m.papila_proj_fonte + ")"], ["Forma da papila (expoente)", d(m.papila_forma_n, 2)], ["Contornos", m.contornos]],
+  R.y = iy - 30;
+  R.par("Fotografia e medidas", [["Foto frontal", corta(fr.nome, 8.8, 140)], ["Escala", d(m.px_por_mm, 2) + " px/mm"], ["Marcador", m.marcador], ["Referência de cor", m.cor_referencia], ["Aréola (eixos)", d(m.areola_eixo_maior_mm) + " × " + d(m.areola_eixo_menor_mm) + " mm"], ["Ângulo da aréola", d(m.areola_angulo_graus, 0) + "°"], ["Papila, diâmetro", d(m.papila_diam_mm) + " mm"], ["Papila, projeção", d(m.papila_proj_mm) + " mm (" + m.papila_proj_fonte + ")"], ["Forma da papila (expoente)", d(m.papila_forma_n, 2)], ["Contornos", m.contornos]],
     "Prótese", [["Espessura no centro", d(S.p.esp_centro_mm, 2) + " mm"], ["Borda afinada", d(S.p.esp_borda_mm, 2) + " mm"], ["Margem além da aréola", d(S.p.margem_mm) + " mm"], ["Microrrelevo da foto", d(S.p.relevo_amp_mm, 2) + " mm" + (S.p.relevo_inverter ? " (invertido)" : "")], ["Raio da mama (verso)", d(S.p.raio_mama_mm, 0) + " mm"], ["Textura da papila", T.ativa ? "sim · intensidade " + d(T.intensidade) : "não"], ["Lóbulos / sulcos", T.ativa ? d(T.lobulo_mm) + " / " + d(T.sulco_mm, 2) + " mm" : "—"], ["Óstios / rugas / sulco basal", T.ativa ? T.ostios + " / " + d(T.ruga_amp_mm, 2) + " / " + d(T.sulco_basal_mm, 2) + " mm" : "—"], ["Espelhada", J.protese.espelhada ? "sim" : "não"]]);
   const dimA = 2 * G.a * G.rho_out, dimB = 2 * G.b * G.rho_out;
-  par("Resultado", [["Dimensões da prótese", d(dimA) + " × " + d(dimB) + " mm"], ["Altura total no centro", d(G.papila_proj_mm + S.p.esp_centro_mm) + " mm"], ["Volume de silicone", vol != null ? d(vol, 2) + " mL" : "—"], ["Massa estimada (1,1 g/mL)", vol != null ? d(vol * 1.1, 1) + " g" : "—"], ["Bloco dos moldes", d(2 * (G.ext - 1), 0) + " × " + d(2 * (G.ext - 1), 0) + " mm"], ["Resolução da malha", d(parseFloat($("res").value), 2) + " mm"], ["Malhas", "sólidos fechados"]],
+  R.par("Resultado", [["Dimensões da prótese", d(dimA) + " × " + d(dimB) + " mm"], ["Altura total no centro", d(G.papila_proj_mm + S.p.esp_centro_mm) + " mm"], ["Volume de silicone", vol != null ? d(vol, 2) + " mL" : "—"], ["Massa estimada (1,1 g/mL)", vol != null ? d(vol * 1.1, 1) + " g" : "—"], ["Bloco dos moldes", d(2 * (G.ext - 1), 0) + " × " + d(2 * (G.ext - 1), 0) + " mm"], ["Resolução da malha", d(parseFloat($("res").value), 2) + " mm"], ["Malhas", "sólidos fechados"]],
     "Fabricação", [["Moldes", "SLA/DLP, camada <= 0,05 mm"], ["Pós-cura", "completa + teste de cura"], ["Desmoldante", "antes da pintura"], ["Pintura", "intrínseca, em camadas"], ["Silicone", "platinum, grau médico"], ["Fixação", "adesivo de grau médico"], ["Acabamento", "aparar a borda fina"]]);
-  // cores
-  if (y - 70 < 50) novaPagina();
-  pg.text(36, y, 10.5, "Cores de referência (pigmentação)", true, ROXO); y -= 6; pg.line(36, y, 559, y, LIN); y -= 34;
-  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
-  [["Aréola", m.cores.areola], ["Papila", m.cores.papila], ["Pele ao redor", m.cores.pele]].forEach(([nm, h], i) => { const x = 36 + i * 176; pg.rect(x, y, 40, 24, rgb(h)); pg.text(x + 48, y + 13, 9, nm, true, TINTA); pg.text(x + 48, y + 2, 8.4, h.toUpperCase(), false, SUT); });
-  y -= 22;
-  // segurança
-  const ch = checagens(), hS = 24 + ch.reduce((s, c) => s + 11 * quebra(c.t, 8.6, 465).length + 2, 12); if (y - hS < 48) novaPagina();
-  pg.text(36, y, 10.5, "Checagem de segurança", true, ROXO); y -= 6; pg.line(36, y, 559, y, LIN); y -= 13;
-  if (!ch.length) { pg.text(36, y, 8.8, "Nenhum problema encontrado pelas verificações automáticas.", false, [0.15, 0.47, 0.31]); y -= 12; }
-  for (const c of ch) { const cor = c.n === "alerta" ? [0.62, 0.18, 0.08] : c.n === "info" ? SUT : [0.55, 0.33, 0.03]; const lin = quebra(c.t, 8.6, 465); if (y - lin.length * 11 < 46) novaPagina(); pg.text(36, y, 8.6, c.n === "alerta" ? "ALERTA" : c.n === "info" ? "info" : "atenção", true, cor); lin.forEach((l, k) => pg.text(92, y - k * 11, 8.6, l, false, TINTA)); y -= 11 * lin.length + 2; }
-  y -= 8; if (y < 76) novaPagina();
-  pg.line(36, y, 559, y, LIN);
-  quebra("Medidas obtidas por fotografia calibrada e modelo computacional. Protótipo de pesquisa, não validado clinicamente: confira as medidas, a cor e a adaptação na paciente antes da entrega. A prótese não substitui a avaliação da equipe de saúde.", 8, 523).forEach((l, k) => pg.text(36, y - 14 - k * 11, 8, l, false, SUT));
-  pags.forEach((p, i) => {
-    if (i === 0) { p.text(36, 34, 7.2, "EITA! MAMILO · © 2026 Lab.EITA — Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás", false, SUT); p.text(36, 24, 7.2, "Autor: Pedro Henrique Gonçalves", false, SUT); }
-    else p.text(36, 28, 7.2, "EITA! MAMILO · Lab.EITA / UFG", false, SUT);
-    const t = "página " + (i + 1) + " de " + pags.length; p.text(559 - pdfW(t, 7.2), i === 0 ? 24 : 28, 7.2, t, false, SUT);
-  });
-  return makePDF(pags, imgs);
+  R.cores("Cores de referência (pigmentação)", [["Aréola", m.cores.areola], ["Papila", m.cores.papila], ["Pele ao redor", m.cores.pele]]);
+  R.seguranca(checagens());
+  R.avisoFinal("Medidas obtidas por fotografia calibrada e modelo computacional. Protótipo de pesquisa, não validado clinicamente: confira as medidas, a cor e a adaptação na paciente antes da entrega. A prótese não substitui a avaliação da equipe de saúde.");
+  return R.finalizar(imgs);
 }
 
 // ------------------------------------------------------------------ ferramentas: marcador e corpo de prova

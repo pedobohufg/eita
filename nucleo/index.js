@@ -6,3 +6,5 @@ export * from "./geometria-plana.js";
 export * from "./calibracao.js";
 export * from "./malha.js";
 export * from "./saida.js";
+export * from "./pdf.js";
+export * from "./ficha.js";

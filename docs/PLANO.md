@@ -74,15 +74,17 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 |---|---|
 | E0 ✔ | Decisões da seção 3; nome; projeto e repositório criados |
 | E1a ✔ | Núcleo de processamento extraído do MAMILO (`nucleo/`: base, imagem, geometria plana, calibração, malha, saída) + módulo `modulos/mamilo/` + montagem + testes (regressão byte a byte contra a v0.2) |
-| E1b | Partes de interface que ainda estão no `ui.js` do MAMILO: casca (layout), ficha/base, PDF, visualizador 3D |
+| E1b ✔ | Interface comum extraída do MAMILO: `nucleo/pdf.js` (gerador + layout de relatório), `nucleo/ficha.js` (armazém de fichas e base), `nucleo/interface/` (casca, imagem no navegador, vista 3D). PDF, STL, ficha e telas 3D idênticos à E1a |
 | E2 | OLHO migrado para o núcleo (o menor), servindo de teste da migração |
 | E3 | Portal + ficha única + importadores das fichas do AFO e do MAMILO |
 | E4 | AFO migrado (sem mudar os resultados: comparar STL e PDF antes e depois) |
 | E5 | Módulo NARIZ/ORELHA: revisão de literatura, captura 3D e moldes multipartes |
 
-## 6. Situação do repositório (10/11/2026)
-- `nucleo/` — processamento comum, em ES modules, sem dependências.
-- `modulos/mamilo/` — processamento específico (`processamento.js`), interface (`ui.js`, ainda a mesma da v0.2), `index.html` e imagens.
+## 6. Situação do repositório (10/11/2026, após a E1b)
+- `nucleo/` — processamento comum, em ES modules, sem dependências: imagem, calibração, malha, zip, **PDF** (gerador + layout de relatório) e **ficha** (armazém no navegador, base do laboratório).
+- `nucleo/interface/` — partes de navegador: casca Lab.EITA (status, ocupado, downloads, etapas, área de soltar), abrir fotos/JPEG e visualizador WebGL.
+- `modulos/mamilo/` — processamento específico (`processamento.js`), interface (`ui.js`, 880 → 650 linhas: ficou só o que é do MAMILO — editor da foto, perfil lateral, cena 3D, conteúdo do relatório, checagens), `index.html` e imagens.
 - `ferramentas/montar.mjs` — gera `dist/<modulo>/` com um `app.js` único, pronto para publicar como artefato.
-- `testes/` — `npm test`: 15 testes (núcleo + MAMILO). O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada. Há também um teste de navegador opcional (Playwright).
+- `testes/` — `npm test`: 21 testes (núcleo, PDF/ficha e MAMILO). O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py` (fumaça) e `comparar_saidas.py` (duas montagens → PDF, STL, ficha e telas idênticos).
+- Próximo: **E2**, OLHO sobre o núcleo. Pontos de atenção: a calibração do OLHO (diâmetro da íris ou régua de 2 pontos, cor por clique) entra em `nucleo/calibracao.js`; o OLHO ainda não tem ficha nem PDF e passa a ganhar os do núcleo.
 - `legado/` — código dos apps publicados (AFO v0.14, OLHO v0.1, MAMILO v0.2) como referência para a migração.

@@ -14,6 +14,10 @@ nucleo/                 processamento comum (ES modules, sem dependências)
   calibracao.js         marcador ArUco v2 (escala) e correção de cor
   malha.js              campo de altura → sólido fechado, STL, volume, verificação
   saida.js              pacote .zip
+  pdf.js                gerador de PDF e layout de relatório Lab.EITA
+  ficha.js              ficha do paciente e base do laboratório (armazenamento no navegador)
+  interface/            só navegador: casca Lab.EITA (status, ocupado, downloads, etapas),
+                        abrir fotos e JPEG, visualizador WebGL
 modulos/
   mamilo/               EITA! MAMILO (processamento, interface, página e imagens)
 ferramentas/montar.mjs  gera dist/<modulo>/ (app.js único, pronto para publicar)
@@ -30,6 +34,7 @@ Requer Node.js 20 ou mais novo. Não há dependências para instalar.
 npm test                 # testes do núcleo e dos módulos
 npm run montar           # gera dist/mamilo/ (abrir dist/mamilo/index.html por um servidor local)
 python3 testes/navegador/teste_mamilo.py   # opcional: teste no navegador (Playwright + Chrome)
+python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens
 ```
 
 ## Regras do projeto
