@@ -95,7 +95,7 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 - `legado/` — código dos apps publicados (AFO v0.14 com imagens e `sobre.html`, OLHO v0.2, MAMILO v0.2, calculadora de assimetria craniana) como referência para a migração.
 - `modulos/afo/` (E4) — `vetor.js`, `anatomia.js`, `casca.js` (geração da casca e texto do Worker) e `vista.js` (câmera), puros; `ui.js` (interface do AFO v0.14 sobre o núcleo: malha/STL, .zip/downloads, ficha, PDF e tour), `index.html`, `sobre.html` e imagens. Entra na plataforma como os demais módulos (`PLATAFORMA.modulos`).
 - Núcleo, novidades da E4: `lerSTL`, `soldar`, `filtrarComponentes`, `contarArestasDeBorda`, `separarVincos`, `normaisDeVertices`; `embalarParaDownload` (STL só dentro de .zip); `capacidadeDownloads`/`salvarPelaCapacidade`/`baixarPorLink`; `exportarBase(agora, extras)`; `criarTour`; `compilarPrograma(…, { verificar })`.
-- Testes da E4: `npm test` 49 (inclui `malha-stl.test.mjs` contra as funções do AFO publicado e `afo.test.mjs`, regressão da casca no Node); no navegador `comparar_afo.py`, `caminhos_afo.py`, `ficha_afo.py`, `tour_afo.py`, `vista_afo.py` (sempre `legado/afo` × montagem nova) e `teste_plataforma.py` com o AFO.
+- Testes da E4: `npm test` 51 com o MAMILO de pigmentação (inclui `malha-stl.test.mjs` contra as funções do AFO publicado e `afo.test.mjs`, regressão da casca no Node); no navegador `comparar_afo.py`, `caminhos_afo.py`, `ficha_afo.py`, `tour_afo.py`, `vista_afo.py` (sempre `legado/afo` × montagem nova) e `teste_plataforma.py` com o AFO.
 - Próximo: **E5** (NARIZ/ORELHA).
 
 ## 7. Ficha única e portal (E3, 10/11/2026)
