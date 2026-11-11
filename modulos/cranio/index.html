@@ -167,6 +167,9 @@ ul.ck{list-style:none;padding:0;margin:8px 0;font-size:12.5px;display:grid;gap:5
 ul.ck li.ck-ok:before{content:"✓";color:var(--ok)}ul.ck li.ck-warn:before{content:"!";color:var(--s2)}ul.ck li.ck-bad:before{content:"✕";color:var(--s3)}ul.ck li.ck-na{color:var(--muted);padding-left:0}ul.ck small{display:block;color:var(--muted);font-size:11.5px}
 pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font:400 11.5px/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .seta{font-size:12px;color:var(--muted);margin:2px 0 0}
+table.perf{width:100%;border-collapse:collapse;font-size:12px}table.perf th{font:600 10px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:right;padding:3px 4px;border-bottom:1px solid var(--line)}table.perf th:first-child,table.perf td:first-child{text-align:left}
+table.perf td{padding:3px 4px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--surface-2)}table.perf tr.max td{background:var(--accent-soft);font-weight:700}table.perf tr.atual td:first-child:after{content:" ●";color:var(--accent)}
+table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align:middle;margin-right:6px;background:var(--sev)}
 
 </style>
 </head>
@@ -239,7 +242,12 @@ pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--
       <label class="chk"><input type="checkbox" id="show-intersection" checked> Mostrar o corte e as linhas de medida</label>
       <div class="row"><button class="primary" id="btn-extract-3d" type="button">Extrair D1, D2, AP e LL do scan</button></div>
       <p class="why" id="why-extract"></p>
-      <div class="note">Depois do alinhamento, o plano fica na altura glabela–opistocrânio. Em reavaliações, use a mesma altura para comparar.</div>
+      <div class="note">Depois do alinhamento, o plano fica na altura glabela–opistocrânio. Em reavaliações, use a mesma altura para comparar. LL é a largura transversal máxima (eúrio a eúrio).</div>
+      <div id="perfil" hidden>
+        <div class="sub-h">Assimetria por altura</div>
+        <div id="perfilTab"></div>
+        <div class="row"><button type="button" id="btn-perfil-max">Medir na altura de maior assimetria</button></div>
+      </div>
       <div class="sub-h">Medidas</div>
     </div>
     <div class="row" style="margin:8px 0 4px"><span style="font-size:13px">Unidade</span><div class="uni" id="uni"><button type="button" data-u="mm" class="on">mm</button><button type="button" data-u="cm">cm</button></div></div>
@@ -294,18 +302,19 @@ pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--
     <label class="ctl sel">Predefinição<select id="cro-preset"><option value="">Selecione…</option></select></label>
     <div class="row"><input type="text" id="cro-preset-name" placeholder="Nome do protocolo do serviço" maxlength="40" style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);font:inherit"><button type="button" id="btn-cro-preset-save">Salvar protocolo</button></div>
     <div id="cro-params">
-      <label class="ctl sel" id="row-cro-type">Tipo<select id="cro-type"><option value="closed">Capacete fechado</option><option value="band">Faixa (topo aberto)</option></select></label>
-      <label class="ctl dec" id="row-cro-bandtop" title="Elevação do topo da faixa, em graus acima do plano de referência.">Topo da faixa (°)<input type="text" inputmode="decimal" id="cro-bandtop" value="55"></label>
+      <label class="ctl sel" id="row-cro-type">Tipo<select id="cro-type"><option value="closed">Capacete fechado</option><option value="band" selected>Faixa (topo aberto)</option></select></label>
+      <label class="ctl dec" id="row-cro-bandtop" title="Elevação da borda superior na frente, em graus acima do plano de referência.">Topo da faixa na frente (°)<input type="text" inputmode="decimal" id="cro-bandtop" value="40"></label>
+      <label class="ctl dec" id="row-cro-bandtop-back" title="Elevação da borda superior atrás; entre a frente e atrás a borda varia suavemente. Igual à da frente = topo reto.">Topo da faixa atrás (°)<input type="text" inputmode="decimal" id="cro-bandtop-back" value="70"></label>
       <label class="ctl dec" id="row-cro-c0" title="Espaço entre a cabeça e a casca para o forro.">Folga / forro (mm)<input type="text" inputmode="decimal" id="cro-c0" value="2"></label>
       <label class="ctl dec" id="row-cro-t">Espessura da casca (mm)<input type="text" inputmode="decimal" id="cro-t" value="3"></label>
-      <label class="ctl dec" id="row-cro-hb" title="Altura da borda atrás, relativa ao plano de referência (negativo = abaixo).">Borda posterior (mm)<input type="text" inputmode="decimal" id="cro-hb" value="-12"></label>
-      <label class="ctl dec" id="row-cro-occ-drop" title="Baixa a borda ao redor do occipício. Não estenda até a nuca: limita a flexão do pescoço.">Descida no occipício (mm)<input type="text" inputmode="decimal" id="cro-occ-drop" value="8"></label>
-      <label class="ctl sel" id="row-cro-cheek">Apoio na bochecha<select id="cro-cheek"><option value="on">Com apoio</option><option value="off">Sem apoio</option></select></label>
+      <label class="ctl dec" id="row-cro-hb" title="Altura da borda atrás, relativa ao plano de referência (negativo = abaixo).">Borda posterior (mm)<input type="text" inputmode="decimal" id="cro-hb" value="-30"></label>
+      <label class="ctl dec" id="row-cro-occ-drop" title="Baixa a borda ao redor do occipício. Não estenda até a nuca: limita a flexão do pescoço.">Descida no occipício (mm)<input type="text" inputmode="decimal" id="cro-occ-drop" value="10"></label>
+      <label class="ctl sel" id="row-cro-cheek" title="Aba à frente da orelha, apoiada na bochecha.">Apoio na bochecha<select id="cro-cheek"><option value="on">Com apoio</option><option value="off">Sem apoio</option></select></label>
       <label class="ctl dec" id="row-cro-cheek-w">Largura do apoio (mm)<input type="text" inputmode="decimal" id="cro-cheek-w" value="30"></label>
-      <label class="ctl sel" id="row-cro-mast">Aba atrás da orelha<select id="cro-mast"><option value="on">Com aba</option><option value="off">Sem aba</option></select></label>
+      <label class="ctl sel" id="row-cro-mast">Aba atrás da orelha<select id="cro-mast"><option value="on">Com aba</option><option value="off" selected>Sem aba</option></select></label>
       <label class="ctl dec" id="row-cro-mast-w">Largura da aba (mm)<input type="text" inputmode="decimal" id="cro-mast-w" value="24"></label>
       <label class="ctl sel" id="row-cro-res">Resolução<select id="cro-res"><option value="normal">Normal (~2 s, ~8 MB)</option><option value="high">Alta (~5 s, ~16 MB)</option><option value="fine">Fina (~10 s, ~28 MB)</option></select></label>
-      <label class="ctl sel" id="row-cro-split">Divisão em valvas<select id="cro-split"><option value="coronal">Coronal (frente/trás)</option><option value="sagittal">Sagital (esq./dir.)</option><option value="none">Sem divisão</option></select></label>
+      <label class="ctl sel" id="row-cro-split">Fenda ou divisão<select id="cro-split"><option value="lateralL" selected>Peça inteira, fenda lateral E</option><option value="lateralR">Peça inteira, fenda lateral D</option><option value="coronal">Duas valvas: coronal (frente/trás)</option><option value="sagittal">Duas valvas: sagital (esq./dir.)</option><option value="none">Peça inteira, sem fenda</option></select></label>
       <div class="sub-h">Orelhas</div>
       <p class="note" id="cro-ear-info">Analise a pressão para detectar as orelhas.</p>
       <div class="row"><button type="button" id="btn-cro-mark-ear-r">◎ Marcar D</button><button type="button" id="btn-cro-mark-ear-l">◎ Marcar E</button><button type="button" id="btn-cro-ear-auto">Voltar à detecção automática</button></div>
@@ -329,15 +338,16 @@ pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--
         <label class="ctl dec" id="row-cro-ear-top-l">Altura do arco E (mm)<input type="text" inputmode="decimal" id="cro-ear-top-l" value="14"></label>
       </details>
       <details class="av"><summary>Avançado: bordas e abas</summary>
-        <label class="ctl dec" id="row-cro-hf">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="4"></label>
+        <label class="ctl dec" id="row-cro-hf">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="-15"></label>
         <label class="ctl dec" id="row-cro-occ-w">Semilargura do occipício (°)<input type="text" inputmode="decimal" id="cro-occ-w" value="50"></label>
-        <label class="ctl dec" id="row-cro-cheek-depth">Profundidade da bochecha (mm)<input type="text" inputmode="decimal" id="cro-cheek-depth" value="32"></label>
+        <label class="ctl dec" id="row-cro-cheek-depth">Profundidade da bochecha (mm)<input type="text" inputmode="decimal" id="cro-cheek-depth" value="45"></label>
         <label class="ctl dec" id="row-cro-cheek-gap">Afastamento da orelha (mm)<input type="text" inputmode="decimal" id="cro-cheek-gap" value="6"></label>
         <label class="ctl dec" id="row-cro-cheek-clear">Folga nos apoios (mm)<input type="text" inputmode="decimal" id="cro-cheek-clear" value="1,5"></label>
         <label class="ctl dec" id="row-cro-mast-depth">Profundidade da aba (mm)<input type="text" inputmode="decimal" id="cro-mast-depth" value="24"></label>
         <label class="ctl dec" id="row-cro-mast-gap">Afastamento atrás da orelha (mm)<input type="text" inputmode="decimal" id="cro-mast-gap" value="4"></label>
       </details>
       <details class="av"><summary>Avançado: furos e divisão</summary>
+        <label class="ctl sel" id="row-cro-hole-zone">Onde ficam os furos<select id="cro-hole-zone"><option value="ap" selected>Só na frente e atrás</option><option value="all">Em toda a casca</option></select></label>
         <label class="ctl dec" id="row-cro-hole-d">Diâmetro dos furos (mm)<input type="text" inputmode="decimal" id="cro-hole-d" value="4"></label>
         <label class="ctl dec" id="row-cro-pitch">Passo entre furos (mm)<input type="text" inputmode="decimal" id="cro-pitch" value="10"></label>
         <label class="ctl dec" id="row-cro-margin">Margem sem furos (mm)<input type="text" inputmode="decimal" id="cro-margin" value="8"></label>
@@ -379,6 +389,7 @@ pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--
       <div class="cartao"><h3>Esquema em vista superior</h3><svg id="fig" viewBox="0 0 260 300" role="img" aria-label="Esquema do crânio em vista superior"></svg><div class="leg"><span><i></i>Diagonal A</span><span><i class="b"></i>Diagonal B</span></div></div>
       <div style="display:grid;gap:14px;align-content:start">
         <div class="cartao"><h3>Resumo</h3><pre class="resumo" id="resumo"></pre></div>
+        <div class="cartao" id="perfilBox" hidden><h3>Assimetria por altura (scan)</h3><div id="perfilRes"></div></div>
         <div class="cartao" id="grafBox" hidden><h3>Evolução do CVAI</h3><canvas id="graf" width="1200" height="440"></canvas></div>
       </div>
     </div>

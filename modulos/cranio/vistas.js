@@ -42,7 +42,8 @@ export function raioMaisDistante(seg, dx, dy) {
 // esquerda) e D2 (anterior esquerda → posterior direita), as diagonais a 30° do eixo AP
 export const DIRECOES = (() => { const s = Math.sin(30 * GRAU), c = Math.cos(30 * GRAU); return { ant: [0, 1], post: [0, -1], right: [1, 0], left: [-1, 0], d1a: [s, c], d1p: [-s, -c], d2a: [-s, c], d2p: [s, -c] }; })();
 // Medidas no plano z (página antiga: planeData, mais a área e os índices da tabela do relatório).
-// → { seg, hit, perimeter, area (mm²), AP, LL, D1, D2 (mm ou null), radii, cva, cvai, ci }
+// → { seg, hit, perimeter, area (mm²), AP, LL (corda a 90° pela origem, como antes), D1, D2 (mm ou null), radii,
+//     largura (extensão transversal máxima), eurios ([[x, y] direito, [x, y] esquerdo]), ciTransversal, cva, cvai, ci (LL/AP, como antes) }
 export function medidasNoPlano(pos, idx, z) {
   const seg = cortePlanoZ(pos, idx, z), hit = {};
   Object.keys(DIRECOES).forEach(function (k) { hit[k] = raioMaisDistante(seg, DIRECOES[k][0], DIRECOES[k][1]); });
@@ -51,7 +52,11 @@ export function medidasNoPlano(pos, idx, z) {
   const len = function (a, b) { return hit[a] && hit[b] ? Math.hypot(hit[a].x - hit[b].x, hit[a].y - hit[b].y) : null; };
   const AP = len("ant", "post"), LL = len("right", "left"), D1 = len("d1a", "d1p"), D2 = len("d2a", "d2p"), radii = {};
   Object.keys(DIRECOES).forEach(function (k) { radii[k] = hit[k] && hit[k].t; });
-  return { seg: seg, hit: hit, perimeter: per, area: Math.abs(area), AP: AP, LL: LL, D1: D1, D2: D2, radii: radii,
+  // largura transversal máxima (perpendicular ao plano sagital, eúrio a eúrio) e IC por ela (E3c-4)
+  let x0 = Infinity, x1 = -Infinity, e0 = null, e1 = null;
+  for (let i = 0; i < seg.length; i += 2) { if (seg[i] < x0) { x0 = seg[i]; e0 = [seg[i], seg[i + 1]]; } if (seg[i] > x1) { x1 = seg[i]; e1 = [seg[i], seg[i + 1]]; } }
+  const largura = seg.length ? x1 - x0 : null;
+  return { seg: seg, hit: hit, perimeter: per, area: Math.abs(area), AP: AP, LL: LL, D1: D1, D2: D2, radii: radii, largura: largura, eurios: e0 && e1 ? [e1, e0] : null, ciTransversal: AP && largura ? largura / AP * 100 : null,
     cva: D1 != null && D2 != null ? Math.abs(D1 - D2) : null,
     cvai: D1 != null && D2 != null ? Math.abs(D1 - D2) / Math.max(D1, D2) * 100 : null,
     ci: AP && LL ? LL / AP * 100 : null };
@@ -181,4 +186,21 @@ export function unidadeProvavel(pos) {
   if (D >= 6 && D <= 60) return "10";
   if (D >= 0.06 && D <= 0.6) return "1000";
   return null;
+}
+
+// ------------------------------------------------------------------ assimetria por altura (E3c-4)
+// CVA/CVAI e IC em planos paralelos ao de referência (zRef), de `de` a `ate` mm, de `passo` em `passo`.
+// Só entram os planos em que o contorno corta as 4 direções e o AP passa de 90% do maior AP da série (fora
+// disso o corte já está perto do vértice ou do pescoço). → { niveis: [{ dz, z, AP, largura, D1, D2, cva, cvai, ci }],
+// maior (o de maior CVAI), referencia (dz = 0, se válido) }
+export function perfilDeAssimetria(pos, idx, zRef, o) {
+  o = o || {};
+  const de = o.de == null ? -10 : o.de, ate = o.ate == null ? 50 : o.ate, passo = o.passo || 5, todos = [];
+  for (let dz = de; dz <= ate + 1e-9; dz += passo) {
+    const md = medidasNoPlano(pos, idx, zRef + dz);
+    if (md.AP && md.D1 && md.D2 && md.largura) todos.push({ dz: dz, z: zRef + dz, AP: md.AP, largura: md.largura, D1: md.D1, D2: md.D2, cva: md.cva, cvai: md.cvai, ci: md.ciTransversal });
+  }
+  const apMax = todos.reduce((m, n) => Math.max(m, n.AP), 0), niveis = todos.filter((n) => n.AP >= 0.9 * apMax);
+  const maior = niveis.reduce((m, n) => (!m || n.cvai > m.cvai ? n : m), null);
+  return { niveis: niveis, maior: maior, referencia: niveis.find((n) => Math.abs(n.dz) < 1e-9) || null };
 }

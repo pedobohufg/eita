@@ -25,6 +25,7 @@ export function legadoCROCore() {
 export function comoCROCore(O) {
   const C = {};
   for (const [antigo, novo] of Object.entries(CONFIG.nomes)) { if (!(novo in O)) throw new Error("falta " + novo); C[antigo] = O[novo]; }
+  C.analyze = (pos, zRef) => O.analisar(pos, zRef, { icLegado: true });   // IC como na página antiga (desde a E3c-4 o padrão é a largura transversal)
   return C;
 }
 

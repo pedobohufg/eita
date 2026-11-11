@@ -77,7 +77,8 @@ function preencher(mm) {   // valores em mm (ou vazio)
 }
 function mostrarOrigem() {
   const o = S.origem;
-  $("origemMed").textContent = o ? `Medidas tiradas do scan ${o.scan} no plano axial z = ${fmt(o.planoZ, 1)} mm${o.alinhado ? "" : " (modelo não alinhado: valores indicativos)"}.` : "";
+  const mx = o && o.maiorAssimetria;
+  $("origemMed").textContent = o ? `Medidas tiradas do scan ${o.scan} no plano axial z = ${fmt(o.planoZ, 1)} mm${o.alinhado ? "" : " (modelo não alinhado: valores indicativos)"}.${mx ? ` Maior assimetria do scan: CVAI ${fmt(mx.cvai, 1)} % a ${mx.dz > 0 ? "+" : ""}${fmt(mx.dz, 0)} mm do plano de referência.` : ""}` : "";
 }
 C.MEDIDAS.forEach((x) => $(x.id).addEventListener("input", () => { if (S.origem) { S.origem = null; mostrarOrigem(); } render(); }));
 document.querySelectorAll("#uni button").forEach((b) => (b.onclick = () => mudarUnidade(b.dataset.u)));
@@ -239,7 +240,7 @@ async function abrirSTL(arq) {
     else if (provavel && provavel !== sel.value) avisoU = ` <b>Atenção:</b> pelo tamanho, o arquivo parece estar em ${NOMES_U[provavel]}, não em ${NOMES_U[sel.value]}. Confira a unidade.`;
     const u = sel.value, { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
     mostrarVista("3d"); iniciar3D();
-    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null;
+    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; limparPerfil();
     trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano();
     ["btn-arm-mark", "btn-clear-marks"].forEach((id) => ($(id).disabled = false));
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
@@ -283,7 +284,7 @@ $("btn-clear-marks").onclick = () => { limparPontos(); status("Pontos de referê
 function alinhar() {
   const r = O.alinharPorPontos(S3.pos, S3.pontos); if (!r) return false;
   S3.alinhamento = {}; O.PONTOS_DE_REFERENCIA.forEach((k) => (S3.alinhamento[k] = S3.pontos[k].map((v) => +v.toFixed(4))));
-  trocarMalha(r.pos, false); limparPontos(); S3.alinhado = true; resetCRO();
+  trocarMalha(r.pos, false); limparPontos(); S3.alinhado = true; S3.zRef0 = r.zRef; limparPerfil(); resetCRO();
   ajustarFaixaPlano();
   if (S3.eixo === "axial") { const sl = $("plane-offset"); sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), r.zRef)); lerPlano(); }
   ETP.feito("s1"); atualizarEstado();
@@ -331,11 +332,12 @@ function mostrarPlano() {
   if (pts.length) { const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(new Float32Array(pts), 3)); linhasCorte = new T.LineSegments(g, new T.LineBasicMaterial({ color: 0x1C1730, transparent: true, opacity: 0.6 })); cena.add(linhasCorte); }
   if (S3.eixo === "axial") {
     const md = V.medidasNoPlano(S3.pos, null, S3.z); S3.medidas = md;
-    for (const [nome, a, b] of [["AP", "ant", "post"], ["LL", "right", "left"], ["D1", "d1a", "d1p"], ["D2", "d2a", "d2p"]]) {
-      const ha = md.hit[a], hb = md.hit[b]; if (!ha || !hb) continue;
+    const eu = md.eurios ? { er: { x: md.eurios[0][0], y: md.eurios[0][1] }, el: { x: md.eurios[1][0], y: md.eurios[1][1] } } : {};
+    for (const [nome, a, b] of [["AP", "ant", "post"], ["LL", "er", "el"], ["D1", "d1a", "d1p"], ["D2", "d2a", "d2p"]]) {
+      const ha = md.hit[a] || eu[a], hb = md.hit[b] || eu[b]; if (!ha || !hb) continue;
       const g = new T.BufferGeometry().setFromPoints([new T.Vector3(ha.x, ha.y, S3.z), new T.Vector3(hb.x, hb.y, S3.z)]);
       const l = new T.LineSegments(g, new T.LineBasicMaterial({ color: COR_MED[nome], depthTest: false })); l.renderOrder = 999; grupoMedidas.add(l);
-      const sp = rotulo3D(`${nome} ${fmt(md[nome], 1)} mm`, COR_MED[nome], S3.maxDim * 0.2); sp.position.set(ha.x, ha.y, S3.z + S3.maxDim * 0.05); grupoMedidas.add(sp);
+      const sp = rotulo3D(`${nome} ${fmt(nome === "LL" ? md.largura : md[nome], 1)} mm`, COR_MED[nome], S3.maxDim * 0.2); sp.position.set(ha.x, ha.y, S3.z + S3.maxDim * 0.05); grupoMedidas.add(sp);
     }
   }
   legenda();
@@ -343,7 +345,7 @@ function mostrarPlano() {
 function legenda() {
   const lg = $("legend");
   if (CRO.an && $("cro-show-map").checked) { lg.innerHTML = `<b style="font-family:var(--f-body)">Mapa de pressão</b><span class="barraCor"></span><span class="ext"><span>−${CRO.range} alívio</span><span>+${CRO.range} contato (mm)</span></span>`; lg.hidden = false; return; }
-  if (S3.medidas) { lg.innerHTML = Object.entries(COR_MED).map(([k, c]) => `<div><i style="background:${c}"></i>${k}${S3.medidas[k] != null ? " " + fmt(S3.medidas[k], 1) + " mm" : ""}</div>`).join(""); lg.hidden = false; return; }
+  if (S3.medidas) { lg.innerHTML = Object.entries(COR_MED).map(([k, c]) => `<div><i style="background:${c}"></i>${k}${(k === "LL" ? S3.medidas.largura : S3.medidas[k]) != null ? " " + fmt(k === "LL" ? S3.medidas.largura : S3.medidas[k], 1) + " mm" : ""}</div>`).join(""); lg.hidden = false; return; }
   lg.hidden = true;
 }
 $("btn-extract-3d").onclick = () => {
@@ -352,9 +354,40 @@ $("btn-extract-3d").onclick = () => {
   const md = V.medidasNoPlano(S3.pos, null, S3.z);
   if (!md.AP && !md.D1) { status("As linhas de medida não cruzaram a malha. Confira a altura do plano ou se o modelo está vazio.", true); return; }
   const r1 = (v) => (v ? Number(v.toFixed(1)) : "");
-  preencher({ a: r1(md.D1), b: r1(md.D2), l: r1(md.AP), w: r1(md.LL) });
-  S.origem = { scan: S3.arquivo, planoZ: +S3.z.toFixed(3), alinhado: S3.alinhado }; mostrarOrigem();
-  status(`Medidas extraídas do scan no plano z = ${fmt(S3.z, 1)} mm: D1 ${fmt(md.D1 || 0, 1)}, D2 ${fmt(md.D2 || 0, 1)}, AP ${fmt(md.AP || 0, 1)}, LL ${fmt(md.LL || 0, 1)} mm. Confira em <b>Resultados</b> e registre a medição.`);
+  preencher({ a: r1(md.D1), b: r1(md.D2), l: r1(md.AP), w: r1(md.largura) });
+  const pf = calcularPerfil(), mx = pf && pf.maior, z0 = S3.zRef0 != null ? S3.zRef0 : S3.z;
+  S.origem = { scan: S3.arquivo, planoZ: +S3.z.toFixed(3), alinhado: S3.alinhado };
+  if (mx) S.origem.maiorAssimetria = { dz: mx.dz, cvai: +mx.cvai.toFixed(2), cva: +mx.cva.toFixed(2), D1: +mx.D1.toFixed(1), D2: +mx.D2.toFixed(1) };
+  mostrarOrigem();
+  const ehMax = mx && Math.abs(z0 + mx.dz - S3.z) < 1;
+  status(`Medidas extraídas do scan no plano z = ${fmt(S3.z, 1)} mm: D1 ${fmt(md.D1 || 0, 1)}, D2 ${fmt(md.D2 || 0, 1)}, AP ${fmt(md.AP || 0, 1)}, LL ${fmt(md.largura || 0, 1)} mm.` +
+    (mx && !ehMax ? ` A maior assimetria está ${mx.dz > 0 ? "+" : ""}${fmt(mx.dz, 0)} mm do plano de referência (CVAI ${fmt(mx.cvai, 1)} %): veja <b>Assimetria por altura</b>.` : "") + " Confira em <b>Resultados</b> e registre a medição.");
+};
+// ------------------------------------------------------------------ assimetria por altura (E3c-4)
+// planos paralelos ao de referência (glabela–opistocrânio do alinhamento; sem alinhamento, o plano atual)
+function limparPerfil() { S3.perfil = null; $("perfil").hidden = true; $("perfilBox").hidden = true; }
+function calcularPerfil() {
+  if (!S3.pos || S3.eixo !== "axial") return null;
+  const z0 = S3.zRef0 != null ? S3.zRef0 : S3.z, pf = V.perfilDeAssimetria(S3.pos, null, z0, { de: -10, ate: 50, passo: 5 });
+  pf.z0 = z0; S3.perfil = pf; mostrarPerfil(); return pf;
+}
+function tabelaPerfil(pf, comAtual) {
+  if (!pf || !pf.niveis.length) return '<div class="note">Sem níveis válidos.</div>';
+  const E_ = C.ESCALAS.cvai, vmax = Math.max(12, ...pf.niveis.map((n) => n.cvai));
+  return `<table class="perf"><thead><tr><th>Altura</th><th>CVAI</th><th>CVA</th><th>D1 / D2</th><th>IC</th></tr></thead><tbody>${pf.niveis.map((n) => {
+    const sev = E_.sev[C.classificar(E_, n.cvai)], atual = comAtual && Math.abs(pf.z0 + n.dz - S3.z) < 2.5;
+    return `<tr class="${n === pf.maior ? "max" : ""}${atual ? " atual" : ""}" title="${n === pf.maior ? "maior assimetria" : ""}"><td>${n.dz > 0 ? "+" : ""}${fmt(n.dz, 0)} mm</td><td data-sev="${sev}"><span class="bar" style="width:${(36 * n.cvai) / vmax}px"></span>${fmt(n.cvai, 1)} %</td><td>${fmt(n.cva, 1)}</td><td>${fmt(n.D1, 1)} / ${fmt(n.D2, 1)}</td><td>${fmt(n.ci, 1)}</td></tr>`;
+  }).join("")}</tbody></table><div class="note">Alturas em relação ao plano ${S3.zRef0 != null ? "glabela–opistocrânio" : "atual (modelo não alinhado)"}; destacada a de maior CVAI${comAtual ? "; ● = plano atual" : ""}. CVAI ${E_.nomes.map((nm, i) => nm.toLowerCase() + (i < E_.cortes.length ? " < " + String(E_.cortes[i]).replace(".", ",") : "")).join(", ")}.</div>`;
+}
+function mostrarPerfil() {
+  const pf = S3.perfil; if (!pf) { limparPerfil(); return; }
+  $("perfil").hidden = false; $("perfilTab").innerHTML = tabelaPerfil(pf, true);
+  $("perfilBox").hidden = false; const mx = pf.maior;
+  $("perfilRes").innerHTML = (mx ? `<div class="ttl2" style="margin-bottom:6px">Maior assimetria a <b>${mx.dz > 0 ? "+" : ""}${fmt(mx.dz, 0)} mm</b> do plano de referência: CVAI <b>${fmt(mx.cvai, 1)} %</b> (${C.ESCALAS.cvai.nomes[C.classificar(C.ESCALAS.cvai, mx.cvai)].toLowerCase()}), CVA ${fmt(mx.cva, 1)} mm.</div>` : "") + tabelaPerfil(pf, false);
+}
+$("btn-perfil-max").onclick = () => {
+  const pf = S3.perfil; if (!pf || !pf.maior) return;
+  const sl = $("plane-offset"); sl.value = pf.z0 + pf.maior.dz; lerPlano(); $("btn-extract-3d").click();
 };
 
 /* ================================================================== órtese craniana (mapa de pressão + casca) */
@@ -404,7 +437,7 @@ function readParams() {
   syncGrowth();
   const g = (id, d, lo, hi) => Math.min(hi, Math.max(lo, numOf(id, d)));
   return {
-    type: $("cro-type").value, bandTop: g("cro-bandtop", 55, 20, 85),
+    type: $("cro-type").value, bandTop: g("cro-bandtop", 55, 20, 85), bandTopBack: g("cro-bandtop-back", 55, 20, 85),
     mode: $("cro-mode").value,
     relief: g("cro-relief", 100, 0, 200) / 100, reliefMax: g("cro-relief-max", 6, 0, 15), compMax: g("cro-comp-max", 1.5, 0, 4),
     c0: g("cro-c0", 2, 0, 8), t: g("cro-t", 3, 1.5, 8),
@@ -416,7 +449,7 @@ function readParams() {
     earAzR: g("cro-ear-az-r", 100, 60, 140), earAzL: g("cro-ear-az-l", 100, 60, 140), earManR: CRO.earMan.r, earManL: CRO.earMan.l,
     cheek: $("cro-cheek").value, cheekWidth: g("cro-cheek-w", 30, 10, 50), cheekDepth: g("cro-cheek-depth", 32, 10, 60),
     cheekGap: g("cro-cheek-gap", 6, 0, 20), cheekClear: g("cro-cheek-clear", 1.5, 0, 6),
-    holeD: g("cro-hole-d", 4, 0, 8), pitch: g("cro-pitch", 10, 5, 25), margin: g("cro-margin", 8, 2, 20),
+    holeD: g("cro-hole-d", 4, 0, 8), pitch: g("cro-pitch", 10, 5, 25), margin: g("cro-margin", 8, 2, 20), holeZone: $("cro-hole-zone").value, holeArc: 50,
     split: $("cro-split").value, splitPos: g("cro-split-pos", -35, -80, 80), gap: g("cro-gap", 2, 1.5, 6),
     occDrop: g("cro-occ-drop", 8, 0, 30), occWidth: g("cro-occ-w", 50, 20, 90), occSoft: 0.6,
     mast: $("cro-mast").value, mastWidth: g("cro-mast-w", 24, 8, 50), mastDepth: g("cro-mast-depth", 24, 5, 50), mastGap: g("cro-mast-gap", 4, 0, 20), legRound: 0.45,
@@ -569,7 +602,7 @@ async function runGenerate() {
     CRO.tris = res.tris; CRO.stale = false; $("cro-show-helmet").checked = true;
     const s = res.stats, gp = s.gap || {};
     const lines = [
-      "Órtese (" + (P.type === "band" ? "faixa de topo aberto" : "capacete fechado") + ", modo " + (P.mode === "active" ? "ativo" : "passivo") + "):",
+      "Órtese (" + (P.type === "band" ? "faixa de topo aberto" : "capacete fechado") + ", modo " + (P.mode === "active" ? "ativo" : "passivo") + (/^lateral/.test(P.split) ? ", peça inteira com fenda lateral " + (P.split === "lateralR" ? "D" : "E") : "") + "):",
       "  triângulos " + s.triangles.toLocaleString("pt-BR") + " · volume " + fN(s.volume_cm3, 1) + " cm³",
       "  massa ≈ " + fN(s.mass_g, 0) + " g (PA12, ρ≈1,01 g/cm³, sem forro)",
       "  dimensões " + s.size.map((v) => fN(v, 0)).join(" × ") + " mm",
@@ -694,14 +727,14 @@ $("btn-cro-export").onclick = async () => {
 // ------------------------------------------------------------------ campos condicionais, orelhas, verificação e estado
 function conditionals() {
   const v = (id) => $(id).value, hide = (id, h) => { const r = $("row-" + id); if (r) r.classList.toggle("is-hidden", h); };
-  hide("cro-bandtop", v("cro-type") !== "band");
+  hide("cro-bandtop", v("cro-type") !== "band"); hide("cro-bandtop-back", v("cro-type") !== "band");
   hide("cro-comp-max", v("cro-mode") !== "active");
   const an = CRO.an, noBr = v("cro-indic") === "plagio" || (v("cro-indic") === "auto" && an && !an.useBr);
   hide("cro-ic-target", !!noBr); $("btn-cro-ic-auto").parentElement.classList.toggle("is-hidden", !!noBr); $("cro-ic-info").classList.toggle("is-hidden", !!noBr);
   const ck = v("cro-cheek") === "off", ms = v("cro-mast") === "off", sp = v("cro-split") === "none";
   ["cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap"].forEach((id) => hide(id, ck));
   ["cro-mast-w", "cro-mast-depth", "cro-mast-gap"].forEach((id) => hide(id, ms));
-  ["cro-split-pos", "cro-gap"].forEach((id) => hide(id, sp));
+  ["cro-split-pos", "cro-gap"].forEach((id) => hide(id, sp)); hide("cro-split-pos", sp || /^lateral/.test(v("cro-split")));
 }
 function earInfo() {
   const el = $("cro-ear-info"), an = CRO.an;
@@ -754,13 +787,15 @@ $("vistas3d").addEventListener("click", (e) => {
 });
 
 // ------------------------------------------------------------------ predefinições (protocolos do serviço)
-const WL = ["cro-type", "cro-bandtop", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
+const WL = ["cro-type", "cro-bandtop", "cro-bandtop-back", "cro-hole-zone", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
 const DEF = {}; WL.forEach((id) => { DEF[id] = $(id).value; });
-const BUILT = {
-  b1: { n: "Braquicefalia (padrão)", v: { "cro-indic": "brachy", "cro-type": "closed", "cro-mode": "passive" } },
-  b2: { n: "Plagiocefalia (padrão)", v: { "cro-indic": "plagio", "cro-type": "closed", "cro-mode": "passive" } },
-  b3: { n: "Faixa de topo aberto", v: { "cro-type": "band", "cro-bandtop": "55", "cro-split": "none" } },
-  b4: { n: "Mais ventilada (furos maiores)", v: { "cro-hole-d": "5", "cro-pitch": "11" } }
+const BUILT = {   // valores que não aparecem aqui voltam ao padrão da página (protocolo Lab.EITA)
+  b0: { n: "Lab.EITA (faixa inclinada, peça inteira)", v: FX.PROTOCOLO_LABEITA },
+  b1: { n: "Braquicefalia", v: { "cro-indic": "brachy", "cro-mode": "passive" } },
+  b2: { n: "Plagiocefalia", v: { "cro-indic": "plagio", "cro-mode": "passive" } },
+  b3: { n: "Faixa de topo reto (55°)", v: { "cro-type": "band", "cro-bandtop": "55", "cro-bandtop-back": "55", "cro-split": "none" } },
+  b4: { n: "Mais ventilada (furos maiores)", v: { "cro-hole-d": "5", "cro-pitch": "11", "cro-hole-zone": "all" } },
+  b5: { n: "Capacete fechado (padrão da versão antiga)", v: Object.fromEntries(Object.entries(FX.PADRAO_ANTIGO).filter(([k]) => !["cro-indic", "cro-age", "cro-ic-target"].includes(k))) }
 };
 const CHAVE_PROTOCOLOS = "eitaCRANIO.protocolos.v1";
 const lerProtocolos = () => { try { return JSON.parse(localStorage.getItem(CHAVE_PROTOCOLOS) || "{}") || {}; } catch (e) { return {}; } };
@@ -812,6 +847,7 @@ function idadeParaOrtese() {
 ["pBirth", "pGest", "mData"].forEach((id) => $(id).addEventListener("change", idadeParaOrtese));
 // parte da órtese na ficha
 const lerEntradas = () => { const o = {}; document.querySelectorAll("#s4 input[id], #s4 select[id], #s5 input[id], #s5 select[id]").forEach((el) => { if (el.type === "file" || el.type === "button") return; o[el.id] = el.type === "checkbox" ? el.checked : el.value; }); return o; };
+const PADRAO_PAGINA = lerEntradas();   // valores iniciais dos campos da órtese (protocolo Lab.EITA): voltam numa ficha nova
 function escreverEntradas(o) { Object.keys(o || {}).forEach((id) => { const el = $(id); if (!el) return; if (el.type === "checkbox") el.checked = !!o[id]; else el.value = o[id]; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }); }
 const edicoes = () => (CRO.an ? CRO.an.edits.map((e) => ({ kind: e.kind, th: +e.th.toFixed(2), ph: +e.ph.toFixed(2), radiusMm: e.radiusMm, mm: e.mm, label: e.label })) : []);
 const estatisticas = () => { try { return CRO.lastStats ? JSON.parse(JSON.stringify(CRO.lastStats)) : null; } catch (e) { return null; } };
@@ -862,6 +898,7 @@ function abrirFicha(f) {
   let msg = `Ficha "${esc(f.nome)}" aberta: ${S.medicoes.length} medição(ões)${ult ? `, a última de ${dataBR(ult.data)}` : ""}.`;
   const o = f.ortese; S3.pendente = null; S3.versoes = o && o.versoes ? o.versoes.map((v) => ({ ...v })) : []; renderVersoes();
   if (o) {
+    o.entradas = FX.completarEntradas(o.entradas);
     escreverEntradas(o.entradas);
     const want = o.scan && o.scan.nome;
     if (S3.pos && (!want || want === S3.arquivo)) { aplicarOrtese(o); return; }
@@ -897,12 +934,12 @@ function renderVersoes() {
 }
 $("v-save").onclick = () => { const n = S3.versoes.length + 1, s = retrato(); S3.versoes.push({ rotulo: "V" + n, data: new Date().toISOString(), entradas: s.entradas, edicoes: s.edicoes, resultado: s.resultado }); renderVersoes(); status("Versão V" + n + " guardada. Salve a ficha para mantê-la depois de fechar a página."); };
 function restaurarVersao(v) {
-  escreverEntradas(v.entradas);
+  escreverEntradas(FX.completarEntradas(v.entradas));
   if (CRO.an) { aplicarCorrecoes(v.edicoes); CRO.stale = true; status("Versão " + esc(v.rotulo) + " restaurada. Gere a órtese de novo para ver o resultado."); }
   else status("Parâmetros da versão " + esc(v.rotulo) + " restaurados. Faça a análise para reaplicar as correções manuais.");
   atualizarEstado();
 }
-function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); $("mData").value = hoje(); preencher(C.EXEMPLO); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
+function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); CRO.icTouched = false; escreverEntradas(Object.fromEntries(Object.entries(PADRAO_PAGINA).filter(([k]) => k !== "cro-preset-name"))); $("mData").value = hoje(); preencher(C.EXEMPLO); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
 async function exportarFicha() { const f = coletar(); if (!f.nome) { status("Dê um nome ou código à ficha antes de exportar.", true); return; } if (await salvar(`${E.nomeArquivo(f.paciente.pId || E.iniciais(f.paciente.pName) || "paciente")}_ficha_CRANIO.json`, new Blob([JSON.stringify(f, null, 1)], { type: "application/json" }))) status("Ficha exportada."); }
 function importarBase(b) {
   const antiga = FX.ehBaseAntiga(b); if (antiga) b = FX.converterBaseAntiga(b);
@@ -967,16 +1004,17 @@ function topoRV(R, pd, z) {
   g.strokeStyle = "#13232A"; g.lineWidth = 2; g.beginPath();
   for (let i = 0; i < pd.seg.length; i += 4) { const a = R.proj(pd.seg[i], pd.seg[i + 1], z), b = R.proj(pd.seg[i + 2], pd.seg[i + 3], z); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); }
   g.stroke();
-  [["AP", "ant", "post"], ["LL", "right", "left"], ["D1", "d1a", "d1p"], ["D2", "d2a", "d2p"]].forEach((L) => {
-    const a = pd.hit[L[1]], b = pd.hit[L[2]]; if (!a || !b) return;
+  const eu = pd.eurios ? { er: { x: pd.eurios[0][0], y: pd.eurios[0][1] }, el: { x: pd.eurios[1][0], y: pd.eurios[1][1] } } : {};
+  [["AP", "ant", "post"], ["LL", "er", "el"], ["D1", "d1a", "d1p"], ["D2", "d2a", "d2p"]].forEach((L) => {
+    const a = pd.hit[L[1]] || eu[L[1]], b = pd.hit[L[2]] || eu[L[2]]; if (!a || !b) return;
     const pa = R.proj(a.x, a.y, z), pb = R.proj(b.x, b.y, z);
     g.strokeStyle = COR_RV[L[0]]; g.lineWidth = 3.2; g.beginPath(); g.moveTo(pa[0], pa[1]); g.lineTo(pb[0], pb[1]); g.stroke();
     [pa, pb].forEach((q) => { g.fillStyle = COR_RV[L[0]]; g.beginPath(); g.arc(q[0], q[1], 5, 0, 7); g.fill(); });
   });
-  const place = { AP: ["ant", 1, 1.6], LL: ["right", 1, -1.6], D1: ["d1a", 1, -1], D2: ["d2a", -1, -1] };
+  const place = { AP: ["ant", 1, 1.6], LL: ["er", 1, -1.6], D1: ["d1a", 1, -1], D2: ["d2a", -1, -1] }, val = (k) => (k === "LL" ? pd.largura : pd[k]);
   ["AP", "LL", "D1", "D2"].forEach((k) => {
-    if (pd[k] == null) return; const pl = place[k], h = pd.hit[pl[0]]; if (!h) return; const p = R.proj(h.x, h.y, z);
-    rotuloRV(g, k + " " + pd[k].toFixed(1) + " mm", k === "LL" ? W - 8 : p[0] + pl[1] * (k === "AP" ? 12 : fs * 2.3), p[1] + pl[2] * fs * 0.9, COR_RV[k], fs, k === "LL" ? "right" : pl[1] > 0 ? "left" : "right");
+    if (val(k) == null) return; const pl = place[k], h = pd.hit[pl[0]] || eu[pl[0]]; if (!h) return; const p = R.proj(h.x, h.y, z);
+    rotuloRV(g, k + " " + val(k).toFixed(1) + " mm", k === "LL" ? W - 8 : p[0] + pl[1] * (k === "AP" ? 12 : fs * 2.3), p[1] + pl[2] * fs * 0.9, COR_RV[k], fs, k === "LL" ? "right" : pl[1] > 0 ? "left" : "right");
   });
   const c = R.proj(0, 0, z); g.strokeStyle = "#13232A"; g.lineWidth = 1.5; g.beginPath(); g.moveTo(c[0] - 8, c[1]); g.lineTo(c[0] + 8, c[1]); g.moveTo(c[0], c[1] - 8); g.lineTo(c[0], c[1] + 8); g.stroke();
 }
@@ -1019,11 +1057,20 @@ async function secoesDoScan(R, imgs) {
   R.novaPagina(); R.secao(`Modelo escaneado (${S3.arquivo})`);
   const lado = 250; R.pg.image("Vt", 36, R.y - lado, lado, lado); R.pg.text(36, R.y - lado - 10, 7.4, "Vista superior: contorno no plano axial z = " + N(z) + " mm", false, E.CORES_PDF.sutil);
   const rd = pd.radii, dsym = pd.cva;
-  E.tabelaPDF(R.pg, 304, R.y, "Medidas no plano", [["AP (ântero-posterior)", N(pd.AP) + " mm"], ["LL (látero-lateral)", N(pd.LL) + " mm"], ["D1 (ant. dir. – post. esq., 30°)", N(pd.D1) + " mm"], ["D2 (ant. esq. – post. dir., 30°)", N(pd.D2) + " mm"], ["|D1 - D2|", N(dsym) + " mm"], ["CVAI (|D1-D2| / maior)", N(pd.cvai) + " %"], ["Índice cefálico (LL/AP)", N(pd.ci)], ["Perímetro do contorno", N(pd.perimeter) + " mm"], ["Área do contorno", N(pd.area / 100) + " cm²"], ["Raio ant. / post.", N(rd.ant) + " / " + N(rd.post) + " mm"], ["Raio dir. / esq.", N(rd.right) + " / " + N(rd.left) + " mm"], ["Raio D1 ant. / post.", N(rd.d1a) + " / " + N(rd.d1p) + " mm"], ["Raio D2 ant. / post.", N(rd.d2a) + " / " + N(rd.d2p) + " mm"]], { passo: 12.4 });
+  E.tabelaPDF(R.pg, 304, R.y, "Medidas no plano", [["AP (ântero-posterior)", N(pd.AP) + " mm"], ["LL (largura transversal máx.)", N(pd.largura) + " mm"], ["D1 (ant. dir. – post. esq., 30°)", N(pd.D1) + " mm"], ["D2 (ant. esq. – post. dir., 30°)", N(pd.D2) + " mm"], ["|D1 - D2|", N(dsym) + " mm"], ["CVAI (|D1-D2| / maior)", N(pd.cvai) + " %"], ["Índice cefálico (LL/AP)", N(pd.ciTransversal)], ["Perímetro do contorno", N(pd.perimeter) + " mm"], ["Área do contorno", N(pd.area / 100) + " cm²"], ["Raio ant. / post.", N(rd.ant) + " / " + N(rd.post) + " mm"], ["Raio dir. / esq.", N(rd.right) + " / " + N(rd.left) + " mm"], ["Raio D1 ant. / post.", N(rd.d1a) + " / " + N(rd.d1p) + " mm"], ["Raio D2 ant. / post.", N(rd.d2a) + " / " + N(rd.d2p) + " mm"]], { passo: 12.4 });
   R.y -= lado + 24;
   paragrafo(R, "Linha tracejada (z) nas vistas = plano axial de referência. Origem na linha glabela–opistocrânio; diagonais a ±30° do eixo AP; raio = interseção mais distante do contorno." + (S3.alinhado ? "" : " Modelo não alinhado pelos pontos de referência: medidas indicativas."), 7.8, E.CORES_PDF.sutil);
+  const pf = S3.perfil && S3.eixo === "axial" ? S3.perfil : calcularPerfil();
+  if (pf && pf.niveis.length) {
+    if (R.y < 150) R.novaPagina();
+    R.pg.text(36, R.y, 9, "Assimetria por altura", true, E.CORES_PDF.roxo); R.y -= 13;
+    const E_ = C.ESCALAS.cvai;
+    tabelaColunas(R, [[36, "Altura"], [100, "CVAI (%)"], [160, "Classificação"], [250, "CVA (mm)"], [310, "D1 / D2 (mm)"], [410, "AP / LL (mm)"], [510, "IC"]],
+      pf.niveis.map((n) => [(n.dz > 0 ? "+" : "") + fmt(n.dz, 0) + " mm" + (n === pf.maior ? " *" : ""), fmt(n.cvai, 1), E_.nomes[C.classificar(E_, n.cvai)].toLowerCase(), fmt(n.cva, 1), fmt(n.D1, 1) + " / " + fmt(n.D2, 1), fmt(n.AP, 1) + " / " + fmt(n.largura, 1), fmt(n.ci, 1)]));
+    paragrafo(R, `Planos paralelos ao ${S3.zRef0 != null ? "plano glabela-opistocrânio" : "plano atual (modelo não alinhado)"}, de 5 em 5 mm, enquanto o AP passa de 90% do maior AP. * Maior assimetria a ${(pf.maior.dz > 0 ? "+" : "") + fmt(pf.maior.dz, 0)} mm: CVAI ${fmt(pf.maior.cvai, 1)} % (${E_.nomes[C.classificar(E_, pf.maior.cvai)].toLowerCase()}).`, 7.8, E.CORES_PDF.sutil);
+  }
   gradeImagens(R, vistas);
-  if (mapas.length) { if (R.y < 90) R.novaPagina(); R.secao("Mapa de pressão e alívio sobre o modelo"); gradeImagens(R, mapas); paragrafo(R, "Vermelho: contato/pressão (a órtese encosta); azul: alívio (a órtese libera espaço).", 7.8, E.CORES_PDF.sutil); }
+  if (mapas.length) { if (R.y < 200) R.novaPagina(); R.secao("Mapa de pressão e alívio sobre o modelo"); gradeImagens(R, mapas); paragrafo(R, "Vermelho: contato/pressão (a órtese encosta); azul: alívio (a órtese libera espaço).", 7.8, E.CORES_PDF.sutil); }
   // seção: planejamento da órtese
   const an = CRO.an;
   if (an) {
@@ -1043,7 +1090,7 @@ async function secoesDoScan(R, imgs) {
     if (q && s) {
       const gp = s.gap || {}, ear = (x) => esc(x.src) + " (az " + fN(x.az, 0) + "°, arco " + (x.top < 0 ? "-" : "+") + fN(Math.abs(x.top), 0) + " mm)";
       R.pg.text(36, R.y, 9, "Parâmetros de projeto", true, E.CORES_PDF.roxo); R.y -= 13;
-      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano"}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm; divisão: ${q.split === "none" ? "sem divisão" : (q.split === "coronal" ? "plano coronal" : "plano sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
+      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto (borda superior a " + fN(q.bandTop, 0) + "° na frente" + (q.bandTopBack != null && q.bandTopBack !== q.bandTop ? " e " + fN(q.bandTopBack, 0) + "° atrás" : "") + ")" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano"}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm${q.holeZone === "ap" ? ", só na frente e atrás" : ""}; ${q.split === "none" ? "peça inteira, sem fenda" : /^lateral/.test(q.split) ? "peça inteira com fenda lateral " + (q.split === "lateralR" ? "D" : "E") + " de " + fN(q.gap, 1) + " mm" : "duas valvas, corte " + (q.split === "coronal" ? "coronal" : "sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
       R.pg.text(36, R.y, 9, "Modelo gerado", true, E.CORES_PDF.roxo); R.y -= 13;
       paragrafo(R, `Volume ${fN(s.volume_cm3, 1)} cm³ · massa estimada ${fN(s.mass_g, 0)} g (PA12, sem forro) · dimensões ${s.size.map((v) => fN(v, 0)).join(" × ")} mm · folga média à cabeça: contato ${fN(gp.contact, 1)} mm, neutra ${fN(gp.neutral, 1)} mm, alívio ${fN(gp.relief, 1)} mm · interferência máxima com a malha: ${s.interference ? fN(s.interference.mm, 1) + " mm" : "—"} · ${s.triangles.toLocaleString("pt-BR")} triângulos · malha ${s.mesh && s.mesh.pinch === 0 && s.mesh.dropped === 0 ? "fechada" : "com defeitos (gerar em resolução maior)"}.`);
       if (casco.length) { R.pg.text(36, R.y, 9, "Órtese gerada", true, E.CORES_PDF.roxo); R.y -= 13; gradeImagens(R, casco); }
@@ -1068,7 +1115,7 @@ async function gerarPDF() {
   const lin = (v, u) => (v != null ? fmt(v, 1) + u : "—"), cl = (k) => (A[k] ? A[k].classe.toLowerCase() : "—");
   R.par("Medidas" + (dataM ? " de " + dataBR(dataM) : "") + (S.origem ? " (do scan)" : ""), C.MEDIDAS.map((x) => [`${x.nome} (${x.sigla})`, m[x.k] > 0 ? fmt(m[x.k], 1) + " mm" : "—"]).concat([["Razão entre as diagonais", lin(r.ratio, " %")], ["Diagonal mais longa", r.longer ? r.longer + " (+" + fmt(r.cva, 1) + " mm)" : r.cva != null ? "iguais" : "—"]]),
     "Resultado", [["CVAI", lin(r.cvai, " %")], ["Classificação do CVAI", cl("cvai")], ["CVA", lin(r.cva, " mm")], ["Classificação do CVA", cl("cva")], ["Índice cefálico", lin(r.ci, "")], ["Forma do crânio", cl("ci")]]);
-  if (S.origem) paragrafo(R, `Medidas tiradas do scan ${S.origem.scan} no plano axial z = ${fmt(S.origem.planoZ, 1)} mm${S.origem.alinhado ? "" : " (modelo não alinhado: valores indicativos)"}.`, 7.8, E.CORES_PDF.sutil);
+  if (S.origem) { const mx = S.origem.maiorAssimetria; paragrafo(R, `Medidas tiradas do scan ${S.origem.scan} no plano axial z = ${fmt(S.origem.planoZ, 1)} mm${S.origem.alinhado ? "" : " (modelo não alinhado: valores indicativos)"}; LL = largura transversal máxima.${mx ? ` Maior assimetria do scan: CVAI ${fmt(mx.cvai, 1)} % a ${mx.dz > 0 ? "+" : ""}${fmt(mx.dz, 0)} mm do plano de referência (ver "Assimetria por altura").` : ""}`, 7.8, E.CORES_PDF.sutil); }
   // esquema e evolução
   const temG = imgs.some((i) => i.name === "Im2"), h = 168;
   if (R.y - h - 20 < 50) R.novaPagina();

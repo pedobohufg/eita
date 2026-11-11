@@ -1,6 +1,6 @@
 """Teste de ponta a ponta do EITA! CRÂNIO com scan (opcional, precisa de Playwright + Chrome e de uma cópia local
    do three.js r128; ver three_local.py). Usa a cabeça sintética (testes/fixtures/cabeca_sintetica.*).
-   1) Mesma ficha da versão antiga ("EITA! Crânio ficha": 5 pontos, "ambas" aos 6 meses, modo ativo, faixa de topo
+   1) Mesma ficha da versão antiga ("EITA! Crânio ficha": 5 pontos, plagiocefalia aos 6 meses, modo ativo, faixa de topo
       aberto, valvas sagitais, sem apoio na bochecha, 2 correções manuais) aberta na página antiga
       (legado/cranio-ortese) e na nova (dist/cranio), seguida do scan com o mesmo nome: as duas alinham, posicionam
       o plano, analisam e reaplicam as correções sozinhas. Depois: gerar a órtese e exportar o STL.
@@ -24,6 +24,8 @@ RELOGIO = """(() => { const T = Date.UTC(2026, 10, 11, 15, 0, 0), D = Date;
 STL = gzip.decompress(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sintetica.stl.gz"), "rb").read())
 CABECA = json.load(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sintetica.json")))
 NOME_STL = "cabeca_sintetica.stl"
+# campos da página antiga sem os criados na E3c-4 (topo atrás, zona dos furos), que a ficha antiga não tem
+PADRAO_ANTIGO = {k: v for k, v in json.loads(subprocess.run(["node", "-e", "import('./modulos/cranio/fichas.js').then((m) => console.log(JSON.stringify(m.PADRAO_ANTIGO)))"], cwd=RAIZ, capture_output=True, text=True, check=True).stdout).items() if k not in ("cro-bandtop-back", "cro-hole-zone")}
 # os pontos da ficha ficam no referencial do scan já centrado (prepararScan: centro da caixa em float32)
 def _centro():
     import numpy as np
@@ -34,7 +36,8 @@ PONTOS = {k: [round(p[q] - CENTRO[q], 4) for q in range(3)] for k, p in CABECA["
 FICHA = {"formato": "EITA! Crânio ficha", "versaoApp": "1.0", "id": "ts-01", "nome": "Teste Scan",
          "paciente": {"pt-name": "Teste Scan", "pt-id": "TS-01", "pt-sex": "Feminino", "pt-birth": "2026-03-01", "pt-eval": "2026-09-01", "pt-ga": "39", "pt-side": "Direito"},
          "atualizado": "2026-11-11T12:00:00.000Z", "scan": {"nome": NOME_STL, "unidade": "1"}, "alinhamento": PONTOS, "planoZ": None,
-         "entradas": {"cro-indic": "both", "cro-age": "6", "cro-mode": "active", "cro-type": "band", "cro-split": "sagittal", "cro-cheek": "off"},
+         # como nas fichas reais da página antiga, todos os campos cro-* (os valores padrão dela) + os do cenário
+         "entradas": dict(PADRAO_ANTIGO, **{"cro-indic": "plagio", "cro-age": "6", "cro-mode": "active", "cro-type": "band", "cro-split": "sagittal", "cro-cheek": "off"}),
          "edicoes": [{"kind": "relief", "th": 150, "ph": 15, "radiusMm": 25, "mm": 3, "label": "M1"}, {"kind": "contact", "th": 220, "ph": 20, "radiusMm": 20, "mm": 2, "label": "M2"}],
          "earMan": None, "analisado": True, "gerada": True, "resultado": None, "versoes": []}
 
@@ -93,17 +96,25 @@ async def main():
             ok(A["z"] == N["z"], "mesmo plano axial depois do alinhamento (zRef no passo do controle)")
             ok(A["stl"] == N["stl"], "STL da órtese idêntico ao da página antiga")
             ok(N["nome"].startswith("TS-01_ortese_craniana_") and N["nome"].endswith(".stl"), f"nome do STL com o código ({N['nome']})")
-            ok(A["resumo"] == N["resumo"], "resumo técnico idêntico")
+            semIC = lambda t: "\n".join(l for l in t.splitlines() if not l.startswith("Índice cefálico no plano"))
+            ok(semIC(A["resumo"]) == semIC(N["resumo"]), "resumo técnico idêntico (menos a linha do índice cefálico)")
+            icN = await pn.evaluate("window.__eitaCranio.CRO.an.ic"); icA = re.search(r"Índice cefálico no plano: ([0-9,]+)", A["resumo"]).group(1)
+            ok(f"Índice cefálico no plano: {icN:.2f}".replace(".", ",") in N["resumo"], f"IC da análise pela largura transversal ({icN:.3f}; a página antiga dava {icA})")
             ok(A["polar"] == N["polar"], "mapa em vista superior idêntico (pixels)")
-            ok(all(abs(a - n) < 0.051 for a, n in zip(A["med"], N["med"])), "D1, D2, AP e LL do scan iguais (±0,05 mm)")
+            ok(all(abs(a - n) < 0.051 for a, n in zip(A["med"][:3], N["med"][:3])), "D1, D2 e AP do scan iguais (±0,05 mm)")
+            ok(N["med"][3] >= A["med"][3] - 0.05, f"LL = largura transversal máxima, não menor que a corda a 90° da página antiga ({N['med'][3]} × {A['med'][3]})")
             await pa.close()
 
-            print("página nova: ficha, relatório, dois cliques, duplo clique e base antiga")
+            print("página nova: perfil de assimetria, ficha, relatório, dois cliques, duplo clique e base antiga")
+            ok(await pn.evaluate("!document.getElementById('perfil').hidden && !document.getElementById('perfilBox').hidden") and await pn.locator("#perfilTab tr.max").count() == 1, "assimetria por altura com o nível de maior CVAI destacado")
+            mx = await pn.evaluate("window.__eitaCranio.S3.perfil.maior")
+            await clicar(pn, "btn-perfil-max"); await pn.wait_for_timeout(200)
+            ok(abs(float(await pn.input_value("#plane-offset")) - mx["z"]) < 1 and "Maior assimetria do scan" in await pn.text_content("#origemMed"), f"medir na altura de maior assimetria (+{mx['dz']} mm, CVAI {mx['cvai']:.1f} %)")
             await clicar(pn, "fSave"); await pn.wait_for_timeout(200)
             f = json.loads(await pn.evaluate("localStorage.getItem('eitaCRANIO.fichas.v1')"))[0]
             o = f.get("ortese") or {}
             ok(f["formato"] == "EITA! CRÂNIO ficha" and f["versaoApp"] == "0.3" and f["paciente"]["pSex"] == "F" and f["paciente"]["pLado"] == "D", "ficha convertida (sexo e lado)")
-            ok(o.get("scan", {}).get("nome") == NOME_STL and o.get("analisado") and o.get("gerada") and len(o.get("edicoes", [])) == 2 and o["entradas"]["cro-indic"] == "both" and o.get("alinhamento"), "ficha com o projeto da órtese")
+            ok(o.get("scan", {}).get("nome") == NOME_STL and o.get("analisado") and o.get("gerada") and len(o.get("edicoes", [])) == 2 and o["entradas"]["cro-indic"] == "plagio" and o["entradas"]["cro-hole-zone"] == "all" and o["entradas"]["cro-bandtop-back"] == "55" and o.get("alinhamento"), "ficha com o projeto da órtese")
             ok(f.get("origem", {}).get("formato") == "EITA! Crânio ficha", "origem da ficha registrada")
             await clicar(pn, "registrar"); await pn.wait_for_timeout(200)
             f = json.loads(await pn.evaluate("localStorage.getItem('eitaCRANIO.fichas.v1')"))[0]
@@ -119,6 +130,8 @@ async def main():
             await pn.click("#tabs button[data-v='3d']"); await pn.wait_for_timeout(300)
             await pn.screenshot(path=os.path.join(RAIZ, "dist", "cranio-scan-teste.png"))
             # duplo clique: novo scan, vértice no centro da vista de cima
+            P = await pn.evaluate("(() => { document.getElementById('fNew').click(); return window.__eitaCranio.readParams(); })()")
+            ok(P["type"] == "band" and P["bandTop"] == 40 and P["bandTopBack"] == 70 and P["split"] == "lateralL" and P["holeZone"] == "ap" and P["mast"] == "off", "protocolo Lab.EITA como padrão da página (campos da ficha nova)")
             await pn.evaluate("document.getElementById('stl-scale-unit').value = '1000'")   # padrão antigo (metros), sem escolha do usuário
             await pn.set_input_files("#stl-file", files=[{"name": "outra.stl", "mimeType": "model/stl", "buffer": STL}])
             await esperar_texto(pn, "status", "outra.stl")

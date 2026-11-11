@@ -22,6 +22,28 @@ const txt = (v) => (v == null ? "" : String(v).trim());
 export const ehFichaAntiga = (f) => !!f && f.formato === FORMATO_FICHA_ANTIGA;
 export const ehBaseAntiga = (b) => !!b && b.formato === FORMATO_BASE_ANTIGA;
 
+// Campos da órtese criados na E3c-4 (estilo do laboratório). Numa ficha que não os tem (página antiga ou v0.3), valem
+// os equivalentes ao comportamento antigo: topo da faixa igual atrás e na frente, furos em toda a casca.
+export function completarEntradas(e) {
+  const o = Object.assign({}, e || {});
+  if (o["cro-type"] == null) return o;   // ficha sem os campos da órtese: ficam os da página (protocolo atual)
+  if (o["cro-bandtop-back"] == null) o["cro-bandtop-back"] = o["cro-bandtop"] != null ? o["cro-bandtop"] : "55";
+  if (o["cro-hole-zone"] == null) o["cro-hole-zone"] = "all";
+  return o;
+}
+// Valores dos campos da página antiga (todos os cro-* de projeto): base para fichas e predefinições que só citam
+// parte deles, para que a casca saia como na página antiga.
+export const PADRAO_ANTIGO = Object.freeze({ "cro-indic": "auto", "cro-age": "", "cro-ic-target": "0,85", "cro-mode": "passive", "cro-relief": "100", "cro-relief-max": "6", "cro-comp-max": "1,5",
+  "cro-type": "closed", "cro-bandtop": "55", "cro-bandtop-back": "55", "cro-c0": "2", "cro-t": "3", "cro-hb": "-12", "cro-occ-drop": "8", "cro-cheek": "on", "cro-cheek-w": "30", "cro-mast": "on", "cro-mast-w": "24",
+  "cro-res": "normal", "cro-split": "coronal", "cro-grow-src": "age", "cro-grow-m": "4", "cro-grow-rate": "0,8", "cro-grow-contact": "30", "cro-grow-vertex": "2", "cro-ear-mode": "auto", "cro-ear-clear": "8",
+  "cro-ear-az-r": "100", "cro-ear-az-l": "100", "cro-ear-w-r": "24", "cro-ear-w-l": "24", "cro-ear-top-r": "14", "cro-ear-top-l": "14", "cro-hf": "4", "cro-occ-w": "50", "cro-cheek-depth": "32",
+  "cro-cheek-gap": "6", "cro-cheek-clear": "1,5", "cro-mast-depth": "24", "cro-mast-gap": "4", "cro-hole-d": "4", "cro-pitch": "10", "cro-margin": "8", "cro-split-pos": "-35", "cro-gap": "2", "cro-hole-zone": "all" });
+// Protocolo do laboratório (E3c-4; padrão da página desde então): faixa de topo aberto inclinado (40° na frente,
+// 70° atrás), bordas baixas, apoio pré-auricular, sem aba atrás da orelha, peça inteira com fenda lateral E e
+// furos só na frente e atrás. A superfície interna segue a cabeça (folga de 2 mm + reserva de crescimento).
+export const PROTOCOLO_LABEITA = Object.freeze({ "cro-type": "band", "cro-bandtop": "40", "cro-bandtop-back": "70", "cro-hf": "-15", "cro-hb": "-30", "cro-occ-drop": "10", "cro-cheek": "on", "cro-cheek-depth": "45",
+  "cro-mast": "off", "cro-split": "lateralL", "cro-gap": "2", "cro-hole-zone": "ap", "cro-c0": "2" });
+
 // Ficha antiga → ficha da plataforma (sem medições: a página antiga não as guardava na ficha).
 // O id é mantido (importar de novo atualiza a mesma ficha); `origem` registra de onde veio.
 export function converterFichaAntiga(f, agora = new Date()) {
@@ -34,7 +56,7 @@ export function converterFichaAntiga(f, agora = new Date()) {
   const ortese = {
     scan: f.scan && (f.scan.nome || f.scan.unidade) ? { nome: txt(f.scan.nome), unidade: txt(f.scan.unidade) } : null,
     alinhamento: f.alinhamento || null, planoZ: typeof f.planoZ === "number" ? f.planoZ : null,
-    entradas: Object.assign({}, f.entradas || {}), edicoes: (f.edicoes || []).map((e) => Object.assign({}, e)),
+    entradas: completarEntradas(f.entradas), edicoes: (f.edicoes || []).map((e) => Object.assign({}, e)),
     earMan: f.earMan ? { r: !!f.earMan.r, l: !!f.earMan.l } : null, analisado: !!f.analisado, gerada: !!f.gerada,
     resultado: f.resultado || null, versoes: (f.versoes || []).map((v) => Object.assign({}, v)), avaliacao: txt(pa["pt-eval"])
   };

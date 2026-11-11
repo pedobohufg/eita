@@ -30,6 +30,7 @@ test("medidas no plano: elipse conhecida (AP, LL, diagonais a 30°, perímetro, 
   assert.ok(Math.abs(md.ci - (100 * a) / b) < 0.01, "índice cefálico = LL/AP × 100");
   assert.ok(Math.abs(md.area - Math.PI * a * b) / (Math.PI * a * b) < 1e-3, "área da elipse");
   assert.ok(Math.abs(md.radii.right - a) < 0.01 && Math.abs(md.radii.ant - b) < 0.01, "raios a partir da origem");
+  assert.ok(Math.abs(md.largura - 2 * a) < 0.01 && Math.abs(md.ciTransversal - (100 * a) / b) < 0.01, "largura transversal e IC por ela");
   assert.equal(V.medidasNoPlano(pos, null, 50).AP, null, "plano fora da malha: sem medidas");
 });
 
@@ -74,6 +75,10 @@ test("fichas antigas: ficha e base da versão completa → ficha unificada", () 
   assert.equal(b.formato, "EITA! CRÂNIO base"); assert.equal(b.fichas.length, 1); assert.deepEqual(b.protocolos, { A: { "cro-c0": "2" } });
   assert.deepEqual(FX.mesclarProtocolos({ A: { x: 1 } }, { A: { x: 2 }, B: { y: 1 } }), { A: { x: 1 }, B: { y: 1 } }, "os protocolos deste navegador prevalecem");
   assert.throws(() => FX.converterFichaAntiga({ formato: "EITA! CRÂNIO ficha" }));
+  // campos criados na E3c-4: numa ficha antiga completa, valem os equivalentes ao comportamento antigo
+  assert.deepEqual(FX.completarEntradas({ "cro-type": "band", "cro-bandtop": "60" }), { "cro-type": "band", "cro-bandtop": "60", "cro-bandtop-back": "60", "cro-hole-zone": "all" });
+  assert.deepEqual(FX.completarEntradas({ "cro-indic": "brachy" }), { "cro-indic": "brachy" }, "sem os campos da casca: fica o padrão da página");
+  assert.equal(f.ortese.entradas["cro-bandtop-back"], undefined, "a ficha de teste não tem cro-type");
 });
 
 test("idade em meses para a órtese (como a página antiga: meses de calendário; corrigida em prematuros)", () => {
@@ -89,4 +94,18 @@ test("unidade provável do STL pelo tamanho (cabeça de ~10 a ~40 cm)", () => {
   assert.equal(V.unidadeProvavel(cab.map((v) => v / 10)), "10");
   assert.equal(V.unidadeProvavel(cab.map((v) => v / 1000)), "1000");
   assert.equal(V.unidadeProvavel(cab.map((v) => v * 100)), null);
+});
+
+test("assimetria por altura: acha o nível de maior CVAI (cabeça sintética, achatamento acima do plano)", () => {
+  const cab = JSON.parse(fs.readFileSync(new URL("./fixtures/cabeca_sintetica.json", import.meta.url)));
+  const bruto = lerSTL(zlib.gunzipSync(fs.readFileSync(new URL("./fixtures/cabeca_sintetica.stl.gz", import.meta.url))).buffer.slice(0));
+  const { pos, centro } = O.prepararScan(bruto, 1), pts = {};
+  for (const [k, p] of Object.entries(cab.pontos_mm)) pts[k] = p.map((v, q) => v - centro[q]);
+  const al = O.alinharPorPontos(pos, pts), pf = V.perfilDeAssimetria(al.pos, null, al.zRef, { de: -10, ate: 50, passo: 5 });
+  assert.ok(pf.niveis.length >= 8 && pf.referencia, `${pf.niveis.length} níveis`);
+  assert.ok(pf.maior.cvai >= pf.referencia.cvai && pf.niveis.every((n) => n.cvai <= pf.maior.cvai));
+  assert.ok(Math.abs(pf.referencia.cvai - V.medidasNoPlano(al.pos, null, al.zRef).cvai) < 1e-9, "o nível 0 é o plano de referência");
+  // prisma elíptico: simétrico, CVAI ~0 em todas as alturas; níveis fora da malha ficam de fora
+  const pr = V.perfilDeAssimetria(prismaEliptico(60, 75, -15, 15), null, 0, { de: -30, ate: 30, passo: 10 });
+  assert.deepEqual(pr.niveis.map((n) => n.dz), [-10, 0, 10]); assert.ok(pr.maior.cvai < 1e-6);
 });

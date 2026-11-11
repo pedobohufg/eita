@@ -34,7 +34,7 @@ CENARIOS, NOMES = CONFIG["cenarios"], CONFIG["nomes"]
 
 COLETAR = """async ({ stl, zRef, cenarios, api, nomes }) => {
   let C = eval(api); if (!C) return { erro: 'objeto CROCore não encontrado: ' + api };
-  if (!C.analyze && C.analisar) { const O = C; C = {}; for (const [antigo, novo] of Object.entries(nomes)) C[antigo] = O[novo]; }   // modulos/cranio/ortese.js
+  if (!C.analyze && C.analisar) { const O = C; C = {}; for (const [antigo, novo] of Object.entries(nomes)) C[antigo] = O[novo]; C.analyze = (p, z) => O.analisar(p, z, { icLegado: true }); }   // modulos/cranio/ortese.js
   const hex = async (x) => { const u = x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x.buffer, x.byteOffset, x.byteLength);
     return 'sha256:' + [...new Uint8Array(await crypto.subtle.digest('SHA-256', u))].map(b => b.toString(16).padStart(2, '0')).join('') + ' (' + u.length + ' B)'; };
   // STL binário → posições soltas (9 floats por triângulo), como o STLLoader

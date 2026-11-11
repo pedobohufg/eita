@@ -75,7 +75,8 @@ export function nomeDaRegiao(th, ph) {
 }
 
 /* ---------------- Análise de assimetria por espelhamento ---------------- */
-export function analisar(pos, zRef) {
+// opcoes.icLegado: índice cefálico como na página antiga (maior corda entre 65° e 115°); ver indiceCefalico
+export function analisar(pos, zRef, opcoes) {
   const NT = GRADE.NT, NP = GRADE.NP, N = NT * NP;
   const sum = new Float64Array(N), cnt = new Uint32Array(N);
   for (let k = 0; k + 2 < pos.length; k += 3) {
@@ -152,7 +153,7 @@ export function analisar(pos, zRef) {
   an.cheekCoverage = cn ? cc / cn : 0;
   an.ears = detectarOrelhas(rs);
   an.rsNoEar = an.ears.rsNoEar; delete an.ears.rsNoEar;
-  const ci = indiceCefalico(rs, an.rsNoEar);
+  const ci = indiceCefalico(rs, an.rsNoEar, !!(opcoes && opcoes.icLegado));
   an.ic = ci.ic; an.width = ci.w; an.length = ci.l;
   an.mirrorMax = maiorDesvio(devM);
   definirIndicacao(an, { mode: 'auto' });
@@ -234,8 +235,21 @@ export function maiorDesvio(dev) {
 }
 
 // índice cefálico no plano de referência (diâmetros que passam pela origem na linha média)
-export function indiceCefalico(rs, rsW) {
+// Desde a E3c-4: largura TRANSVERSAL (maior extensão perpendicular ao plano sagital, x) sobre o comprimento
+// (maior extensão ântero-posterior, y), no plano de referência. A página antiga usava a maior corda entre 65° e 115°
+// de azimute, que numa cabeça em paralelogramo (plagiocefalia) pega a diagonal longa e infla o IC; continua
+// disponível com legado = true (comparações com a página antiga).
+export function indiceCefalico(rs, rsW, legado) {
   const rw = rsW || rs;   // largura medida sem o pavilhão auricular
+  if (!legado) {
+    let x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    for (let t = 0; t < 360; t += 0.5) {
+      const rx = amostrarGrade(rw, t, 0) * Math.sin(t * GRAU), ry = amostrarGrade(rs, t, 0) * Math.cos(t * GRAU);
+      if (rx > x1) x1 = rx; if (rx < x0) x0 = rx; if (ry > y1) y1 = ry; if (ry < y0) y0 = ry;
+    }
+    const L = y1 - y0, W = x1 - x0;
+    return { l: L, w: W, ic: L > 0 ? W / L : 0 };
+  }
   let L = 0, W = 0;
   for (let t = -15; t <= 15; t += 2) L = Math.max(L, amostrarGrade(rs, t, 0) + amostrarGrade(rs, t + 180, 0));
   for (let t = 65; t <= 115; t += 2) W = Math.max(W, amostrarGrade(rw, t, 0) + amostrarGrade(rw, t + 180, 0));
@@ -540,7 +554,11 @@ export function gerarOrtese(an, zRef, P, pos) {
   const lv = P.res === 'fine' ? 2 : (P.res === 'high' ? 1 : 0);
   const Nc = [360, 540, 720][lv], dPhT = [1, 0.67, 0.5][lv];
   const dTh = 360 / Nc;
-  const phiTop = P.type === 'band' ? P.bandTop : 90;
+  // faixa de topo aberto: borda superior na elevação bandTop (frente) e, se dado e diferente, bandTopBack (atrás),
+  // variando com o azimute como a borda inferior (E3c-4, estilo do laboratório)
+  const topoVar = P.type === 'band' && P.bandTopBack != null && P.bandTopBack !== P.bandTop;
+  const phiTop = P.type === 'band' ? (topoVar ? Math.max(P.bandTop, P.bandTopBack) : P.bandTop) : 90;
+  const topoEm = topoVar ? (th) => P.bandTopBack + (P.bandTop - P.bandTopBack) * (1 + Math.cos(th * GRAU)) / 2 : () => phiTop;
   const closed = phiTop >= 89.9;
   const wrap = th => ((th % 360) + 360) % 360;
 
@@ -563,10 +581,17 @@ export function gerarOrtese(an, zRef, P, pos) {
   const useHoles = P.holeD >= 1 && P.pitch > P.holeD + 1.5;
   const hr = P.holeD / 2, rowSp = P.pitch * 0.8660254 / Rm;
   const slitOn = P.split !== 'none';
-  function campoDaFenda(x, y) { return Math.abs((P.split === 'coronal' ? y : x) - P.splitPos) - P.gap / 2; }
+  // fenda lateral única (peça inteira, E3c-4): plano vertical pelo eixo z no azimute da fenda, só daquele lado
+  const lateral = P.split === 'lateralL' || P.split === 'lateralR', azF = (P.split === 'lateralR' ? 90 : 270) * GRAU;
+  function campoDaFenda(x, y) {
+    if (lateral) return x * Math.sin(azF) + y * Math.cos(azF) <= 0 ? 1e3 : Math.abs(x * Math.cos(azF) - y * Math.sin(azF)) - P.gap / 2;
+    return Math.abs((P.split === 'coronal' ? y : x) - P.splitPos) - P.gap / 2;
+  }
+  // furos só na frente e atrás (E3c-4): dentro de ±holeArc graus de azimute em torno de 0° e de 180°
+  const furosNaZona = P.holeZone === 'ap' ? (th) => diferencaAzimute(th, 0) <= (P.holeArc || 50) || diferencaAzimute(th, 180) <= (P.holeArc || 50) : () => true;
   function manterAprox(th, ph) {
     let v = tf.f(wrap(th), ph);
-    if (!closed) v = Math.min(v, (phiTop - ph) * GRAU * Rm);
+    if (!closed) v = Math.min(v, (topoEm(wrap(th)) - ph) * GRAU * Rm);
     if (slitOn) {
       const r = amostrarGrade(an.rho, wrap(th), ph) + P.c0 + P.t + 3, cp = Math.cos(ph * GRAU);
       v = Math.min(v, campoDaFenda(r * cp * Math.sin(th * GRAU), r * cp * Math.cos(th * GRAU)));
@@ -578,7 +603,7 @@ export function gerarOrtese(an, zRef, P, pos) {
     const key = k * 100003 + m;
     let a = act.get(key);
     if (a !== undefined) return a;
-    a = phc < 76 * GRAU && manterAprox(thc / GRAU, phc / GRAU) > 0;
+    a = phc < 76 * GRAU && furosNaZona(wrap(thc / GRAU)) && manterAprox(thc / GRAU, phc / GRAU) > 0;
     if (a) {
       const R = hr + P.margin, cp = Math.max(0.2, Math.cos(phc));
       if (slitOn) { const r0 = amostrarGrade(an.rho, wrap(thc / GRAU), phc / GRAU) + P.c0 + P.t + 3; if (campoDaFenda(r0 * Math.cos(phc) * Math.sin(thc), r0 * Math.cos(phc) * Math.cos(thc)) < R) a = false; }
@@ -621,6 +646,7 @@ export function gerarOrtese(an, zRef, P, pos) {
       const th = j * dTh, v = i * Nc + j;
       acrescentarPosicao(th, ph);
       let f = tf.f(th, ph);
+      if (topoVar) f = Math.min(f, (topoEm(th) - ph) * GRAU * Rm);
       if (slitOn) f = Math.min(f, campoDaFenda(POUT[v * 3], POUT[v * 3 + 1]));
       if (useHoles && f > 0) f = Math.min(f, campoDosFuros(th, ph));
       Fv[v] = Math.abs(f) < 1e-6 ? 1e-6 : f;
@@ -717,7 +743,7 @@ export function gerarOrtese(an, zRef, P, pos) {
       let th = Math.atan2(x, y) / GRAU; if (th < 0) th += 360;
       const ftj = th / dTh, j0 = Math.floor(ftj) % Nc, j1 = (j0 + 1) % Nc, w = ftj - Math.floor(ftj);
       const trim = phT[j0] * (1 - w) + phT[j1] * w;
-      if (ph < trim + 2 || ph > phiTop - 2) continue;
+      if (ph < trim + 2 || ph > topoEm(th) - 2) continue;
       const rin = raioInterno(an, th, ph, P);
       nIn++;
       const interf = r - rin;

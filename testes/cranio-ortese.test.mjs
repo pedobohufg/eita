@@ -88,5 +88,41 @@ test("alinhamento pelos 5 pontos: o mesmo modelo, qualquer que seja a posição 
   assert.equal(O.alinharPorPontos(pos, { anterior: [0, 1, 0] }), null);
   // a análise do modelo alinhado acha o achatamento parieto-occipital direito
   const an = O.analisar(al.pos, al.zRef), A1 = an.peaks.find((p) => p.label === "A1");
-  assert.match(A1.region, /parieto-occipital D/); assert.ok(Math.abs(an.ic - O.analisar(pos, meta.zRef).ic) < 0.005);
+  assert.match(A1.region, /parieto-occipital D/); assert.ok(Math.abs(an.ic - O.analisar(pos, meta.zRef).ic) < 0.02);   // o alinhamento inclina ~5° (E3c-2) e a largura transversal depende do referencial
+});
+
+test("índice cefálico pela largura transversal (E3c-4): paralelogramo não vira braquicefalia", () => {
+  // grade sintética: elipse 75 × 60 mm (IC 0,80) cisalhada em x (plagiocefalia em paralelogramo)
+  const { NT, NP, dT } = O.GRADE, rs = new Float32Array(NT * NP);
+  const raio = (t, k) => { const d = [Math.sin(t), Math.cos(t)]; let lo = 0, hi = 200; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2, x = m * d[0], y = m * d[1], xs = x - k * y; (xs / 60) ** 2 + (y / 75) ** 2 > 1 ? (hi = m) : (lo = m); } return lo; };
+  for (const [k, legadoMaior] of [[0, false], [0.3, true]]) {
+    for (let ip = 0; ip < NP; ip++) for (let it = 0; it < NT; it++) rs[ip * NT + it] = raio(it * dT * O.GRAU, k);
+    const novo = O.indiceCefalico(rs, null), velho = O.indiceCefalico(rs, null, true);
+    const W = 2 * Math.hypot(60, k * 75);   // extensão em x da elipse cisalhada (x = 60 cos u + k·75 sen u)
+    assert.ok(Math.abs(novo.w - W) < 0.3 && Math.abs(novo.l - 150) < 0.3, `transversal ${novo.w} × ${novo.l}`);
+    if (legadoMaior) assert.ok(velho.w > novo.w + 2, `a corda oblíqua mede mais que a largura (${velho.w} × ${novo.w})`);
+  }
+});
+
+test("estilo do laboratório (E3c-4): topo inclinado, fenda lateral única e furos só na frente e atrás", () => {
+  const an = O.analisar(pos, meta.zRef), base = Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 40, bandTopBack: 70, split: "lateralL", gap: 2, holeZone: "ap", holeArc: 45, cheek: "off", mast: "off" });
+  const g = O.gerarOrtese(an, meta.zRef, base, pos), T = g.tris;
+  assert.deepEqual(g.stats.mesh, { pinch: 0, dropped: 0 });
+  // borda superior: mais baixa na frente que atrás
+  const topo = (az) => { let m = -90; for (let k = 0; k < T.length; k += 3) { const x = T[k], y = T[k + 1], z = T[k + 2] - meta.zRef, th = ((Math.atan2(x, y) / O.GRAU) + 360) % 360; if (O.diferencaAzimute(th, az) < 3) m = Math.max(m, Math.asin(z / Math.hypot(x, y, z)) / O.GRAU); } return m; };
+  assert.ok(topo(0) < 46 && topo(180) > 64, `topo frente ${topo(0).toFixed(1)}°, atrás ${topo(180).toFixed(1)}°`);
+  // fenda só do lado E: nenhum ponto da casca a menos de 0,9 mm do plano da fenda no lado E (x < 0), e há material do lado D
+  let naFenda = 0, ladoD = 0;
+  for (let k = 0; k < T.length; k += 3) { if (T[k] < -20 && Math.abs(T[k + 1]) < 0.9) naFenda++; if (T[k] > 20 && Math.abs(T[k + 1]) < 0.9) ladoD++; }
+  assert.equal(naFenda, 0); assert.ok(ladoD > 0);
+  // furos dos dois lados (frente D e frente E têm a mesma quantidade de aberturas, a menos de uma fileira)
+  const furosLado = (sinal) => { const ref = O.gerarOrtese(an, meta.zRef, Object.assign({}, base, { holeD: 0 }), pos).stats.volume_cm3; return ref; };
+  const semFuros = furosLado(), comFuros = g.stats.volume_cm3;
+  assert.ok(semFuros - comFuros > 1, "os furos tiram material");
+  const contar = (T2, s) => { let n = 0; for (let k = 0; k < T2.length; k += 9) { const x = (T2[k] + T2[k + 3] + T2[k + 6]) / 3, y = (T2[k + 1] + T2[k + 4] + T2[k + 7]) / 3; if (Math.sign(x) === s && y > 30) n++; } return n; };
+  const d = contar(T, 1), e = contar(T, -1);
+  assert.ok(Math.abs(d - e) / Math.max(d, e) < 0.15, `triângulos na frente D ${d} × E ${e} (os furos refinam a malha dos dois lados)`);
+  // com topo igual na frente e atrás, a casca é a mesma de antes (bandTopBack ignorado)
+  const igual = (P2) => O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, P2, pos).tris);
+  assert.deepEqual(igual(Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 55, bandTopBack: 55 })), igual(Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 55 })));
 });
