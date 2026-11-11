@@ -3,9 +3,10 @@
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 import * as N from "../../nucleo/index.js";
 import * as M from "./processamento.js";
+import * as P from "./pigmentacao.js";
 import * as UI from "../../nucleo/interface/index.js";
 
-const E = Object.assign({}, N, M);
+const E = Object.assign({}, N, M, P);
 E.lab = N.paraLab;                                          // nome antigo
 E.stl = (malha, transformar) => N.stl(malha, transformar, M.CABECALHO_STL);
 E.marcadorSVG = (bits) => N.marcadorSVG(bits, "EITA!Mamilo");

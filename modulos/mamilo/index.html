@@ -69,6 +69,12 @@ table.m td:last-child{text-align:right;font:500 13px var(--f-mono)}
 .seg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;flex:1;padding:7px 8px;font-size:12.5px}.seg button+button{border-left:1px solid var(--line-strong)}
 .sw{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sw div{font:500 11.5px var(--f-mono);color:var(--muted)}.sw i{display:block;height:30px;border-radius:7px;border:1px solid var(--line);margin-bottom:4px}
 .marc{display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:6px}.marc svg{width:150px;height:auto;background:#fff}
+#cvPig{width:100%;aspect-ratio:2/1;display:block;border-radius:8px;border:1px solid var(--line);margin-top:6px;background:#fff}
+.pgz{display:grid;grid-template-columns:18px 1fr 64px;gap:4px 6px;align-items:center;margin:6px 0}
+.pgz i{width:18px;height:18px;border-radius:4px;border:1px solid var(--line-strong);display:block}
+.pgz b{font:600 12px var(--f-body);color:var(--ink)}.pgz small{display:block;font:11px var(--f-body);color:var(--muted)}
+.pgz input{width:100%;min-width:0;padding:4px 6px;border:1px solid var(--line-strong);border-radius:6px;font:12px var(--f-body);color:var(--ink);background:var(--bg);box-sizing:border-box}
+.pgz .w{grid-column:2/-1}
 #cvCorpo{width:100%;aspect-ratio:1;display:block;border-radius:8px;border:1px solid var(--line);margin-top:6px}
 .credit{margin-top:auto;padding:16px 4px 0;font-size:11.5px;color:var(--muted);line-height:1.5;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
 .credit img{height:58px;width:auto;flex:none}.credit b{color:var(--ink)}
@@ -231,14 +237,33 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
   </div>
 </section>
 
+<section id="sPig" class="off collapsed">
+  <h2><span class="n">6</span>Pigmentação</h2>
+  <div class="bd">
+    <div class="note" style="margin-top:0">Pintura intrínseca em camadas no molde frontal: o que se vê primeiro é pintado primeiro. As cores foram medidas na foto calibrada.</div>
+    <canvas id="cvPig" aria-label="Mapa de pigmentação"></canvas>
+    <div class="note" id="pigLeg"></div>
+    <div class="sub-h">Receita da pigmentação</div>
+    <label class="pf">Silicone (marca, dureza)<input type="text" id="pgSil" placeholder="ex.: silicone platinum, Shore 00-30" autocomplete="off"></label>
+    <div id="pgZonas"></div>
+    <label class="pf">Tom aprovado / observações<textarea id="pgObs" rows="2" placeholder="ex.: plaquinha 3 aprovada com a paciente, luz do dia"></textarea></label>
+    <div class="note">Anote os pigmentos em gramas (ex.: <i>vermelho 0,02 g; marrom 0,05 g</i>) e a massa de silicone de cada mistura. A receita fica na ficha e sai no relatório.</div>
+    <div class="sub-h">Máscara de pintura</div>
+    <label class="chk"><input type="checkbox" id="pgMasc" checked> Incluir a máscara no pacote (.zip)</label>
+    <label class="ctl">Altura da parede<select id="pgAlt"><option value="1.5">1,5 mm</option><option value="2" selected>2,0 mm</option><option value="3">3,0 mm</option></select></label>
+    <div class="note">Anel fino que assenta no molde frontal sobre a borda da aréola, com duas abas. Pinte a aréola por dentro do anel, retire a máscara e siga com a base. Imprima em resina flexível ou TPU.</div>
+    <div class="row"><button class="primary" id="pigPdf" type="button">Mapa de pigmentação (PDF)</button><button id="pigStl" type="button">Só a máscara (.zip)</button></div>
+  </div>
+</section>
+
 <section id="s6" class="off collapsed">
-  <h2><span class="n">6</span>Exportar</h2>
+  <h2><span class="n">7</span>Exportar</h2>
   <div class="bd">
     <label class="ctl">Resolução da malha<select id="res"><option value="0.1" selected>Alta (0,10 mm)</option><option value="0.15">Normal (0,15 mm)</option><option value="0.2">Rápida (0,20 mm)</option></select></label>
     <label class="ctl">Código nos arquivos<input type="text" id="caso" placeholder="da ficha"></label>
     <div class="note">Vazio = prontuário da ficha ou iniciais. Os nomes dos arquivos nunca levam o nome completo.</div>
     <div class="row"><button class="primary" id="exp" type="button">Baixar pacote (.zip)</button><button id="expPdf" type="button">Relatório (PDF)</button></div>
-    <div class="note">O pacote traz <b>molde_frontal.stl</b> (cavidade com o relevo), <b>contramolde.stl</b> (pinos de registro e canal de transbordo), <b>protese_referencia.stl</b>, o relatório em PDF e JSON e os contornos editáveis.</div>
+    <div class="note">O pacote traz <b>molde_frontal.stl</b> (cavidade com o relevo), <b>contramolde.stl</b> (pinos de registro e canal de transbordo), <b>protese_referencia.stl</b>, a <b>máscara de pintura</b>, o <b>mapa de pigmentação</b> em escala 1:1, o relatório em PDF e JSON e os contornos editáveis.</div>
     <div id="expInfo"></div>
   </div>
 </section>

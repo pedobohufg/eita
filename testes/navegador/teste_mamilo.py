@@ -24,7 +24,7 @@ async def main():
             async with pg.expect_download(timeout=180000) as d: await pg.click("#exp")
             z = zipfile.ZipFile(await (await d.value).path())
             nomes = sorted(z.namelist()); print("pacote:", nomes)
-            assert {"protese_referencia.stl", "molde_frontal.stl", "contramolde.stl", "relatorio.json", "relatorio.pdf"} <= set(nomes)
+            assert {"protese_referencia.stl", "molde_frontal.stl", "contramolde.stl", "relatorio.json", "relatorio.pdf", "mapa_pigmentacao.pdf", "mascara_pintura_areola.stl"} <= set(nomes)
             print("medidas:", json.loads(z.read("relatorio.json"))["medidas"])
             await pg.screenshot(path=os.path.join(RAIZ, "dist", "mamilo-teste.png"))
             await b.close()

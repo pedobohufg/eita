@@ -50,3 +50,34 @@ test("malhas: prótese, molde frontal e contramolde são sólidos fechados", () 
   for (const [nome, m] of Object.entries(X.malhas)) assert.ok(verificarFechada(m).fechada, nome);
   assert.ok(X.volume_ml > 0.5 && X.volume_ml < 5);
 });
+
+test("pigmentação: cores por zona perto das cores reais da fantoma", async () => {
+  const { perfilCorRadial } = await import("../modulos/mamilo/pigmentacao.js");
+  const F = frontal(E, "claro_A"), P = perfilCorRadial(F.im, F.seg);
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  // comparação com a paleta da v0.2, medida na mesma imagem calibrada
+  const pal = F.resumo.paleta;
+  assert.ok(dist(rgb(P.zonas.papila), rgb(pal.papila)) < 12, "papila " + P.zonas.papila);
+  assert.ok(dist(rgb(P.zonas.areola_borda), rgb(pal.areola)) < 12, "aréola " + P.zonas.areola_borda);
+  assert.ok(dist(rgb(P.zonas.base), rgb(pal.pele)) < 12, "pele " + P.zonas.base);
+  assert.equal(P.faixas.length, 8); assert.ok(P.faixas.every((f) => /^#[0-9a-f]{6}$/.test(f.cor)));
+});
+
+test("pigmentação: máscara de pintura é sólido fechado, assenta no molde e fica fora da aréola", async () => {
+  const { mascaraPintura } = await import("../modulos/mamilo/pigmentacao.js");
+  const F = frontal(E, "claro_A"), L = lateral(E, "lateral_0");
+  const p = { ...E.PARAMETROS, resolucao_mm: 0.2, textura_papila: { ...E.PARAMETROS.textura_papila } };
+  for (const espelhar of [false, true]) {
+    const G = E.geometria(F.im, F.seg, F.k, { ...p, espelhar }, L.L, null);
+    const m = mascaraPintura(G, { ...p, espelhar });
+    assert.ok(verificarFechada(m.malha).fechada, "fechada");
+    // nenhum vértice da máscara dentro da aréola (rho < 1 − meio passo de grade)
+    const { V } = m.malha, dx = G.xs[1] - G.xs[0], tol = dx / Math.min(G.a, G.b);
+    for (let v = 0; v < V.length; v += 3) {
+      const i = Math.round((V[v] - G.xs[0]) / dx), j = Math.round((V[v + 1] - G.xs[0]) / dx);
+      assert.ok(G.rho[j * G.n + i] >= 1 - tol, "vértice dentro da aréola");
+    }
+    const dv = new DataView(m.arquivo); assert.equal(dv.getUint32(80, true), m.malha.F.length / 3);
+  }
+});

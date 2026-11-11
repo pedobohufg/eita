@@ -15,7 +15,7 @@ const UI = E.ui, CASCA = UI.criarCasca(), status = CASCA.status, ocupado = CASCA
 const { carregarImagem, lerArquivo, paraCanvas } = UI;
 
 // ------------------------------------------------------------------ etapas e seções
-const ETAPAS = [["s1", "Foto"], ["s2", "Contornos"], ["s3", "Escala e cor"], ["s4", "Lateral"], ["s5", "Prótese"], ["s6", "Exportar"]];
+const ETAPAS = [["s1", "Foto"], ["s2", "Contornos"], ["s3", "Escala e cor"], ["s4", "Lateral"], ["s5", "Prótese"], ["sPig", "Pigmentação"], ["s6", "Exportar"]];
 const ETP = E.ui.criarEtapas({ etapas: ETAPAS, status, bloqueada: "Carregue a foto frontal primeiro (etapa 1).", aoAbrir(id, semVista) {
   if (!semVista) {
     if (id === "s1" || id === "s2") { mudarAba("photo"); if (id === "s2") enquadrar("areola"); }
@@ -24,9 +24,10 @@ const ETP = E.ui.criarEtapas({ etapas: ETAPAS, status, bloqueada: "Carregue a fo
     if (id === "s5" || id === "s6") mudarAba("3d");
   }
   if (id === "sCorpo") desenharCorpo();
+  if (id === "sPig") desenharPig();
 } });
 const montarStepper = ETP.montar, abrir = ETP.abrir, feito = ETP.feito;
-function liberar() { ETP.liberar(["s2", "s3", "s4", "s5", "s6"]); }
+function liberar() { ETP.liberar(["s2", "s3", "s4", "s5", "sPig", "s6"]); }
 
 // ------------------------------------------------------------------ abas da vista
 function mudarAba(t) {
@@ -377,6 +378,7 @@ function relatorioJSON(G, vol) {
       papila_diam_mm: +G.papila_diam_mm.toFixed(2), papila_proj_mm: +G.papila_proj_mm.toFixed(2), papila_proj_fonte: S.lateral && !S.projForcada ? "foto lateral" : "digitada", papila_forma_n: lateralEfetiva().forma_n,
       contornos: fr.editado ? "ajustados à mão" : "automáticos", cores: fr.paleta },
     lateral: S.lateral ? { projecao_mm: S.lateral.projecao_mm, largura_base_mm: S.lateral.largura_base_mm, forma_n: S.lateral.forma_n, rms_ajuste_mm: S.lateral.rms_ajuste_mm, avisos: S.lateral.avisos } : null,
+    pigmentacao: (() => { const P = perfilPig(); return { cores_medidas: P ? P.zonas : null, faixas_areola: P ? P.faixas.map((f) => ({ rho: [f.rho0, f.rho1], cor: f.cor })) : null, receita: readPig() }; })(),
     parametros: S.p, volume_silicone_ml: vol != null ? +vol.toFixed(3) : null,
     avisos: checagens().map((c) => c.n + ": " + c.t)
   };
@@ -386,6 +388,9 @@ const LEIAME = `EITA! MAMILO — pacote de fabricação (Lab.EITA/UFG)
 molde_frontal.stl ...... molde com a cavidade para cima (face visível da prótese, com o relevo)
 contramolde.stl ........ face que fica contra a pele, com 4 pinos de registro e canal de transbordo
 protese_referencia.stl . a prótese em si, para conferência visual
+mascara_pintura_areola.stl  anel que assenta no molde frontal sobre a borda da aréola (mesmas
+                         coordenadas do molde); imprimir em resina flexível ou TPU
+mapa_pigmentacao.pdf ... mapa em escala 1:1 (prótese e molde espelhado), cores medidas e receita
 segmentacao.json ....... contornos em pixels (compatível com o pipeline Python: --segmentacao)
 relatorio.pdf ......... relatório de fabricação (paciente, medidas, cores, checagem de segurança)
 relatorio.json ........ medidas, cores, parâmetros e avisos
@@ -404,9 +409,12 @@ $("exp").onclick = async () => {
     const J = relatorioJSON(G, ex.volume_ml);
     ocupado(true, "Montando o relatório…"); await espera(); const pdf = await gerarPDF(G, ex.volume_ml);
     ocupado(true, "Compactando…"); await espera();
-    const zip = await E.zip(Object.assign({}, ex.arquivos, { "relatorio.json": JSON.stringify(J, null, 2), "segmentacao.json": JSON.stringify(S.frontal.seg, null, 2), "LEIA-ME.txt": LEIAME, "relatorio.pdf": pdf }));
+    ocupado(true, "Mapa de pigmentação e máscara…"); await espera();
+    const extra = { "mapa_pigmentacao.pdf": await mapaPigmentacaoPDF() };
+    if ($("pgMasc").checked) extra["mascara_pintura_areola.stl"] = arquivoMascara(G);
+    const zip = await E.zip(Object.assign({}, ex.arquivos, extra, { "relatorio.json": JSON.stringify(J, null, 2), "segmentacao.json": JSON.stringify(S.frontal.seg, null, 2), "LEIA-ME.txt": LEIAME, "relatorio.pdf": pdf }));
     ocupado(false);
-    $("expInfo").innerHTML = `<div class="okbox">3 STL (malhas fechadas) · silicone ${fmt(ex.volume_ml, 2)} mL · pacote ${fmt(zip.size / 1e6, 1)} MB</div>`;
+    $("expInfo").innerHTML = `<div class="okbox">${extra["mascara_pintura_areola.stl"] ? 4 : 3} STL (malhas fechadas) · silicone ${fmt(ex.volume_ml, 2)} mL · pacote ${fmt(zip.size / 1e6, 1)} MB</div>`;
     legenda();
     if (await salvar(`EITA-Mamilo_${caso}.zip`, zip)) feito("s6");
   } catch (e) { ocupado(false); status("Falha ao exportar: " + e.message, true); }
@@ -438,6 +446,7 @@ function collectFicha() {
     projForcada: S.projForcada, forma: S.forma,
     lados: { foto: $("photoSide").value, protese: $("protSide").value },
     parametros: JSON.parse(JSON.stringify(S.p)),
+    pigmentacao: readPig(),
     resultado: S.vol ? { volume_ml: +S.vol.toFixed(3) } : null
   };
 }
@@ -470,7 +479,7 @@ function sincronizarControles() {
 }
 function openFicha(f) {
   if (!FICHAS.ehFicha(f)) { status("Arquivo de ficha não reconhecido.", true); return; }
-  S.fichaId = f.id; writePatient(f.paciente || { pName: f.nome });
+  S.fichaId = f.id; writePatient(f.paciente || { pName: f.nome }); writePig(f.pigmentacao);
   if (f.lados) { $("photoSide").value = f.lados.foto; $("protSide").value = f.lados.protese; }
   if (f.parametros) { S.p = Object.assign({}, E.PARAMETROS, f.parametros, { textura_papila: Object.assign({}, E.PARAMETROS.textura_papila, f.parametros.textura_papila || {}) }); sincronizarControles(); }
   lados();
@@ -519,6 +528,7 @@ function checagens() {
   if (!S.lateral) out.push({ n: "info", t: `Sem foto lateral: projeção da papila digitada (${fmt(S.p.papila_proj_mm)} mm).` });
   else if (fr) { const dpf = fr.seg.papila.diam_px / fr.k; if (S.lateral.largura_base_mm < 0.6 * dpf || S.lateral.largura_base_mm > 2 * dpf) out.push({ n: "atenção", t: "A largura da papila no perfil não bate com a foto frontal." }); }
   if (S.p.textura_papila.ativa && parseFloat($("res").value) > 0.1) out.push({ n: "info", t: "Textura da papila ativa com malha acima de 0,10 mm: os óstios podem não aparecer no molde." });
+  if (fr && !temReceita()) out.push({ n: "info", t: "Receita de pigmentação não registrada (etapa 6)." });
   if (!P.pProf) out.push({ n: "info", t: "Profissional responsável não informado na ficha." });
   return out;
 }
@@ -594,6 +604,17 @@ async function gerarPDF(G, vol) {
   R.par("Resultado", [["Dimensões da prótese", d(dimA) + " × " + d(dimB) + " mm"], ["Altura total no centro", d(G.papila_proj_mm + S.p.esp_centro_mm) + " mm"], ["Volume de silicone", vol != null ? d(vol, 2) + " mL" : "—"], ["Massa estimada (1,1 g/mL)", vol != null ? d(vol * 1.1, 1) + " g" : "—"], ["Bloco dos moldes", d(2 * (G.ext - 1), 0) + " × " + d(2 * (G.ext - 1), 0) + " mm"], ["Resolução da malha", d(parseFloat($("res").value), 2) + " mm"], ["Malhas", "sólidos fechados"]],
     "Fabricação", [["Moldes", "SLA/DLP, camada <= 0,05 mm"], ["Pós-cura", "completa + teste de cura"], ["Desmoldante", "antes da pintura"], ["Pintura", "intrínseca, em camadas"], ["Silicone", "platinum, grau médico"], ["Fixação", "adesivo de grau médico"], ["Acabamento", "aparar a borda fina"]]);
   R.cores("Cores de referência (pigmentação)", [["Aréola", m.cores.areola], ["Papila", m.cores.papila], ["Pele ao redor", m.cores.pele]]);
+  // receita de pigmentação
+  const RP = readPig(), PZ = perfilPig(), linhasR = E.ZONAS_PIGMENTO.filter((z) => RP.zonas[z.id]);
+  if (R.y - 40 - 12 * linhasR.length < 50) R.novaPagina();
+  R.secao("Receita de pigmentação");
+  if (!linhasR.length && !RP.silicone) { R.pg.text(36, R.y, 8.6, "Não registrada. Anote na etapa 6 (Pigmentação) depois das plaquinhas-teste.", false, SUT); R.y -= 12; }
+  else {
+    if (RP.silicone) { R.pg.text(36, R.y, 8.6, "Silicone: " + corta(RP.silicone, 8.6, 480), true, E.CORES_PDF.tinta); R.y -= 12; }
+    for (const z of linhasR) { const r = RP.zonas[z.id], c = corZona(PZ, z.id); if (c) R.pg.rect(36, R.y - 2, 10, 9, E.ui.hexParaRgb(c)); R.pg.text(52, R.y, 8.6, z.nome, true, E.CORES_PDF.tinta); R.pg.text(160, R.y, 8.6, corta((r.pigmentos || "—") + (r.silicone_g ? " · silicone " + r.silicone_g + " g" : ""), 8.6, 395), false, E.CORES_PDF.tinta); R.y -= 12; }
+    if (RP.observacoes) E.quebrarTexto("Tom aprovado / observações: " + RP.observacoes, 8.4, 523).forEach((l) => { R.pg.text(36, R.y, 8.4, l, false, SUT); R.y -= 11; });
+  }
+  R.y -= 10;
   R.seguranca(checagens());
   R.avisoFinal("Medidas obtidas por fotografia calibrada e modelo computacional. Protótipo de pesquisa, não validado clinicamente: confira as medidas, a cor e a adaptação na paciente antes da entrega. A prótese não substitui a avaliação da equipe de saúde.");
   return R.finalizar(imgs);
@@ -637,6 +658,114 @@ $("corpoDl").onclick = async () => {
     await salvar("EITA-Mamilo_corpo-de-prova.zip", zip);
   } catch (e) { ocupado(false); status("Falha: " + e.message, true); }
 };
+
+// ------------------------------------------------------------------ 6. pigmentação (mapa 1:1, receita e máscara de pintura)
+function perfilPig() {
+  const fr = S.frontal; if (!fr) return null;
+  const chave = JSON.stringify(fr.seg);
+  if (!S.pigCache || S.pigCache.chave !== chave || S.pigCache.img !== fr.img) S.pigCache = { chave, img: fr.img, P: E.perfilCorRadial(fr.img, fr.seg) };
+  return S.pigCache.P;
+}
+function corZona(P, id) { return id === "extrinseca" ? null : P && P.zonas[id]; }
+function montarZonasPig() {
+  if ($("pgZonas").childElementCount) return;
+  $("pgZonas").innerHTML = E.ZONAS_PIGMENTO.map((z) => `<div class="pgz"><i id="pgC_${z.id}"></i><div><b>${z.nome}</b><small>${z.camada}</small></div><input type="text" id="pgG_${z.id}" placeholder="silic. g" title="massa de silicone da mistura (g)"><span></span><input class="w" type="text" id="pgP_${z.id}" placeholder="pigmentos (nome: g; …)" autocomplete="off"></div>`).join("");
+}
+function atualizarCoresPig() {
+  montarZonasPig(); const P = perfilPig();
+  for (const z of E.ZONAS_PIGMENTO) { const c = corZona(P, z.id), el = $("pgC_" + z.id); el.style.background = c || "repeating-linear-gradient(45deg,#fff 0 3px,#ddd 3px 6px)"; el.title = c || "sem cor medida"; }
+}
+function readPig() {
+  montarZonasPig(); const zonas = {};
+  for (const z of E.ZONAS_PIGMENTO) { const pg = $("pgP_" + z.id).value.trim(), g = $("pgG_" + z.id).value.trim(); if (pg || g) zonas[z.id] = { pigmentos: pg, silicone_g: g }; }
+  return { silicone: $("pgSil").value.trim(), zonas, observacoes: $("pgObs").value.trim(), mascara: { incluir: $("pgMasc").checked, altura_mm: parseFloat($("pgAlt").value) } };
+}
+function writePig(t) {
+  montarZonasPig(); t = t || {};
+  $("pgSil").value = t.silicone || ""; $("pgObs").value = t.observacoes || "";
+  for (const z of E.ZONAS_PIGMENTO) { const r = (t.zonas || {})[z.id] || {}; $("pgP_" + z.id).value = r.pigmentos || ""; $("pgG_" + z.id).value = r.silicone_g || ""; }
+  if (t.mascara) { $("pgMasc").checked = t.mascara.incluir !== false; if (t.mascara.altura_mm) $("pgAlt").value = String(t.mascara.altura_mm); }
+}
+function temReceita() { const r = readPig(); return !!(r.silicone || Object.keys(r.zonas).length); }
+
+// geometria do mapa em mm, no referencial da foto (x à direita, y para baixo), já espelhada se a prótese for do outro lado
+function formaPig() {
+  const fr = S.frontal, a = fr.seg.areola, p = fr.seg.papila, k = fr.k;
+  return { A: a.eixo_maior_px / k / 2, B: a.eixo_menor_px / k / 2, th: (a.angulo_graus * Math.PI) / 180, px: (p.cx - a.cx) / k, py: (p.cy - a.cy) / k, rp: p.diam_px / k / 2,
+    rhoOut: 1 + S.p.margem_mm / Math.min(a.eixo_maior_px, a.eixo_menor_px) * 2 * k, larg: 1.0 / Math.min(a.eixo_maior_px / k / 2, a.eixo_menor_px / k / 2) };
+}
+// desenha uma vista do mapa centrada em (cx, cy) com 'e' px por mm; espelho = vista dentro do molde
+function desenharMapa(x, cx, cy, e, espelho, P, f, opc = {}) {
+  const sx = (S.p.espelhar ? -1 : 1) * (espelho ? -1 : 1), base = P.zonas.base || "#d8b49a";
+  x.save(); x.translate(cx, cy); x.scale(sx * e, e);
+  const elipse = (r) => { x.beginPath(); x.ellipse(0, 0, f.A * r, f.B * r, f.th, 0, 2 * Math.PI); };
+  elipse(f.rhoOut); x.fillStyle = base; x.fill();
+  if (P.zonas.transicao) { elipse(1.08); x.fillStyle = P.zonas.transicao; x.fill(); }
+  for (let i = P.faixas.length - 1; i >= 0; i--) { elipse(P.faixas[i].rho1); x.fillStyle = P.faixas[i].cor || P.zonas.areola_borda; x.fill(); }
+  x.beginPath(); x.arc(f.px, f.py, f.rp, 0, 2 * Math.PI); x.fillStyle = P.zonas.papila || "#8a5547"; x.fill();
+  x.lineWidth = 0.25; x.strokeStyle = "rgba(28,23,48,.85)";
+  x.setLineDash([1.2, 0.8]); elipse(f.rhoOut); x.stroke(); x.setLineDash([]);
+  if (opc.mascara) { x.lineWidth = f.larg * Math.min(f.A, f.B); x.strokeStyle = "rgba(60,60,70,.45)"; elipse(1 + f.larg / 2); x.stroke(); }
+  x.lineWidth = 0.2; x.strokeStyle = "rgba(28,23,48,.9)"; elipse(1); x.stroke();
+  x.beginPath(); x.arc(f.px, f.py, f.rp, 0, 2 * Math.PI); x.stroke();
+  x.restore();
+  // números das camadas (sem espelhar o texto)
+  const pos = (mx, my) => [cx + sx * mx * e, cy + my * e], ct = Math.cos(f.th), st = Math.sin(f.th);
+  const r4 = (1 + f.rhoOut) / 2, marcas = [["1", f.px, f.py], ["2", 0.5 * f.B * st, -0.5 * f.B * ct], ["3", -0.8 * f.A * ct, -0.8 * f.A * st], ["4", -r4 * f.B * st, r4 * f.B * ct]];
+  x.font = `700 ${Math.max(11, 2.6 * e)}px Helvetica, Arial`; x.textAlign = "center"; x.textBaseline = "middle";
+  for (const [t, mx, my] of marcas) { const [u, v] = pos(mx, my), r = Math.max(8, 1.9 * e); x.fillStyle = "rgba(255,255,255,.88)"; x.beginPath(); x.arc(u, v, r, 0, 2 * Math.PI); x.fill(); x.fillStyle = "#1C1730"; x.fillText(t, u, v + 0.5); }
+  x.textAlign = "left"; x.textBaseline = "alphabetic";
+}
+function desenharPig() {
+  const fr = S.frontal; if (!fr) return; atualizarCoresPig();
+  const P = perfilPig(), f = formaPig(), cv = $("cvPig"), W = 720, H = 360; cv.width = W; cv.height = H;
+  const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, W, H);
+  const raio = Math.max(f.A, f.B) * f.rhoOut + 2, e = (H / 2 - 26) / raio;
+  desenharMapa(x, W / 4, H / 2 + 10, e, false, P, f); desenharMapa(x, (3 * W) / 4, H / 2 + 10, e, true, P, f, { mascara: true });
+  x.fillStyle = "#5B5573"; x.font = "600 13px Instrument Sans, sans-serif"; x.textAlign = "center";
+  x.fillText("na prótese (vista de frente)", W / 4, 20); x.fillText("dentro do molde (espelhado) + máscara", (3 * W) / 4, 20); x.textAlign = "left";
+  $("pigLeg").innerHTML = "1 papila · 2 aréola, centro · 3 aréola, borda · 4 base. Faixa cinza = máscara de pintura. Tracejado = borda da prótese.";
+}
+
+async function mapaPigmentacaoPDF() {
+  const P = perfilPig(), f = formaPig(), RP = readPig(), C = E.CORES_PDF, rgb = E.ui.hexParaRgb, quebra = E.quebrarTexto;
+  const MM = 72 / 25.4, raio = Math.max(f.A, f.B) * f.rhoOut + 3, Wmm = 2 * raio, PXMM = 12;
+  const vista = (espelho) => { const c = document.createElement("canvas"); c.width = c.height = Math.round(Wmm * PXMM); const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); desenharMapa(x, c.width / 2, c.height / 2, PXMM, espelho, P, f, { mascara: espelho }); return jpegOf(c, 0.92); };
+  const imgs = [Object.assign({ name: "V1" }, vista(false)), Object.assign({ name: "V2" }, vista(true))];
+  const lg = await logoJpeg(); if (lg) imgs.push(Object.assign({ name: "Lg" }, lg));
+  const R = E.criarRelatorioPDF({ app: ["EITA!", "MAMILO"], subtitulo: "Mapa de pigmentação · escala 1:1 · imprimir em 100% (tamanho real)", logo: lg ? "Lg" : null,
+    dataTexto: new Date().toLocaleDateString("pt-BR"), pacienteTexto: "Caso: " + codigoArquivo() });
+  // vistas em tamanho real (lado a lado se couberem)
+  const w = Wmm * MM, lado = 2 * w + 20 <= 523, pg = R.pg; let y = R.y - 10;
+  pg.text(36, y, 9.5, "Na prótese (vista de frente)", true, C.roxo);
+  pg.text(lado ? 36 + w + 20 : 36, lado ? y : y - w - 22, 9.5, "Dentro do molde (espelhado) — use para pintar", true, C.roxo);
+  y -= 6; pg.image("V1", 36, y - w, w, w);
+  if (lado) pg.image("V2", 36 + w + 20, y - w, w, w); else pg.image("V2", 36, y - 2 * w - 22, w, w);
+  y -= (lado ? w : 2 * w + 22) + 14;
+  pg.line(36, y, 36 + 50 * MM, y, C.tinta, 1.2); pg.line(36, y - 3, 36, y + 3, C.tinta, 1.2); pg.line(36 + 50 * MM, y - 3, 36 + 50 * MM, y + 3, C.tinta, 1.2);
+  pg.text(36 + 50 * MM + 8, y - 3, 8.4, "confira com régua: esta barra mede 50 mm", false, C.sutil);
+  R.y = y - 22;
+  if (R.y < 330) R.novaPagina();
+  R.secao("Camadas, na ordem em que entram no molde");
+  E.ZONAS_PIGMENTO.forEach((z, i) => {
+    if (R.y < 70) R.novaPagina();
+    const q = R.pg, yy = R.y, c = corZona(P, z.id), r = RP.zonas[z.id] || {};
+    q.text(36, yy, 9.5, i < 4 ? String(i + 1) : "+", true, C.roxo);
+    if (c) q.rect(50, yy - 4, 26, 15, rgb(c)); else q.line(50, yy + 3, 76, yy + 3, C.linha, 0.8);
+    q.text(84, yy + 4, 9, z.nome + (c ? "  " + c.toUpperCase() : ""), true, C.tinta); q.text(84, yy - 6, 7.8, z.camada, false, C.sutil);
+    q.text(300, yy + 4, 8.4, corta(r.pigmentos ? "Pigmentos: " + r.pigmentos : "Pigmentos: ________________________", 8.4, 255), false, r.pigmentos ? C.tinta : C.sutil);
+    q.text(300, yy - 6, 8.4, r.silicone_g ? "Silicone: " + r.silicone_g + " g" : "Silicone: ______ g", false, r.silicone_g ? C.tinta : C.sutil);
+    R.y -= 28;
+  });
+  R.pg.text(36, R.y, 8.6, "Silicone: " + (RP.silicone || "—"), true, C.tinta); R.y -= 12;
+  if (RP.observacoes) quebra("Tom aprovado / observações: " + RP.observacoes, 8.4, 523).forEach((l) => { R.pg.text(36, R.y, 8.4, l, false, C.tinta); R.y -= 11; });
+  R.avisoFinal("Camadas finas de silicone pigmentado, esperando o ponto pegajoso entre elas. Aréola mais concentrada no centro e diluída na borda; a máscara de pintura (faixa cinza) segura a tinta na borda. Use pigmentos próprios para silicone platinum, luvas nitrílicas e molde de resina com pós-cura completa. Faça plaquinhas-teste na mesma espessura e compare com a pele sob a mesma luz: as cores foram medidas na foto calibrada e servem de ponto de partida.");
+  return R.finalizar(imgs);
+}
+function arquivoMascara(G) { const R = readPig(); return E.mascaraPintura(G, S.p, { altura_mm: R.mascara.altura_mm }).arquivo; }
+$("pigPdf").onclick = async () => { if (!S.frontal) return; try { ocupado(true, "Montando o mapa…"); await espera(); const pdf = await mapaPigmentacaoPDF(); ocupado(false); await salvar(`EITA-Mamilo_${codigoArquivo()}_mapa-pigmentacao.pdf`, new Blob([pdf], { type: "application/pdf" })); } catch (e) { ocupado(false); status("Falha ao gerar o mapa: " + e.message, true); } };
+$("pigStl").onclick = async () => { if (!S.frontal) return; try { ocupado(true, "Gerando a máscara…"); await espera(); const G = geometria(parseFloat($("res").value)); const zip = await E.zip({ "mascara_pintura_areola.stl": arquivoMascara(G) }); ocupado(false); await salvar(`EITA-Mamilo_${codigoArquivo()}_mascara.zip`, zip); } catch (e) { ocupado(false); status("Falha ao gerar a máscara: " + e.message, true); } };
+for (const id of ["pgSil", "pgObs", "pgMasc", "pgAlt"]) $(id).addEventListener("change", () => desenharPig());
 
 // ------------------------------------------------------------------ início
 async function carregarExemplo() {

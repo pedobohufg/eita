@@ -19,7 +19,7 @@ nucleo/                 processamento comum (ES modules, sem dependências)
   interface/            só navegador: casca Lab.EITA (status, ocupado, downloads, etapas),
                         abrir fotos e JPEG, visualizador WebGL
 modulos/
-  mamilo/               EITA! MAMILO (processamento, interface, página e imagens)
+  mamilo/               EITA! MAMILO (processamento, pigmentação, interface, página e imagens)
   olho/                 EITA! OLHO (idem)
   cranio/               EITA! CRÂNIO (assimetria craniana: cálculo, ficha com acompanhamento, relatório)
   portal/               portal de pacientes (ficha única) e ponte.js para as páginas dos módulos
