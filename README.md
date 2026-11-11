@@ -40,6 +40,7 @@ node ferramentas/montar.mjs plataforma-sem-legado   # plataforma para publicar (
 python3 testes/navegador/teste_mamilo.py   # opcional: teste no navegador (Playwright + Chrome)
 python3 testes/navegador/teste_olho.py     # idem, OLHO
 python3 testes/navegador/teste_cranio.py   # idem, CRÂNIO
+python3 testes/navegador/comparar_afo.py legado/afo dist/afo   # AFO antes × depois (perna sintética)
 python3 testes/navegador/teste_plataforma.py   # portal de pacientes de ponta a ponta
 python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens (MAMILO)
 python3 testes/navegador/comparar_olho.py ANTES/ dist/olho/       # idem, OLHO (ANTES pode ser legado/olho + assets)
