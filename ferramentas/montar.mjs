@@ -15,6 +15,7 @@ export const MODULOS = {
   mamilo: { titulo: "EITA! MAMILO", entrada: "modulos/mamilo/global.js", interface: ["modulos/mamilo/ui.js"], estaticos: ["modulos/mamilo/index.html", "modulos/mamilo/assets"] },
   // escopo: a interface é um script de topo; a montagem a envolve numa função própria (modo estrito, sem globais)
   olho: { titulo: "EITA! OLHO", entrada: "modulos/olho/global.js", interface: ["modulos/olho/ui.js"], estaticos: ["modulos/olho/index.html", "modulos/olho/assets"], escopo: true },
+  afo: { titulo: "EITA! AFO", entrada: "modulos/afo/global.js", interface: ["modulos/afo/ui.js"], estaticos: ["modulos/afo/index.html", "modulos/afo/sobre.html", "modulos/afo/assets"], escopo: true },
   cranio: { titulo: "EITA! CRÂNIO", entrada: "modulos/cranio/global.js", interface: ["modulos/cranio/ui.js"], estaticos: ["modulos/cranio/index.html", "modulos/cranio/assets"], escopo: true },
   portal: { titulo: "Plataforma EITA", entrada: "modulos/portal/global.js", interface: ["modulos/portal/ui.js"], estaticos: ["modulos/portal/index.html", "modulos/portal/assets"], escopo: true, soNaPlataforma: true },
 };

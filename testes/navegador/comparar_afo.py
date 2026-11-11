@@ -80,4 +80,5 @@ async def main():
     assert not falhas and not eB, (falhas, eB)
     print("OK — saídas idênticas")
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
