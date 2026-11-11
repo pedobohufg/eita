@@ -32,7 +32,7 @@ for (const [nome, correcao] of Object.entries(CENARIOS)) {
 test("cenário B: correção aplicada sem pular a inversão; perna deslocada", () => {
   const r = R.B || executar(E, { params: JSON.parse(REF["B/casca.json"]).params, correcao: CENARIOS.B, perna });
   assert.equal(r.S.invSkipped, false); assert.equal(r.S.corrected, true);
-  const m = E.afo.measure(r.S.L, r.S.frame);
+  const m = E.afo.medir(r.S.L, r.S.frame);
   assert.ok(Math.abs(m.sag - 95) < 1.5, "ângulo perna-pé " + m.sag); assert.ok(Math.abs(m.inv - 3) < 1.5, "inversão " + m.inv);
 });
 
@@ -48,7 +48,7 @@ test("Worker: o texto montado por textoDoWorker() gera a mesma casca", async () 
   vm.runInContext(A.textoDoWorker(), ctx);
   ctx.self.onmessage({ data: { id: 1, A: anat, F: r.S.F, L: pts, P } });
   assert.ok(resposta && !resposta.err, resposta && resposta.err);
-  const direto = A.generateShell(anat, r.S.F, pts, Object.assign({}, P));
+  const direto = A.gerarCasca(anat, r.S.F, pts, Object.assign({}, P));
   assert.deepEqual([...resposta.R.shell.F], [...direto.shell.F]);
   assert.deepEqual([...resposta.R.shell.V], [...direto.shell.V]);
   // a lista do Worker cobre tudo que generateShell usa
@@ -56,7 +56,7 @@ test("Worker: o texto montado por textoDoWorker() gera a mesma casca", async () 
 });
 
 test("vista: o alvo da câmera cai no centro da tela; câmera olha para o alvo; mul4 em precisão dupla", () => {
-  const A = E.afo, cam = { target: [10, -5, 30], dist: 400, yaw: 0.6, pitch: 0.15, fov: 35 / A.DEG, basis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
+  const A = E.afo, cam = { target: [10, -5, 30], dist: 400, yaw: 0.6, pitch: 0.15, fov: 35 / A.GRAU, basis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
   const v = A.vetoresCamera(cam);
   assert.ok(Math.abs(A.V3.len(A.V3.sub(v.eye, cam.target)) - 400) < 1e-9);
   assert.ok(A.V3.dot(A.V3.norm(A.V3.sub(cam.target, v.eye)), v.f) > 1 - 1e-12);

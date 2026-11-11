@@ -14,7 +14,10 @@ import { executar, carregarPerna, CENARIOS, jsonCasca } from "../testes/apoio/pi
 const REF = new URL("../testes/referencia/", import.meta.url);
 const CHROME = JSON.parse(fs.readFileSync(new URL("afo-v0.14.json", REF), "utf8"));
 const L = legadoAFO();
-const legado = Object.assign({}, N, { afo: Object.assign({}, N.afo, L, { deform: (...a) => ({ V: L.deform(...a), invSkipped: L.S.invSkipped }) }) });
+// funções do legado com os nomes atuais do módulo (E4, nomes em português)
+const NOMES = { sectionCentroid: "centroideSecao", computeFrame: "calcularReferencial", addPlantar: "acrescentarPlantares", measure: "medir", generateShell: "gerarCasca", printXf: "orientacaoImpressao" };
+const doLegado = Object.fromEntries(Object.entries(NOMES).map(([v, n]) => [n, L[v]]));
+const legado = Object.assign({}, N, { afo: Object.assign({}, N.afo, doLegado, { corrigirPostura: (...a) => ({ V: L.deform(...a), invSkipped: L.S.invSkipped }) }) });
 const out = { _gerado_com: "EITA! AFO v0.14 publicado (legado/afo, funções puras) no Node " + process.version + ", perna sintética; parâmetros de afo-v0.14.json" };
 const perna = carregarPerna();
 for (const [nome, correcao] of Object.entries(CENARIOS)) {

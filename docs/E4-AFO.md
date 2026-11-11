@@ -60,7 +60,7 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 - **Conferências:** `comparar_afo.py legado/afo dist/afo` → saídas idênticas (A e B); novo `testes/navegador/caminhos_afo.py legado/afo dist/afo` (Worker criado e sem erro; downloads com a capacidade simulada — nomes e conteúdo descompactado —, download recusado, download por link, comparação com a AFO real e AFO de referência) → mesmos caminhos; novo `testes/malha-stl.test.mjs` compara no Node, bit a bit, as funções do núcleo com as do `legado/afo/index.html` na perna sintética (e um cubo para os vincos); `npm test` (43), `teste_mamilo.py`, `teste_olho.py`, `teste_cranio.py` e `teste_plataforma.py` passam.
 
 ## Feito na E4c (10/11/2026)
-- **Módulos puros** (sem estado e sem DOM; rodam no Node): `modulos/afo/vetor.js` (`V3`, `DEG`, `smooth`), `modulos/afo/anatomia.js` (`sectionCentroid`, `computeFrame`, `addPlantar`, `pl`, `measure`, `deform`, `pcaBasis`, e `paraAnatomico(frame)`/`deAnatomico(frame, p)`, o corpo de `anatXf`/`anatInv` sem ler `S`) e `modulos/afo/casca.js` (`binCenters`, `fillSmooth`, `legCenterline`, `footAxis`, `pctl`, `gauss1`, `generateShell`, `meshCheck`, `engraveText`, `STROKE_FONT`, `nnGrid`, `printXf`). O código foi movido sem mudança (recorte pelas faixas do analisador sintático); os nomes continuam os do legado (traduzir fica para quando cada parte for mexida de fato).
+- **Módulos puros** (sem estado e sem DOM; rodam no Node): `modulos/afo/vetor.js` (`V3`, `DEG`, `smooth`), `modulos/afo/anatomia.js` (`sectionCentroid`, `computeFrame`, `addPlantar`, `pl`, `measure`, `deform`, `pcaBasis`, e `paraAnatomico(frame)`/`deAnatomico(frame, p)`, o corpo de `anatXf`/`anatInv` sem ler `S`) e `modulos/afo/casca.js` (`binCenters`, `fillSmooth`, `legCenterline`, `footAxis`, `pctl`, `gauss1`, `generateShell`, `meshCheck`, `engraveText`, `STROKE_FONT`, `nnGrid`, `printXf`). O código foi movido sem mudança (recorte pelas faixas do analisador sintático); os nomes foram traduzidos depois da E4 (tabela em "Depois da E4", abaixo).
 - **Única mudança de código:** `deform()` devolve `{ V, invSkipped }` em vez de gravar `S.invSkipped`; `applyCorrection` grava no estado.
 - **Worker:** o texto sai de `textoDoWorker()` em `casca.js`, com a lista `FUNCOES_DO_WORKER` num só lugar (mesma montagem da v0.14). `global.js` publica tudo em `EITA.afo`; o `ui.js` só desestrutura o que usa.
 - **Achado — a matemática do Chrome 153 é outra:** o V8 do Chrome 153 dá, para `sin`, `cos`, `tan`, `atan`, `atan2`, `acos`, `exp`, `log1p` e `pow`, resultados que diferem do Node 22 no último bit em 3 a 18 % das entradas (`sqrt` e `hypot` iguais). Por isso o próprio AFO publicado gera, no Node, uma casca que difere da do Chrome nos últimos algarismos (ex.: um rebite em 19,5297266064 × 19,5297266065 mm); a perna (referencial, pontos, correção) sai idêntica. Consequência prática: o STL da casca de um mesmo caso pode variar no último bit conforme a versão do navegador — sem efeito clínico, mas "idêntico" só vale no mesmo motor.
@@ -79,6 +79,35 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 - `PLATAFORMA.modulos` passou a incluir `afo` (`legados` vazio): `dist/plataforma/afo/` é montado de `modulos/afo/`, com a ponte do portal.
 - `teste_plataforma.py` agora salva uma ficha no AFO aberto pelo portal, confere o vínculo com o paciente, reabre a ficha pelo portal e confere a ficha do AFO na base exportada. `comparar_afo.py` e `caminhos_afo.py` dão idêntico também com `dist/plataforma/afo` (a ponte não muda as saídas).
 - Ramo `e4-afo` juntado ao `main` (junto com a etapa de pigmentação do MAMILO, que entrou no `main` em paralelo; código lido antes da publicação). **Publicação:** a sessão da E4 estava com a rede desligada e não podia alterar o artefato existente (https://claude.ai/artifact/CthWngqti2LVBFsk3wTTwW, que fica na versão da E3b). A plataforma com o AFO foi publicada num **artefato novo**, "Plataforma EITA" — https://claude.ai/artifact/6FEje9UMAvK66manzFPtZx (capacidade `downloads`, contrato 0.2.96, como o anterior). Cada artefato tem a própria origem: as fichas e pacientes guardados no navegador pelo artefato antigo não aparecem no novo — exportar a base no portal antigo e importar no novo. **Decisão (11/11/2026): fica o endereço novo.** O antigo continua no ar só para exportar as bases; próximas publicações vão para o novo (slug `2a7a9218-7168-4cff-b5c4-cd171533c253`).
+
+## Depois da E4 (11/11/2026)
+- **Alinhamento no núcleo:** `nucleo/alinhamento.js` — `autovaloresSimetrica` (jacobiEig), `ajustarSimilaridade` (fitSim), `matrizVetor`, `matrizMatriz`, `comporTransformacoes` (compose), `aplicarTransformacao` (applyT); mesma aritmética, testada número a número contra o AFO publicado (`testes/alinhamento.test.mjs`). `caminhos_afo.py` passou a comparar também uma AFO real girada e deslocada.
+- **Nomes em português** nos módulos do AFO (renomeados pela análise de escopo, só as referências a cada função; o Worker recebe os mesmos nomes). STL no Node, referência do Node e as cinco comparações no navegador idênticos. A API de teste `window.AFO` e as funções de interface do `ui.js` mantêm os nomes da v0.14.
+
+| v0.14 | agora |
+|---|---|
+| `DEG` | `GRAU` |
+| `smooth` | `degrauSuave` |
+| `sectionCentroid` | `centroideSecao` |
+| `computeFrame` | `calcularReferencial` |
+| `addPlantar` | `acrescentarPlantares` |
+| `pl` | `pontoPlantar` |
+| `measure` | `medir` |
+| `deform` | `corrigirPostura` |
+| `pcaBasis` | `basePrincipal` |
+| `binCenters` | `centrosPorFaixa` |
+| `fillSmooth` | `preencherSuavizar` |
+| `legCenterline` | `linhaCentralPerna` |
+| `footAxis` | `eixoDoPe` |
+| `pctl` | `quantil` |
+| `gauss1` | `gaussiana1D` |
+| `generateShell` | `gerarCasca` |
+| `meshCheck` | `verificarMalha` |
+| `engraveText` | `linhasGravacao` |
+| `STROKE_FONT` | `FONTE_TRACOS` |
+| `nnGrid` | `gradeVizinhos` |
+| `printXf` | `orientacaoImpressao` |
+| `mul4` | `multiplicar4Duplo` |
 
 ## Cuidados
 - A casca roda num Worker criado a partir do texto das funções (`makeWorker`). Ao modularizar, o Worker precisa receber o mesmo código (gerar o script do Worker a partir do bundle do módulo, ou um arquivo `casca-worker.js` montado junto).

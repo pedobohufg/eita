@@ -4,8 +4,8 @@
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 "use strict";
 // Cálculo puro do AFO (E4c): vetores, anatomia e casca em modulos/afo/{vetor,anatomia,casca}.js, publicados em EITA.afo.
-const { V3, DEG, smooth, computeFrame, addPlantar, measure, deform, pcaBasis, paraAnatomico, deAnatomico } = EITA.afo;
-const { engraveText, meshCheck, nnGrid, printXf, generateShell } = EITA.afo;
+const { V3, GRAU, degrauSuave, calcularReferencial, acrescentarPlantares, medir, corrigirPostura, basePrincipal, paraAnatomico, deAnatomico } = EITA.afo;
+const { linhasGravacao, verificarMalha, gradeVizinhos, orientacaoImpressao, gerarCasca } = EITA.afo;
 // Malha e STL pelo núcleo (nucleo/malha.js; E4b). O STL do AFO usa transformações de ponto [x, y, z] e
 // cabeçalho de até 79 caracteres, como na v0.14.
 const { lerSTL, soldar, filtrarComponentes, contarArestasDeBorda, separarVincos, normaisDeVertices } = EITA;
@@ -149,7 +149,7 @@ const cam = {
   dist: 400,
   yaw: 0.6,
   pitch: 0.15,
-  fov: 35 / DEG,
+  fov: 35 / GRAU,
   basis: [
     [1, 0, 0],
     [0, 1, 0],
@@ -159,7 +159,7 @@ const cam = {
 // contas da câmera em modulos/afo/vista.js (E4d)
 const camVectors = () => EITA.afo.vetoresCamera(cam),
   matrices = () => EITA.afo.matrizesCamera(cam, glc.width, glc.height),
-  mul4 = EITA.afo.mul4,
+  multiplicar4Duplo = EITA.afo.multiplicar4Duplo,
   project = (t, e) => EITA.afo.projetar(t, e, ov.width, ov.height);
 function fit() {
   if (!S.V) return;
@@ -263,7 +263,7 @@ function draw() {
     const s = hex(o.col);
     gl.uniform3fv(gl.getUniformLocation(meshP, "col"), s);
     const v = [e, 0, 0, 0, 0, e, 0, 0, 0, 0, e, 0, l[0], l[1], l[2], 1];
-    (gl.uniformMatrix4fv(gl.getUniformLocation(meshP, "mvp"), !1, mul4(t.mvp, v)),
+    (gl.uniformMatrix4fv(gl.getUniformLocation(meshP, "mvp"), !1, multiplicar4Duplo(t.mvp, v)),
       gl.drawArrays(gl.TRIANGLES, 0, SPH.count));
   }
   if (
@@ -669,9 +669,9 @@ function fmt(t, e = 1) {
   return t === void 0 || isNaN(t) ? "—" : t.toFixed(e);
 }
 function update() {
-  ((S.frame = computeFrame(S.L, S.V)),
-    S.frame && !S.corrected && addPlantar(S.L, S.V, S.frame),
-    (S.meas = measure(S.L, S.frame)));
+  ((S.frame = calcularReferencial(S.L, S.V)),
+    S.frame && !S.corrected && acrescentarPlantares(S.L, S.V, S.frame),
+    (S.meas = medir(S.L, S.frame)));
   const t = LM.every((o) => S.L[o.id]);
   (setTimeout(checkLandmarks, 0),
     $("s3").classList.toggle("off", !S.frame),
@@ -772,7 +772,7 @@ async function loadBuffer(t, e) {
     ((S.N = normaisDeVertices(S.V, S.F)),
       uploadGhost(),
       uploadMesh(),
-      (cam.basis = pcaBasis(o)),
+      (cam.basis = basePrincipal(o)),
       (cam.yaw = 0.6),
       (cam.pitch = 0.1));
     const T = contarArestasDeBorda(l),
@@ -882,17 +882,17 @@ function applyCorrection(t) {
     o = t?.band ?? +$("band").value,
     l = {};
   for (const b in S.L0) l[b] = S.L0[b].slice();
-  const s = computeFrame(l, S.V0);
-  addPlantar(l, S.V0, s);
-  const v = measure(l, s),
+  const s = calcularReferencial(l, S.V0);
+  acrescentarPlantares(l, S.V0, s);
+  const v = medir(l, s),
     h = { sag: v.sag, inv: v.inv };
   clearShell();
-  const { V: u, invSkipped: inv } = deform(S.V0, S.F, l, s, v, e, n, o);
+  const { V: u, invSkipped: inv } = corrigirPostura(S.V0, S.F, l, s, v, e, n, o);
   S.invSkipped = inv;
   ((S.V = u), (S.L = l), (S.corrected = !0), (S.disp = new Float32Array(u.length / 3)));
   for (let b = 0; b < S.disp.length; b++)
     S.disp[b] = Math.hypot(u[b * 3] - S.V0[b * 3], u[b * 3 + 1] - S.V0[b * 3 + 1], u[b * 3 + 2] - S.V0[b * 3 + 2]);
-  ((S.N = normaisDeVertices(S.V, S.F)), uploadMesh(), (S.frame = s), (S.meas = measure(S.L, s)));
+  ((S.N = normaisDeVertices(S.V, S.F)), uploadMesh(), (S.frame = s), (S.meas = medir(S.L, s)));
   const x = S.meas;
   let T = 0;
   for (const b of S.disp) T = Math.max(T, b);
@@ -1320,7 +1320,7 @@ async function makeShell(t = {}) {
       status('Casca gerada. A perna aparece translúcida; desmarque "Mostrar perna" para ver só a AFO.'));
     {
       const j = performance.now(),
-        Q = meshCheck(u.shell.V, u.log.baseTris ? u.shell.F.subarray(0, u.log.baseTris * 3) : u.shell.F);
+        Q = verificarMalha(u.shell.V, u.log.baseTris ? u.shell.F.subarray(0, u.log.baseTris * 3) : u.shell.F);
       ((S.shell.check = Q), (u.log.check = Q.n), (u.log.checkMs = performance.now() - j));
       const G = S.meas && S.meas.pf,
         O = !S.corrected && G !== void 0 && Math.abs(G) > 12;
@@ -2138,7 +2138,7 @@ $("expAfo").onclick = async () => {
   }
   ((expForce = !1), ($("expConfirm").innerHTML = ""));
   const e = $("orient") ? $("orient").value : "anat",
-    n = stlAFO(S.shell.shell.V, S.shell.shell.F, printXf(e, S.shell.shell.V), "EITA AFO " + baseName()),
+    n = stlAFO(S.shell.shell.V, S.shell.shell.F, orientacaoImpressao(e, S.shell.shell.V), "EITA AFO " + baseName()),
     o = await saveFile(baseName() + "_AFO.stl", n, "model/stl");
   o && S.shell.check && S.shell.check.n
     ? ($("expnote").innerHTML =
@@ -2467,7 +2467,7 @@ async function overlayVersion(t) {
       for (const b in S.L) u[b] = s(S.L[b]);
       const x = shellParams();
       x.reliefs = S.reliefs.map((b) => ({ p: s(b.p), d: b.d, r: b.r }));
-      const T = generateShell(h, S.F, u, x);
+      const T = gerarCasca(h, S.F, u, x);
       e.mesh = { V: T.shell.V, F: T.shell.F };
     } finally {
       (writeInputs(n), (S.trimAdj = o), (S.reliefs = l));
@@ -2534,7 +2534,7 @@ function alignScan(t, e, n = {}) {
     }
     l = B;
   }
-  const v = nnGrid(l, 3),
+  const v = gradeVizinhos(l, 3),
     h = o(t, 6e3),
     u = o(e, 700),
     x = o(e, 2500),
@@ -2684,7 +2684,7 @@ function compareReal(t, e, n) {
     const Q = aplicarTransformacao(v, [t[j], t[j + 1], t[j + 2]]);
     ((h[j] = Q[0]), (h[j + 1] = Q[1]), (h[j + 2] = Q[2]));
   }
-  const u = nnGrid(h, 3),
+  const u = gradeVizinhos(h, 3),
     x = normaisDeVertices(l, o.shell.F),
     T = l.length / 3,
     b = new Float32Array(T).fill(-999),
@@ -3121,7 +3121,7 @@ async function generateShellAsync(t, e, n, o) {
       if (workerOK !== !0 || /worker/.test(s.message)) workerOK = !1;
       else throw s;
     }
-  return generateShell(t, e, n, o);
+  return gerarCasca(t, e, n, o);
 }
 function anatInv(t) {
   return deAnatomico(S.frame, t);
@@ -3296,7 +3296,7 @@ function safetyChecks() {
       ),
     o.engrave && o.engrave.skipped && e("info", "identificação em relevo não coube na panturrilha"),
     l.engrave &&
-      !engraveText(l.engText).some((h) => /[A-Z0-9]{2,}/.test(h.replace(/\s/g, ""))) &&
+      !linhasGravacao(l.engText).some((h) => /[A-Z0-9]{2,}/.test(h.replace(/\s/g, ""))) &&
       e("info", "identificação sem código do paciente — preencha o prontuário"),
     !S.corrected &&
       S.meas &&
@@ -3428,7 +3428,7 @@ const TOUR_AFO = EITA.ui.criarTour({ passos: TOUR, chave: "eitaAFO.tour", abrir:
     exportData,
     stl: () => stlAFO(S.V, S.F, anatXf(), "t"),
     makeShell,
-    afoStl: (t) => stlAFO(S.shell.shell.V, S.shell.shell.F, printXf(t || "anat", S.shell.shell.V), "t"),
+    afoStl: (t) => stlAFO(S.shell.shell.V, S.shell.shell.F, orientacaoImpressao(t || "anat", S.shell.shell.V), "t"),
     report: () => buildReport(!0),
   }),
   (() => {
@@ -3525,7 +3525,7 @@ const TOUR_AFO = EITA.ui.criarTour({ passos: TOUR, chave: "eitaAFO.tour", abrir:
       }));
     const s = () => {
       const b = $("engPrev");
-      b && (b.textContent = $("pEng").checked ? engraveText(engraveAuto()).join(" / ") || "—" : "desligado");
+      b && (b.textContent = $("pEng").checked ? linhasGravacao(engraveAuto()).join(" / ") || "—" : "desligado");
     };
     ($("pBirth").addEventListener("input", updAge),
       $("s0").addEventListener("change", (b) => {

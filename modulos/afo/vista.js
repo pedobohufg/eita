@@ -1,6 +1,6 @@
 /* EITA! AFO · vista — contas da câmera do visualizador (órbita sobre uma base de eixos, matrizes e projeção na tela).
    Puro (sem DOM e sem WebGL): roda no Node. Movido de ui.js na E4d sem mudança de conta; a câmera, o tamanho do canvas
-   e o da sobreposição passaram a ser argumentos. mul4 trabalha em precisão dupla (a projeção das marcas na tela usa
+   e o da sobreposição passaram a ser argumentos. multiplicar4Duplo trabalha em precisão dupla (a projeção das marcas na tela usa
    a matriz antes de ela ir para a GPU), por isso não é o multiplicar4 do núcleo (Float32Array).
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 import { V3 } from "./vetor.js";
@@ -47,11 +47,11 @@ export function matrizesCamera(cam, t, e) {
     x = 1 / Math.tan(cam.fov / 2),
     T = t / e,
     b = [x / T, 0, 0, 0, 0, x, 0, 0, 0, 0, (u + h) / (h - u), -1, 0, 0, (2 * u * h) / (h - u), 0],
-    y = mul4(b, v),
+    y = multiplicar4Duplo(b, v),
     L = [...v];
   return ((L[12] = L[13] = L[14] = 0), { mvp: y, vrot: L, eye: n, f: o, r: l, u: s });
 }
-export function mul4(t, e) {
+export function multiplicar4Duplo(t, e) {
   const n = new Array(16).fill(0);
   for (let o = 0; o < 4; o++)
     for (let l = 0; l < 4; l++) for (let s = 0; s < 4; s++) n[o * 4 + l] += t[s * 4 + l] * e[o * 4 + s];

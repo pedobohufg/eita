@@ -29,14 +29,14 @@ export function executar(E, { params, correcao = null, perna = carregarPerna() }
   const offset = V3.mid(h, u);
   for (let i = 0; i < V.length; i += 3) for (let k = 0; k < 3; k++) V[i + k] -= offset[k];
   Object.assign(S, { V0: new Float64Array(V), V, F, L0: {}, L: {}, corrected: false });
-  const atualizar = () => { S.frame = A.computeFrame(S.L, S.V); if (S.frame && !S.corrected) A.addPlantar(S.L, S.V, S.frame); };
+  const atualizar = () => { S.frame = A.calcularReferencial(S.L, S.V); if (S.frame && !S.corrected) A.acrescentarPlantares(S.L, S.V, S.frame); };
   // setLandmark + update()
   for (const k of ORDEM) { const p = V3.sub(perna.pontos[k], offset); S.L[k] = p.slice(); S.L0[k] = p.slice(); atualizar(); }
   // applyCorrection
   if (correcao) {
     const l = {}; for (const k in S.L0) l[k] = S.L0[k].slice();
-    const s = A.computeFrame(l, S.V0); A.addPlantar(l, S.V0, s);
-    const v = A.measure(l, s), r = A.deform(S.V0, S.F, l, s, v, correcao.tSag, correcao.tCor, correcao.band);
+    const s = A.calcularReferencial(l, S.V0); A.acrescentarPlantares(l, S.V0, s);
+    const v = A.medir(l, s), r = A.corrigirPostura(S.V0, S.F, l, s, v, correcao.tSag, correcao.tCor, correcao.band);
     Object.assign(S, { V: r.V, L: l, corrected: true, invSkipped: r.invSkipped, frame: s });
     atualizar();
   }
@@ -45,17 +45,17 @@ export function executar(E, { params, correcao = null, perna = carregarPerna() }
   for (let j = 0; j < n; j++) { const q = xf([S.V[j * 3], S.V[j * 3 + 1], S.V[j * 3 + 2]]); anat[j * 3] = q[0]; anat[j * 3 + 1] = q[1]; anat[j * 3 + 2] = q[2]; }
   const pts = {}; for (const k in S.L) pts[k] = xf(S.L[k]);
   const P = JSON.parse(JSON.stringify(params));
-  let c = A.generateShell(anat, S.F, pts, Object.assign({}, P, { selfCheck: true }));
+  let c = A.gerarCasca(anat, S.F, pts, Object.assign({}, P, { selfCheck: true }));
   let cel = [], tent = 0;
   while (P.autoFix && c.log.check > 0 && tent < 3) {
     tent++; cel = cel.concat(c.log.crossCells || []);
-    const g = A.generateShell(anat, S.F, pts, Object.assign({}, P, { selfCheck: true, fixCells: cel, fixR: [4 + 2 * tent, 8 + 3 * tent] }));
+    const g = A.gerarCasca(anat, S.F, pts, Object.assign({}, P, { selfCheck: true, fixCells: cel, fixR: [4 + 2 * tent, 8 + 3 * tent] }));
     if (g.log.check <= c.log.check) c = g;
   }
   c.log.fixTries = tent;
   const casca = c.shell, stlAFO = (V, F, t) => E.stl({ V, F }, (x, y, z) => t([x, y, z]), "t");
   const stl = {};
-  for (const o of ["anat", "pe", "deitada"]) stl["afo_" + o + ".stl"] = hashSTL(stlAFO(casca.V, casca.F, A.printXf(o, casca.V)));
+  for (const o of ["anat", "pe", "deitada"]) stl["afo_" + o + ".stl"] = hashSTL(stlAFO(casca.V, casca.F, A.orientacaoImpressao(o, casca.V)));
   stl["perna.stl"] = hashSTL(stlAFO(S.V, S.F, xf));
   return { S, casca: c, stl, log: c.log };
 }

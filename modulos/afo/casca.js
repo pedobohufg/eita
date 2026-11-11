@@ -1,11 +1,11 @@
 /* EITA! AFO · casca — geração da casca da AFO e funções que rodam no Worker. Puro (sem estado e sem DOM). Movido de ui.js
    na E4c sem mudança; o texto do Worker passou a ser montado aqui (textoDoWorker), com a lista de dependências num só lugar.
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
-import { V3, DEG, smooth } from "./vetor.js";
-import { pl } from "./anatomia.js";
+import { V3, GRAU, degrauSuave } from "./vetor.js";
+import { pontoPlantar } from "./anatomia.js";
 import { normaisDeVertices } from "../../nucleo/malha.js";
 
-export function binCenters(t, e, n, o, l) {
+export function centrosPorFaixa(t, e, n, o, l) {
   const s = Array.from({ length: l }, () => [[], []]);
   for (let v = 0; v < e.length; v++) {
     const h = Math.floor((e[v] - n) / o);
@@ -18,7 +18,7 @@ export function binCenters(t, e, n, o, l) {
     return [(u(v, 0.03) + u(v, 0.97)) / 2, (u(h, 0.03) + u(h, 0.97)) / 2];
   });
 }
-export function fillSmooth(t, e) {
+export function preencherSuavizar(t, e) {
   const n = t.length;
   for (let o = 1; o < n; o++) t[o] || (t[o] = t[o - 1]);
   for (let o = n - 2; o >= 0; o--) t[o] || (t[o] = t[o + 1]);
@@ -32,7 +32,7 @@ export function fillSmooth(t, e) {
       })
     : t.map(() => null);
 }
-export function legCenterline(t) {
+export function linhaCentralPerna(t) {
   const e = t.length / 3,
     n = 5,
     o = 30;
@@ -45,7 +45,7 @@ export function legCenterline(t) {
     const T = t[x * 3 + 2];
     T >= o && (v.push([t[x * 3], t[x * 3 + 1]]), h.push(T));
   }
-  const u = fillSmooth(binCenters(v, h, o, n, s), 3);
+  const u = preencherSuavizar(centrosPorFaixa(v, h, o, n, s), 3);
   return (x) => {
     if (!u[0]) return [0, 0];
     if (x <= 0) return [0, 0];
@@ -60,7 +60,7 @@ export function legCenterline(t) {
     return [u[b][0] + (u[y][0] - u[b][0]) * L, u[b][1] + (u[y][1] - u[b][1]) * L];
   };
 }
-export function footAxis(t) {
+export function eixoDoPe(t) {
   const e = t.length / 3,
     n = 6;
   let o = 1e9,
@@ -70,17 +70,17 @@ export function footAxis(t) {
     v = [],
     h = [];
   for (let x = 0; x < e; x++) t[x * 3 + 2] < 10 && (v.push([t[x * 3], t[x * 3 + 2]]), h.push(t[x * 3 + 1]));
-  const u = fillSmooth(binCenters(v, h, o, n, s), 2);
+  const u = preencherSuavizar(centrosPorFaixa(v, h, o, n, s), 2);
   return (x) => {
     const T = Math.max(0, Math.min(s - 1, Math.floor((x - o) / n)));
     return u[T] || [0, -20];
   };
 }
-export function pctl(t, e) {
+export function quantil(t, e) {
   const n = Float64Array.from(t).sort();
   return n[Math.min(n.length - 1, Math.max(0, Math.floor(e * (n.length - 1))))];
 }
-export function gauss1(t, e, n, o, l, s) {
+export function gaussiana1D(t, e, n, o, l, s) {
   if (l <= 0) return;
   const v = Math.ceil(l * 2.5),
     h = [];
@@ -103,7 +103,7 @@ export function gauss1(t, e, n, o, l, s) {
     for (let y = 0; y < e; y++) t[T + y * b] = u[y];
   }
 }
-export const STROKE_FONT = {
+export const FONTE_TRACOS = {
   0: [
     [0, 0, 4, 0, 4, 6, 0, 6, 0, 0],
     [0, 0, 4, 6],
@@ -211,7 +211,7 @@ export const STROKE_FONT = {
   ")": [[1, 6, 2.5, 4, 2.5, 2, 1, 0]],
   _: [[0, 0, 4, 0]],
 };
-export function engraveText(t) {
+export function linhasGravacao(t) {
   return String(t || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -221,7 +221,7 @@ export function engraveText(t) {
     .filter(Boolean)
     .slice(0, 3);
 }
-export function meshCheck(t, e, n, o) {
+export function verificarMalha(t, e, n, o) {
   const l = e.length / 3,
     s = 3,
     v = 1024,
@@ -310,7 +310,7 @@ export function meshCheck(t, e, n, o) {
   }
   return { n: C, where: W };
 }
-export function nnGrid(t, e) {
+export function gradeVizinhos(t, e) {
   const n = t.length / 3,
     o = new Uint32Array(n);
   for (let h = 0; h < n; h++) o[h] = h;
@@ -372,7 +372,7 @@ export function nnGrid(t, e) {
     return (C(v), [y, Math.sqrt(b)]);
   };
 }
-export function printXf(t, e) {
+export function orientacaoImpressao(t, e) {
   if (t === "anat") return (v) => v;
   const n = t === "deitada" ? (v) => [v[0], -v[2], v[1]] : (v) => v;
   let o = [1e9, 1e9, 1e9],
@@ -387,7 +387,7 @@ export function printXf(t, e) {
     return [h[0] - s[0], h[1] - s[1], h[2] - s[2]];
   };
 }
-export function generateShell(t, e, n, o) {
+export function gerarCasca(t, e, n, o) {
   const l = t.length / 3,
     s = {},
     v = performance.now();
@@ -437,8 +437,8 @@ export function generateShell(t, e, n, o) {
   const u = [],
     x = [];
   for (let a = 0; a < l; a++) t[a * 3 + 2] < -5 && (u.push(t[a * 3 + 2]), x.push(t[a * 3 + 1]));
-  const T = pctl(u, 0.005),
-    b = pctl(x, 0.995),
+  const T = quantil(u, 0.005),
+    b = quantil(x, 0.995),
     y = Math.max(n.M1[1], n.M5[1]),
     L = n.CA[1];
   let C = b;
@@ -477,7 +477,7 @@ export function generateShell(t, e, n, o) {
   const U = W.reduce((a, r) => Math.max(a, r[1]), -1e9),
     j = o.toe === "dedos" ? Math.max(C, Math.min(U, b + 2)) : Math.min(C, y + o.metExt);
   s.yToeReal = U;
-  const Q = pctl(x, 0.005),
+  const Q = quantil(x, 0.005),
     G = C - Q,
     O = Math.min(y, Q + o.plateFrac * G);
   ((s.footLen = G), (s.yPlate = O));
@@ -518,7 +518,7 @@ export function generateShell(t, e, n, o) {
       return !0;
     };
     if (!A(c) || !A(w)) throw new Error("Não encontrei o contorno do pé no scan. Confira os pontos CA, M1 e M5.");
-    (gauss1(c, m, 1, 1, o.olSig, !1), gauss1(w, m, 1, 1, o.olSig, !1));
+    (gaussiana1D(c, m, 1, 1, o.olSig, !1), gaussiana1D(w, m, 1, 1, o.olSig, !1));
     let F = p(O);
     for (let _ = p(O - 15); _ <= p(O + 5); _++) w[_] - c[_] > w[F] - c[F] && (F = _);
     const R = o.plateMargin,
@@ -592,7 +592,7 @@ export function generateShell(t, e, n, o) {
       z &&
         P &&
         P[1] - z[1] > 10 &&
-        (lt = Math.max(-o.tipMaxAng / DEG, Math.min(o.tipMaxAng / DEG, Math.atan2(P[0] - z[0], P[1] - z[1]))));
+        (lt = Math.max(-o.tipMaxAng / GRAU, Math.min(o.tipMaxAng / GRAU, Math.atan2(P[0] - z[0], P[1] - z[1]))));
       const V = Math.sin(lt),
         J = Math.cos(lt),
         pt = (yt) => yt[0] * J - yt[1] * V,
@@ -641,7 +641,7 @@ export function generateShell(t, e, n, o) {
           (pe.push(Rt(zt - Jt * be, et + ce * xe)), pe.push(Rt(zt + $t * be, et + ce * xe)));
         }
         (ce <= 1.5 * (ft - et) + 6 ? (N = I(pe)) : (s.tipFallback = !0),
-          (s.tipCap = { ang: +(lt * DEG).toFixed(1), aL: +Jt.toFixed(1), aR: +$t.toFixed(1), b: +ce.toFixed(1) }));
+          (s.tipCap = { ang: +(lt * GRAU).toFixed(1), aL: +Jt.toFixed(1), aR: +$t.toFixed(1), b: +ce.toFixed(1) }));
       }
     }
     let st = d;
@@ -665,7 +665,7 @@ export function generateShell(t, e, n, o) {
       if (_ < X + 5) return [z, P];
       const lt = q(Math.min(_, st - 0.01));
       if (!lt) return [z, P];
-      const V = smooth(X + 5, O + 15, _);
+      const V = degrauSuave(X + 5, O + 15, _);
       if (((z += (lt[0] - z) * V), (P += (lt[1] - P) * V), _ > st)) {
         const J = (z + P) / 2;
         return [J - 0.5, J + 0.5];
@@ -764,7 +764,7 @@ export function generateShell(t, e, n, o) {
     for (let _ = 0; _ < ct.length; _++) Number.isFinite(ct[_]) || (ct[_] = T);
     {
       const _ = Float64Array.from(ct);
-      if ((gauss1(ct, Ft, 1, xt, o.plantarSig, !1), gauss1(ct, xt, Ft, Ft, o.plantarSig, !1), o.envIt > 0)) {
+      if ((gaussiana1D(ct, Ft, 1, xt, o.plantarSig, !1), gaussiana1D(ct, xt, Ft, Ft, o.plantarSig, !1), o.envIt > 0)) {
         {
           const it = Float64Array.from(_);
           for (let z = 0; z < xt; z++)
@@ -778,11 +778,11 @@ export function generateShell(t, e, n, o) {
                 }
               _[z * Ft + P] = lt;
             }
-          (gauss1(_, Ft, 1, xt, o.envRefSig, !1), gauss1(_, xt, Ft, Ft, o.envRefSig, !1));
+          (gaussiana1D(_, Ft, 1, xt, o.envRefSig, !1), gaussiana1D(_, xt, Ft, Ft, o.envRefSig, !1));
         }
         for (let it = 0; it < o.envIt; it++) {
           for (let z = 0; z < ct.length; z++) ct[z] > _[z] + o.envTol && (ct[z] = _[z] + o.envTol);
-          (gauss1(ct, Ft, 1, xt, 1, !1), gauss1(ct, xt, Ft, Ft, 1, !1));
+          (gaussiana1D(ct, Ft, 1, xt, 1, !1), gaussiana1D(ct, xt, Ft, Ft, 1, !1));
         }
       }
     }
@@ -820,7 +820,7 @@ export function generateShell(t, e, n, o) {
       for (let it = 0; it < Ft; it++) de[_ * Ft + it] = ne[_] + (1 - mt) * (ct[_ * Ft + it] - Ct[_]);
     const ie = p(O);
     for (let _ = 0; _ < xt; _++) {
-      const it = smooth(O - 4, O + 8, i(_));
+      const it = degrauSuave(O - 4, O + 8, i(_));
       if (!(it <= 0)) {
         for (let z = 0; z < Ft; z++) de[_ * Ft + z] += (de[ie * Ft + z] - de[_ * Ft + z]) * it;
         ne[_] += (ne[ie] - ne[_]) * it;
@@ -847,8 +847,8 @@ export function generateShell(t, e, n, o) {
       (s.archMax = Math.max(...Array.from(Ct, (_, it) => _ - se[it]))));
   }
   ((s.zFloor = T), (s.yToe = j));
-  const kt = legCenterline(t),
-    Bt = footAxis(t),
+  const kt = linhaCentralPerna(t),
+    Bt = eixoDoPe(t),
     wt = [];
   if (!(o.top >= 25))
     throw new Error(
@@ -873,7 +873,7 @@ export function generateShell(t, e, n, o) {
       A = (a * f - r * m) / g,
       F = (m - A * r) / a;
     for (let R = o.top + 8; R >= o.bendZ; R -= 2) wt.push([c * R + w, A * R + F, R]);
-    s.legTilt = Math.atan(Math.hypot(c, A)) * DEG;
+    s.legTilt = Math.atan(Math.hypot(c, A)) * GRAU;
   }
   const Kt = wt[wt.length - 1],
     Gt = Math.max(10, Math.min(o.bendY, 0.4 * j)),
@@ -883,7 +883,7 @@ export function generateShell(t, e, n, o) {
       const r = Bt(Math.min(a, O));
       let d = r[0],
         m = r[1];
-      const i = smooth(O - 25, O, a);
+      const i = degrauSuave(O - 25, O, a);
       if (i > 0) {
         const p = B(Math.min(a, O)),
           f = rt(a) + o.plateCH;
@@ -938,7 +938,7 @@ export function generateShell(t, e, n, o) {
   const ye = Pt.map((a, r) => V3.norm(V3.sub(Pt[Math.min(Et - 1, r + 1)], Pt[Math.max(0, r - 1)])));
   {
     const a = [];
-    for (let r = 1; r < Et; r++) a.push(+(Math.acos(Math.min(1, V3.dot(ye[r - 1], ye[r]))) * DEG).toFixed(1));
+    for (let r = 1; r < Et; r++) a.push(+(Math.acos(Math.min(1, V3.dot(ye[r - 1], ye[r]))) * GRAU).toFixed(1));
     s.spineK = a;
   }
   const Ne = [],
@@ -962,7 +962,7 @@ export function generateShell(t, e, n, o) {
   let co = o.rLim;
   const fo = [];
   {
-    const a = pl(n, "CA");
+    const a = pontoPlantar(n, "CA");
     for (let r = 0; r < l; r++) t[r * 3 + 1] < a[1] + 15 && t[r * 3 + 2] < T + 50 && fo.push(r);
   }
   let uo = 0;
@@ -974,7 +974,7 @@ export function generateShell(t, e, n, o) {
     for (let c = 0; c < l; c++)
       Ue[c] = (t[c * 3] - r[0]) * d[0] + (t[c * 3 + 1] - r[1]) * d[1] + (t[c * 3 + 2] - r[2]) * d[2];
     const p = (c, w) => {
-      let A = Math.floor((Math.atan2(w, c) * DEG + 180) / Qe);
+      let A = Math.floor((Math.atan2(w, c) * GRAU + 180) / Qe);
       return A >= tt ? tt - 1 : A;
     };
     let f = null;
@@ -1146,9 +1146,9 @@ export function generateShell(t, e, n, o) {
       if (te[r] < Qt) continue;
       const d = Pt[r][1],
         m = B(d),
-        i = smooth(Qt - 5, Qt + 25, te[r]);
+        i = degrauSuave(Qt - 5, Qt + 25, te[r]);
       if (d > O - 5) {
-        const q = smooth(O - 5, O + 10, d);
+        const q = degrauSuave(O - 5, O + 10, d);
         for (let st = 0; st < tt; st++) Tt[r * tt + st] *= 1 - q;
       }
       const p = m[0],
@@ -1179,7 +1179,7 @@ export function generateShell(t, e, n, o) {
           Nt = Mt * I[0] + Xt * I[2],
           Ft = Mt * N[0] + Xt * N[2],
           xt = Math.hypot(Nt, Ft);
-        let bt = Math.floor((Math.atan2(Ft, Nt) * DEG + 180) / Qe);
+        let bt = Math.floor((Math.atan2(Ft, Nt) * GRAU + 180) / Qe);
         (bt >= tt && (bt = tt - 1), St ? xt > H[bt] && (H[bt] = xt) : xt > X[bt] && (X[bt] = xt));
       }
       for (let q = 0; q < tt; q++) {
@@ -1207,7 +1207,7 @@ export function generateShell(t, e, n, o) {
   {
     const a = Float64Array.from(Tt);
     if (o.envPre) for (let r = 0; r < Tt.length; r++) a[r] = Math.max(a[r], Ro[r]);
-    for (let r = 0; r < 2; r++) (gauss1(Tt, tt, 1, Et, o.sigPhi, !0), gauss1(Tt, Et, tt, tt, o.sigU, !1));
+    for (let r = 0; r < 2; r++) (gaussiana1D(Tt, tt, 1, Et, o.sigPhi, !0), gaussiana1D(Tt, Et, tt, tt, o.sigU, !1));
     if (o.envIt > 0) {
       {
         const d = Float64Array.from(a);
@@ -1220,11 +1220,11 @@ export function generateShell(t, e, n, o) {
             }
             a[m * tt + i] = p;
           }
-        (gauss1(a, tt, 1, Et, o.envRefSig, !0), gauss1(a, Et, tt, tt, o.envRefSig, !1));
+        (gaussiana1D(a, tt, 1, Et, o.envRefSig, !0), gaussiana1D(a, Et, tt, tt, o.envRefSig, !1));
       }
       for (let d = 0; d < o.envIt; d++) {
         for (let m = 0; m < Tt.length; m++) Tt[m] < a[m] - o.envTol && (Tt[m] = a[m] - o.envTol);
-        (gauss1(Tt, tt, 1, Et, 1, !0), gauss1(Tt, Et, tt, tt, 1, !1));
+        (gaussiana1D(Tt, tt, 1, Et, 1, !0), gaussiana1D(Tt, Et, tt, tt, 1, !1));
       }
       let r = 0;
       for (let d = 0; d < Tt.length; d++) {
@@ -1252,7 +1252,7 @@ export function generateShell(t, e, n, o) {
         (c.sort((w, A) => w - A), (f[g] = c[p]));
       }
       for (let g = 0; g < tt; g++) i[g] = Math.min(i[g], f[g] + 1.5);
-      gauss1(i, tt, 1, 1, 5, !0);
+      gaussiana1D(i, tt, 1, 1, 5, !0);
       for (let g = 0; g < tt; g++) Tt[d * tt + g] += (i[g] - Tt[d * tt + g]) * m;
     }
     for (let d = Math.max(0, a - 4); d <= a; d++)
@@ -1292,7 +1292,7 @@ export function generateShell(t, e, n, o) {
       return Tt[a * tt + m] * (1 - i) + Tt[a * tt + ((m + 1) % tt)] * i;
     },
     po = (a, r) => {
-      const d = r / DEG,
+      const d = r / GRAU,
         m = Oe(a, r);
       return V3.add(Pt[a], V3.add(V3.mul(Ne[a], m * Math.cos(d)), V3.mul(Ge[a], m * Math.sin(d))));
     },
@@ -1302,14 +1302,14 @@ export function generateShell(t, e, n, o) {
     ),
     Re = Et - 1,
     go = (a) => {
-      let r = o.hHeel + (o.hFore - o.hHeel) * smooth(L + 10, L + 70, a);
-      return r + (o.hToe - r) * smooth(O - 45, O + 5, a);
+      let r = o.hHeel + (o.hFore - o.hHeel) * degrauSuave(L + 10, L + 70, a);
+      return r + (o.hToe - r) * degrauSuave(O - 45, O + 5, a);
     },
     ke = new Float64Array(Et),
     Fe = new Float64Array(Et);
   for (let a = 0; a < Et; a++) {
     const r = Pt[a][2],
-      d = o.thAnk + (o.thCalf - o.thAnk) * smooth(0, 60, r),
+      d = o.thAnk + (o.thCalf - o.thAnk) * degrauSuave(0, 60, r),
       m = 180 - d,
       i = te[a] >= Qt ? rt(Pt[a][1]) : T,
       p = te[a] >= Qt - 10,
@@ -1322,7 +1322,7 @@ export function generateShell(t, e, n, o) {
         }
         return 176;
       },
-      g = 1 - smooth(Qt, Qt + o.blend, te[a]);
+      g = 1 - degrauSuave(Qt, Qt + o.blend, te[a]);
     let c = g < 1 ? Math.min(o.phiFootMax, f(1)) : 0,
       w = g < 1 ? Math.min(o.phiFootMax, f(-1)) : 0;
     ((ke[a] = g * m + (1 - g) * c),
@@ -1344,12 +1344,12 @@ export function generateShell(t, e, n, o) {
     for (let a = Ht; a <= Re; a++) {
       const r = Math.max(10, (Oe(a, 90) + Oe(a, -90)) / 2),
         d = Mo(a);
-      ((Fe[a] += (Xe(0, d) / r) * DEG),
-        (ke[a] += (Xe(1, d) / r) * DEG),
+      ((Fe[a] += (Xe(0, d) / r) * GRAU),
+        (ke[a] += (Xe(1, d) / r) * GRAU),
         (Fe[a] = Math.max(20, Math.min(178, Fe[a]))),
         (ke[a] = Math.max(20, Math.min(178, ke[a]))));
     }
-  (gauss1(ke, Et, 1, 1, o.sigTrim / ae, !1), gauss1(Fe, Et, 1, 1, o.sigTrim / ae, !1));
+  (gaussiana1D(ke, Et, 1, 1, o.sigTrim / ae, !1), gaussiana1D(Fe, Et, 1, 1, o.sigTrim / ae, !1));
   const $o = (a) => {
     let r = 0;
     for (let d = 0; d < tt; d++) r += Tt[a * tt + d];
@@ -1362,7 +1362,7 @@ export function generateShell(t, e, n, o) {
     const i = (g, c) => (g < c ? (1 - Math.sqrt(Math.max(0, 1 - ((c - g) / c) ** 2))) * c : 0);
     m = Math.max(i(r, o.rTop), i(d, o.rToe));
     const p = Math.max(10, (Oe(a, 90) + Oe(a, -90)) / 2),
-      f = (m / p) * DEG;
+      f = (m / p) * GRAU;
     ((ke[a] = Math.max(15, ke[a] - f)), (Fe[a] = Math.max(15, Fe[a] - f)));
   }
   s.trimTop = [ke[Ht], Fe[Ht]];
@@ -1427,7 +1427,7 @@ export function generateShell(t, e, n, o) {
         }
         c = Y;
       }
-      const w = (H) => f + (go(H) - f) * smooth(g, g + o.blendU, H),
+      const w = (H) => f + (go(H) - f) * degrauSuave(g, g + o.blendU, H),
         A = new Map();
       for (let H = 0; H < e.length; H += 3) {
         let X = 1e9,
@@ -1513,7 +1513,7 @@ export function generateShell(t, e, n, o) {
                 V = J;
               }
             for (let J = V + 1; J < mt; J++) z[J] = z[V];
-            gauss1(z, mt, 1, 1, 1.5, !1);
+            gaussiana1D(z, mt, 1, 1, 1.5, !1);
           };
           if ((ne(Ct, N - st), ne(Wt, I + st), o.wallNoUndercut)) {
             const z = o.undercut || 0;
@@ -1524,7 +1524,7 @@ export function generateShell(t, e, n, o) {
                 (lt = Math.min(lt, Wt[V])),
                 (Ct[V] = Math.max(Ct[V], P - z)),
                 (Wt[V] = Math.min(Wt[V], lt + z)));
-            (gauss1(Ct, mt, 1, 1, 1, !1), gauss1(Wt, mt, 1, 1, 1, !1));
+            (gaussiana1D(Ct, mt, 1, 1, 1, !1), gaussiana1D(Wt, mt, 1, 1, 1, !1));
           }
           const de = (z, P, lt) => {
               const V = Math.max(0, Math.min(mt - 1.001, (P - ct) / 2)),
@@ -1542,7 +1542,7 @@ export function generateShell(t, e, n, o) {
           for (let z = 0; z < 2; z++)
             for (let P of [0, 2]) {
               const lt = Float64Array.from(_.map((V) => V[P]));
-              (gauss1(lt, _.length, 1, 1, it, !1),
+              (gaussiana1D(lt, _.length, 1, 1, it, !1),
                 (_ = _.map((V, J) => {
                   const pt = V.slice();
                   return ((pt[P] = lt[J]), pt);
@@ -1553,7 +1553,7 @@ export function generateShell(t, e, n, o) {
       for (let H = a; H <= Re; H++) {
         const X = H - Ht,
           Y = R(Pt[H][1], H),
-          I = smooth(a - 1, a + o.swRows, H);
+          I = degrauSuave(a - 1, a + o.swRows, H);
         for (let N = 0; N < M; N++) {
           const q = (X * M + N) * 3;
           for (let st = 0; st < 3; st++) at[q + st] += (Y[N][st] - at[q + st]) * I;
@@ -1568,7 +1568,7 @@ export function generateShell(t, e, n, o) {
               if (I === 1) continue;
               const N = new Float64Array(X);
               for (let q = 0; q < X; q++) N[q] = at[((H + q) * M + Y) * 3 + I];
-              gauss1(N, X, 1, 1, o.footSig, !1);
+              gaussiana1D(N, X, 1, 1, o.footSig, !1);
               for (let q = 0; q < X; q++) {
                 const st = Math.min(1, q / 8);
                 at[((H + q) * M + Y) * 3 + I] += (N[q] - at[((H + q) * M + Y) * 3 + I]) * st;
@@ -1579,7 +1579,7 @@ export function generateShell(t, e, n, o) {
         let H = 0;
         for (let X = 0; X < K; X++) {
           const Y = Ht + X,
-            I = smooth(Qt - 15, Qt + 10, te[Y]);
+            I = degrauSuave(Qt - 15, Qt + 10, te[Y]);
           if (I <= 0) continue;
           const N = new Float64Array(M);
           for (let Nt = 0; Nt < M; Nt++) N[Nt] = at[(X * M + Nt) * 3];
@@ -1665,7 +1665,7 @@ export function generateShell(t, e, n, o) {
                       ? vt[mt]
                       : vt[mt] + ((vt[Ct] - vt[mt]) * (ct - mt)) / (Ct - mt);
               }
-            gauss1(vt, vt.length, 1, 1, o.tipFrontSig, !1);
+            gaussiana1D(vt, vt.length, 1, 1, o.tipFrontSig, !1);
             for (let ct = 0; ct < vt.length; ct++) St[ct] = vt[ct];
           }
           const Xt = (bt) => {
@@ -1686,7 +1686,7 @@ export function generateShell(t, e, n, o) {
               Wt = 2.5;
             Ft[bt] = Math.max(Ct, mt) + Wt * Math.log1p(Math.exp(-Math.abs(Ct - mt) / Wt));
           }
-          gauss1(Ft, M, 1, 1, o.tipColSig, !1);
+          gaussiana1D(Ft, M, 1, 1, o.tipColSig, !1);
           let xt = !1;
           if (o.tipArc) {
             const bt = Pt[Ht + I][1],
@@ -1722,7 +1722,7 @@ export function generateShell(t, e, n, o) {
                   const E = Float64Array.from(ft.map((ht) => ht[k])),
                     et = E.length,
                     dt = E.slice();
-                  gauss1(E, et, 1, 1, 4, !1);
+                  gaussiana1D(E, et, 1, 1, 4, !1);
                   for (let ht = 1; ht < et - 1; ht++) ft[ht][k] = E[ht];
                   ((ft[0][k] = dt[0]), (ft[et - 1][k] = dt[et - 1]));
                 }
@@ -1761,7 +1761,7 @@ export function generateShell(t, e, n, o) {
                 for (let E = 0; E < 2; E++) {
                   const et = Float64Array.from(J.map((ht) => ht[E])),
                     dt = et.slice();
-                  gauss1(et, ft, 1, 1, k, !1);
+                  gaussiana1D(et, ft, 1, 1, k, !1);
                   for (let ht = 0; ht < ft; ht++) {
                     const yt = Math.min(1, ht / (2 * k), (ft - 1 - ht) / (2 * k));
                     J[ht][E] = dt[ht] + (et[ht] - dt[ht]) * yt;
@@ -1783,7 +1783,7 @@ export function generateShell(t, e, n, o) {
                     zt = at[et + 1];
                   ((at[dt] = jt + (yt[0] - jt) * k),
                     (at[dt + 1] = zt + (yt[1] - zt) * k),
-                    (at[dt + 2] = Nt + (at[et + 2] - Nt) * (1 - smooth(0, o.tipWallFade, k))));
+                    (at[dt + 2] = Nt + (at[et + 2] - Nt) * (1 - degrauSuave(0, o.tipWallFade, k))));
                 }
               }
               ((xt = !0), (s.tipArc = +Ct[Ct.length - 1].toFixed(1)));
@@ -1805,7 +1805,7 @@ export function generateShell(t, e, n, o) {
                   z = (Wt - mt) * _;
                 ((at[it] = ct + (o.tipCont ? de * z * (1 - 0.5 * _) : 0)),
                   (at[it + 1] = mt + z),
-                  (at[it + 2] = Nt + (Ct - Nt) * (1 - smooth(0, o.tipWallFade, _))));
+                  (at[it + 2] = Nt + (Ct - Nt) * (1 - degrauSuave(0, o.tipWallFade, _))));
               }
             }
           if (o.tipResample)
@@ -1832,7 +1832,7 @@ export function generateShell(t, e, n, o) {
       m = s.aSw != null ? s.aSw : K;
     for (let i = 0; i < K; i++) {
       const p = Ht + i,
-        f = m < K ? smooth(m - 10, m + 2, i) : smooth(Qt - 25, Qt + 5, te[p]),
+        f = m < K ? degrauSuave(m - 10, m + 2, i) : degrauSuave(Qt - 25, Qt + 5, te[p]),
         g = [0, 1, 0];
       let c = V3.sub([0, 0, 1], V3.mul(g, g[2]));
       const w = V3.len(c);
@@ -1854,7 +1854,7 @@ export function generateShell(t, e, n, o) {
             for (; I < M && !Number.isFinite(A[I]); ) I++;
             H = Y < 0 ? A[I] : I >= M || R - Y <= I - R ? A[Y] : A[I];
           }
-          const X = f * (1 - smooth(o.snapB0, o.snapB1, F[R]));
+          const X = f * (1 - degrauSuave(o.snapB0, o.snapB1, F[R]));
           X <= 0 || ((r[i * M + R] = (H / Math.max(0.6, c[2])) * X), a++);
         }
     }
@@ -1867,7 +1867,7 @@ export function generateShell(t, e, n, o) {
     s.snapRaw = [];
     for (let i = Math.max(0, m - 30); i < Math.min(K, m + 10); i++)
       s.snapRaw.push([i - m, +r[i * M + 20].toFixed(1), +r[i * M + 40].toFixed(1), +r[i * M + 60].toFixed(1)]);
-    (gauss1(r, M, 1, K, o.snapSig, !1), gauss1(r, K, M, M, o.snapSig, !1));
+    (gaussiana1D(r, M, 1, K, o.snapSig, !1), gaussiana1D(r, K, M, M, o.snapSig, !1));
     for (let i = 0; i < K; i++)
       for (let p = 0; p < M; p++) {
         const f = i * M + p;
@@ -1912,7 +1912,7 @@ export function generateShell(t, e, n, o) {
         const i = new Float64Array(K);
         for (let f = 0; f < K; f++) i[f] = at[(f * M + d) * 3 + m];
         const p = i.slice();
-        gauss1(i, K, 1, 1, o.edgeFair, !1);
+        gaussiana1D(i, K, 1, 1, o.edgeFair, !1);
         for (let f = 0; f < K; f++) {
           const g = Math.min(1, (f - 1) / o.cornerD, (K - 2 - f) / o.cornerD);
           if (g <= 0) continue;
@@ -1933,7 +1933,7 @@ export function generateShell(t, e, n, o) {
           const f = new Float64Array(M);
           for (let c = 0; c < M; c++) f[c] = at[(d * M + c) * 3 + p];
           const g = f.slice();
-          gauss1(f, M, 1, 1, i, !1);
+          gaussiana1D(f, M, 1, 1, i, !1);
           for (let c = 1; c < M - 1; c++) {
             const w = Math.min(1, (c - 1) / o.cornerD, (M - 2 - c) / o.cornerD);
             w > 0 && (at[(d * M + c) * 3 + p] = g[c] + (f[c] - g[c]) * w);
@@ -1948,7 +1948,7 @@ export function generateShell(t, e, n, o) {
       for (let f = Math.max(0, i - r[0] - 3); f <= Math.min(K - 1, i + r[0] + 3); f++)
         for (let g = Math.max(0, p - r[1] - 4); g <= Math.min(M - 1, p + r[1] + 4); g++) {
           const c = Math.hypot((f - i) / (r[0] + 3), (g - p) / (r[1] + 4));
-          a[f * M + g] = Math.max(a[f * M + g], 1 - smooth(0.5, 1, c));
+          a[f * M + g] = Math.max(a[f * M + g], 1 - degrauSuave(0.5, 1, c));
         }
     const d = new Float64Array(at.length),
       m = (i) => {
@@ -2004,7 +2004,7 @@ export function generateShell(t, e, n, o) {
       i = new Float64Array(K);
     for (let f = 0; f < K; f++) {
       const g = te[Ht + f] - Qt;
-      i[f] = smooth(-70, -45, g) * (1 - smooth(70, 95, g));
+      i[f] = degrauSuave(-70, -45, g) * (1 - degrauSuave(70, 95, g));
     }
     let p = 0;
     for (let f = 0; f < 4; f++) {
@@ -2036,7 +2036,7 @@ export function generateShell(t, e, n, o) {
       for (let c = 0; c < 3; c++) {
         const w = new Float64Array(K * M);
         for (let A = 0; A < K * M; A++) w[A] = g[A * 3 + c];
-        (gauss1(w, M, 1, K, 2, !1), gauss1(w, K, M, M, 2, !1));
+        (gaussiana1D(w, M, 1, K, 2, !1), gaussiana1D(w, K, M, M, 2, !1));
         for (let A = 0; A < K * M; A++) ((at[A * 3 + c] += w[A]), Math.abs(w[A]) > 0.05 && p++);
       }
     }
@@ -2063,7 +2063,7 @@ export function generateShell(t, e, n, o) {
     for (let a = 0; a < 3; a++) {
       const r = new Float64Array(K * M);
       for (let d = 0; d < K * M; d++) r[d] = Dt[d * 3 + a];
-      (gauss1(r, M, 1, K, o.nSig, !1), gauss1(r, K, M, M, o.nSig, !1));
+      (gaussiana1D(r, M, 1, K, o.nSig, !1), gaussiana1D(r, K, M, M, o.nSig, !1));
       for (let d = 0; d < K * M; d++) Dt[d * 3 + a] = r[d];
     }
     for (let a = 0; a < K * M; a++) {
@@ -2091,19 +2091,19 @@ export function generateShell(t, e, n, o) {
         }
       const f = te[Ht + a] - te[Ht];
       f < o.flareL && (p += o.flare * (1 - f / o.flareL) ** 2);
-      const g = o.t + o.tAnk * smooth(-25, -5, m[2]) * (1 - smooth(45, 75, m[2]));
+      const g = o.t + o.tAnk * degrauSuave(-25, -5, m[2]) * (1 - degrauSuave(45, 75, m[2]));
       for (let c = 0; c < 3; c++) ((Ot[d + c] = m[c] + i[c] * p), (Lt[d + c] = m[c] + i[c] * (p + g)));
     }
   if ((h && h("In", Ot, K, M, s.aSw != null ? s.aSw : 0), o.flat)) {
     const a = new Float64Array(K).fill(1 / 0),
       r = new Float64Array(K),
-      d = pl(n, "CA"),
-      m = V3.mid(pl(n, "M1"), pl(n, "M5")),
+      d = pontoPlantar(n, "CA"),
+      m = V3.mid(pontoPlantar(n, "M1"), pontoPlantar(n, "M5")),
       i = Math.max(20, m[1] - d[1]),
       p = (m[2] - d[2]) / i,
       f = (c) => d[2] + p * (c - d[1]) - o.clear - o.t;
     for (let c = 0; c < K; c++)
-      if (((r[c] = (1 - smooth(-12, 2, Pt[Ht + c][2])) * smooth(o.soleT0, o.soleT1, ye[Ht + c][1])), !(r[c] <= 0)))
+      if (((r[c] = (1 - degrauSuave(-12, 2, Pt[Ht + c][2])) * degrauSuave(o.soleT0, o.soleT1, ye[Ht + c][1])), !(r[c] <= 0)))
         for (let w = 0; w < M; w++) a[c] = Math.min(a[c], Lt[(c * M + w) * 3 + 2]);
     const g = new Float64Array(K * M);
     for (let c = 0; c < K; c++)
@@ -2116,20 +2116,20 @@ export function generateShell(t, e, n, o) {
           const H = Math.max(Lt[F] - a[c], at[F] - Z(at[F - 2], at[F - 1]), 0),
             X = Lt[F] - R,
             Y =
-              (1 - smooth(o.soleB0, o.soleB1 + 0.8 * Math.min(X, o.soleDropCap), H)) *
+              (1 - degrauSuave(o.soleB0, o.soleB1 + 0.8 * Math.min(X, o.soleDropCap), H)) *
               r[c] *
-              smooth(o.soleN0, o.soleN1, -Dt[A * 3 + 2]);
+              degrauSuave(o.soleN0, o.soleN1, -Dt[A * 3 + 2]);
           g[A] = -Y * X;
         }
-    (gauss1(g, M, 1, K, o.soleSig, !1), gauss1(g, K, M, M, o.soleSig, !1));
+    (gaussiana1D(g, M, 1, K, o.soleSig, !1), gaussiana1D(g, K, M, M, o.soleSig, !1));
     for (let c = 0; c < K * M; c++) {
       const w = c * 3 + 2,
         A = Lt[w];
       if (!(g[c] < 0)) continue;
-      const F = smooth(0.2, 3, Ot[w] - A);
+      const F = degrauSuave(0.2, 3, Ot[w] - A);
       F <= 0 || (Lt[w] += g[c] * F);
     }
-    s.soleSlope = Math.atan(p) * DEG;
+    s.soleSlope = Math.atan(p) * GRAU;
   }
   {
     let a = 0;
@@ -2216,7 +2216,7 @@ export function generateShell(t, e, n, o) {
       for (let i = Math.max(0, d - a[0]); i <= Math.min(K - 1, d + a[0]); i++)
         for (let p = Math.max(0, m - a[1]); p <= Math.min(M - 1, m + a[1]); p++) {
           const f = Math.hypot((i - d) / a[0], (p - m) / a[1]);
-          r[i * M + p] = Math.max(r[i * M + p], 1 - smooth(0.4, 1, f));
+          r[i * M + p] = Math.max(r[i * M + p], 1 - degrauSuave(0.4, 1, f));
         }
     for (const d of [Lt, Ot])
       for (let m = 0; m < 6; m++) {
@@ -2421,7 +2421,7 @@ export function generateShell(t, e, n, o) {
           pI: X,
           n: N,
           z: +Y[2].toFixed(0),
-          y: +(Y[1] - pl(n, "CA")[1]).toFixed(0),
+          y: +(Y[1] - pontoPlantar(n, "CA")[1]).toFixed(0),
           edge: o.rvInset,
         });
       }
@@ -2485,7 +2485,7 @@ export function generateShell(t, e, n, o) {
           pI: [Ot[A * 3], Ot[A * 3 + 1], Ot[A * 3 + 2]],
           n: [Dt[A * 3], Dt[A * 3 + 1], Dt[A * 3 + 2]],
           z: +at[A * 3 + 2].toFixed(0),
-          y: +(at[A * 3 + 1] - pl(n, "CA")[1]).toFixed(0),
+          y: +(at[A * 3 + 1] - pontoPlantar(n, "CA")[1]).toFixed(0),
           edge: 0,
           mode: o.artMode,
           d: o.artD,
@@ -3015,7 +3015,7 @@ export function generateShell(t, e, n, o) {
   const Ie = [le.map(([a, r]) => ve + re(a, r))],
     ze = le.length;
   for (let a = 1; a < yo; a++) {
-    const r = (-90 + (180 * a) / yo) / DEG;
+    const r = (-90 + (180 * a) / yo) / GRAU;
     Ie.push(
       le.map(([d, m], i) => {
         const p = re(d, m) * 3,
@@ -3128,7 +3128,7 @@ export function generateShell(t, e, n, o) {
     me = new Uint32Array(Le);
   if (o.dbg) {
     const a = [],
-      r = meshCheck(ee, me, a),
+      r = verificarMalha(ee, me, a),
       d = (K - 1) * (M - 1),
       m = (p) => {
         const f = $e[p];
@@ -3153,7 +3153,7 @@ export function generateShell(t, e, n, o) {
   if (o.selfCheck) {
     const a = [],
       r = performance.now(),
-      d = meshCheck(ee, me, a, !0);
+      d = verificarMalha(ee, me, a, !0);
     ((s.check = d.n), (s.checkMs = performance.now() - r));
     const m = (K - 1) * (M - 1),
       i = new Map(),
@@ -3196,7 +3196,7 @@ export function generateShell(t, e, n, o) {
   }
   ((s.baseTris = me.length / 3), (s.engrave = null));
   {
-    const a = o.engrave ? engraveText(o.engText) : [];
+    const a = o.engrave ? linhasGravacao(o.engText) : [];
     if (a.length) {
       const r = (A) => te[Ht + A] - te[Ht];
       let d = 0;
@@ -3283,7 +3283,7 @@ export function generateShell(t, e, n, o) {
             const Ct = (ct.length * 6 - 2) * Mt,
               Wt = c(i) / 2 - i - mt * i * (1 + f);
             [...ct].forEach((se, ne) => {
-              const de = STROKE_FONT[se];
+              const de = FONTE_TRACOS[se];
               if (!de) return;
               const ie = -Ct / 2 + ne * 6 * Mt;
               for (const _ of de) {
@@ -3459,7 +3459,7 @@ export function generateShell(t, e, n, o) {
       V3.dot([Dt[k * 3], Dt[k * 3 + 1], Dt[k * 3 + 2]], f) > -0.55 || (F[k * 3 + 2] < 12 && (R[k] = 1));
     const H = new Float64Array(a * 3);
     for (let k = 0; k < a; k++) ((H[k * 3] = F[k * 3]), (H[k * 3 + 1] = F[k * 3 + 1]), (H[k * 3 + 2] = R[k] ? 0 : 1e6));
-    const X = nnGrid(H, 2),
+    const X = gradeVizinhos(H, 2),
       Y = (k, E) => {
         const [et] = X(k, E, 0, 20);
         if (et < 0) return 0;
@@ -3535,7 +3535,7 @@ export function generateShell(t, e, n, o) {
       }
     if (
       ((s.wdbg = {
-        tilt: +(Math.acos(f[2]) * DEG).toFixed(1),
+        tilt: +(Math.acos(f[2]) * GRAU).toFixed(1),
         nS: R.reduce((k, E) => k + E, 0),
         nCell: N.reduce((k, E) => k + E, 0),
         nxt: q.size,
@@ -3599,7 +3599,7 @@ export function generateShell(t, e, n, o) {
     for (const [k, E] of Mt)
       ((Nt = Math.min(Nt, E)), (Ft = Math.max(Ft, E)), (xt = Math.min(xt, k)), (bt = Math.max(bt, k)));
     const vt = Math.sign(V3.dot(V3.sub(n.ML, n.MM), c)) || 1,
-      ct = Math.tan(o.wedge / DEG),
+      ct = Math.tan(o.wedge / GRAU),
       mt = o.wedgeSide === "medial" ? -vt : vt,
       Ct = mt > 0 ? xt : bt,
       Wt = (k) => {
@@ -3769,18 +3769,18 @@ export function generateShell(t, e, n, o) {
   };
 }
 
-// Texto do Worker da casca: generateShell e tudo de que ela depende, copiados como texto (o Worker não importa módulos).
-// Mesma montagem da v0.14 (makeWorker); ao mudar as dependências de generateShell, mudar esta lista.
-export const FUNCOES_DO_WORKER = [binCenters, fillSmooth, legCenterline, footAxis, pctl, gauss1, generateShell, meshCheck, engraveText, nnGrid, normaisDeVertices];
+// Texto do Worker da casca: gerarCasca e tudo de que ela depende, copiados como texto (o Worker não importa módulos).
+// Mesma montagem da v0.14 (makeWorker); ao mudar as dependências de gerarCasca, mudar esta lista.
+export const FUNCOES_DO_WORKER = [centrosPorFaixa, preencherSuavizar, linhaCentralPerna, eixoDoPe, quantil, gaussiana1D, gerarCasca, verificarMalha, linhasGravacao, gradeVizinhos, normaisDeVertices];
 export function textoDoWorker() {
   const t = FUNCOES_DO_WORKER.map((o) => o.toString()).join("\n");
   return (
     "const V3={" + Object.entries(V3).map(([o, l]) => o + ":" + l.toString()).join(",") + "};\n" +
-    "const DEG=" + DEG + ";\n" +
-    "const smooth=" + smooth.toString() + ";\n" +
-    "const pl=" + pl.toString() + ";\n" +
-    "const STROKE_FONT=" + JSON.stringify(STROKE_FONT) + ";\n" +
+    "const GRAU=" + GRAU + ";\n" +
+    "const degrauSuave=" + degrauSuave.toString() + ";\n" +
+    "const pontoPlantar=" + pontoPlantar.toString() + ";\n" +
+    "const FONTE_TRACOS=" + JSON.stringify(FONTE_TRACOS) + ";\n" +
     t + "\n" +
-    "self.onmessage=e=>{const {id,A,F,L,P}=e.data;try{const R=generateShell(A,F,L,P);const tr=[R.shell.V.buffer,R.shell.F.buffer];if(R.heat)tr.push(R.heat.buffer);self.postMessage({id,R},tr)}catch(err){self.postMessage({id,err:String(err&&err.message||err)})}};"
+    "self.onmessage=e=>{const {id,A,F,L,P}=e.data;try{const R=gerarCasca(A,F,L,P);const tr=[R.shell.V.buffer,R.shell.F.buffer];if(R.heat)tr.push(R.heat.buffer);self.postMessage({id,R},tr)}catch(err){self.postMessage({id,err:String(err&&err.message||err)})}};"
   );
 }

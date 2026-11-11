@@ -28,8 +28,8 @@ export const V3 = {
       ];
     },
   };
-export const DEG = 180 / Math.PI;
-export const smooth = (t, e, n) => {
+export const GRAU = 180 / Math.PI;
+export const degrauSuave = (t, e, n) => {
     const o = Math.min(1, Math.max(0, (n - t) / (e - t)));
     return o * o * (3 - 2 * o);
   };
