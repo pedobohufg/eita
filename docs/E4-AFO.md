@@ -33,7 +33,7 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 2. ✔ **E4b — núcleo de malha e saída** (10/11/2026; detalhes em "Feito na E4b", abaixo): STL (leitura/escrita), solda, componentes, normais, zip e downloads do núcleo.
 3. ✔ **E4c — cálculo puro** (10/11/2026; detalhes em "Feito na E4c", abaixo): anatomia/correção e casca em módulos puros testáveis no Node (teste de regressão no Node como no MAMILO e no OLHO: STL da casca idêntico ao do navegador, se não houver canvas no caminho).
 4. ✔ **E4d — interface** (11/11/2026; detalhes em "Feito na E4d", abaixo): ficha, PDF e visualizador sobre o núcleo; tour para `nucleo/interface/`.
-5. **E4e — plataforma:** AFO entra em `PLATAFORMA.modulos` (deixa de ser legado); republicar a Plataforma EITA.
+5. ✔ **E4e — plataforma** (11/11/2026): AFO entra em `PLATAFORMA.modulos` (deixa de ser legado); republicar a Plataforma EITA.
 
 ## Feito na E4a (10/11/2026)
 - `modulos/afo/index.html` = página publicada sem o `<script>` (agora `<script src="app.js">`); `modulos/afo/ui.js` = o script inteiro, só reformatado com o Prettier 3.8 (largura 120) para leitura; `modulos/afo/global.js` publica o núcleo em `window.EITA` (o AFO ainda não o usa); `sobre.html` e `assets/` copiados. Entrada `afo` em `MODULOS` (`ferramentas/montar.mjs`), com `escopo: true` (a interface roda dentro de uma função; o legado usava globais, mas só `window.AFO` e `window.__regenNow` são lidos de fora, e ambos são atribuídos explicitamente).
@@ -74,6 +74,11 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 - **Visualizador:** as contas da câmera foram para `modulos/afo/vista.js` (`vetoresCamera`, `matrizesCamera`, `mul4`, `projetar`; puras, testadas no Node); shaders pelo `compilarPrograma` do núcleo, que ganhou `{ verificar: true }` (lança o log do compilador, como a v0.14; padrão inalterado para os outros módulos). **Não** foi para o `criarVista3D` do núcleo: o visualizador do AFO é outro desenho (malhas indexadas com índice de 32 bits, câmera sobre uma base de eixos, seleção por raio, sobreposição em canvas 2D, capturas para o PDF) e trocá-lo mudaria o comportamento. O `mul4` do AFO fica (precisão dupla; a projeção das marcas usa a matriz antes da GPU). O desenho (`draw`, alças, rebites, alívios, `raycast`) segue no `ui.js`, preso ao estado da página.
 - **Ficou para depois:** trocar os temporizadores de interface (pré-visualização da gravação, checagem de segurança, par de fichas, estado das etapas) por atualização por evento — não é necessário para a plataforma e mexe em comportamento.
 - **Conferências** (novas em `testes/navegador/`): `ficha_afo.py` (salvar, listar, exportar ficha e base, importar base válida e inválida, abrir ficha; diferenças só nas duas mensagens esperadas; exclusão em dois cliques sem diálogo), `tour_afo.py` (texto, destaque e posição do cartão em cada passo; teclas; "já visto"; redimensionar), `vista_afo.py` (marcar os 6 pontos clicando, girar, aproximar, tela e `screenOf`). Mais `comparar_afo.py` e `caminhos_afo.py` idênticos; `npm test` (49); `teste_olho.py`, `teste_mamilo.py`, `teste_plataforma.py` sem erros. A tela logo depois de carregar varia entre rodadas nas duas versões (transições), por isso não é comparada.
+
+## Feito na E4e (11/11/2026)
+- `PLATAFORMA.modulos` passou a incluir `afo` (`legados` vazio): `dist/plataforma/afo/` é montado de `modulos/afo/`, com a ponte do portal.
+- `teste_plataforma.py` agora salva uma ficha no AFO aberto pelo portal, confere o vínculo com o paciente, reabre a ficha pelo portal e confere a ficha do AFO na base exportada. `comparar_afo.py` e `caminhos_afo.py` dão idêntico também com `dist/plataforma/afo` (a ponte não muda as saídas).
+- Ramo `e4-afo` juntado ao `main`; artefato "Plataforma EITA" republicado. O AFO v0.14 publicado à parte continua no ar (o portal só aponta para ele se o módulo faltar na montagem).
 
 ## Cuidados
 - A casca roda num Worker criado a partir do texto das funções (`makeWorker`). Ao modularizar, o Worker precisa receber o mesmo código (gerar o script do Worker a partir do bundle do módulo, ou um arquivo `casca-worker.js` montado junto).

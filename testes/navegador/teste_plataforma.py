@@ -20,7 +20,7 @@ async def esperar_status(pg, trecho, t=90000):
     await pg.wait_for_function(f"document.getElementById('status') && document.getElementById('status').textContent.includes({json.dumps(trecho)})", timeout=t)
 
 async def main():
-    subprocess.run(["node", "ferramentas/montar.mjs", "plataforma"], cwd=RAIZ, check=True)
+    subprocess.run(["node", "ferramentas/montar.mjs", "plataforma-sem-legado"], cwd=RAIZ, check=True)
     srv = subprocess.Popen([sys.executable, "-m", "http.server", "8768"], cwd=os.path.join(RAIZ, "dist", "plataforma"), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1); erros = []
     try:
@@ -68,11 +68,18 @@ async def main():
             await pg.locator("#lista .pac", has_text="Bebê").click()
             ok("aréola" in (await pg.text_content(".prots")).lower(), "MAMILO ligado ao paciente sem prontuário")
 
-            print("AFO (legado) com a ponte")
+            print("AFO (modulos/afo, desde a E4e): ficha nova, salvar, voltar e reabrir pelo portal")
             await pg.locator("#lista .pac", has_text="Paciente Teste").click()
             await pg.click("[data-novo=afo]"); await pg.wait_for_url("**/afo/index.html")
             await esperar_status(pg, "Nova ficha para")
             ok(await pg.input_value("#pName") == "Paciente Teste" and await pg.input_value("#pBirth") == "2018-06-15", "dados preenchidos no AFO")
+            await pg.evaluate("document.getElementById('fSave').click()"); await esperar_status(pg, "salva neste navegador")
+            await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html")
+            await pg.locator("#lista .pac", has_text="Paciente Teste").click()
+            ok("afo" in (await pg.text_content(".prots")).lower(), "AFO ligada ao paciente")
+            await pg.click(".prots [data-ficha^='afo|']"); await pg.wait_for_url("**/afo/index.html")
+            await esperar_status(pg, "aberta")
+            ok(await pg.input_value("#pName") == "Paciente Teste", "ficha do AFO reaberta pelo portal")
             await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html")
 
             print("CRÂNIO: ficha nova com os dados do portal, medição e volta")
@@ -88,7 +95,7 @@ async def main():
             async with pg.expect_download() as d: await pg.click("#exp")
             caminho = await (await d.value).path(); base = json.load(open(caminho))
             ok((await d.value).suggested_filename.startswith("base_EITA_"), "nome do arquivo sem nome de paciente")
-            ok(base["formato"] == "EITA base v1" and len(base["pacientes"]) == 2 and len(base["fichas"]["olho"]) == 1 and len(base["fichas"]["mamilo"]) == 1 and len(base["fichas"]["cranio"]) == 1, "base com 2 pacientes e 3 fichas")
+            ok(base["formato"] == "EITA base v1" and len(base["pacientes"]) == 2 and len(base["fichas"]["olho"]) == 1 and len(base["fichas"]["mamilo"]) == 1 and len(base["fichas"]["cranio"]) == 1 and len(base["fichas"]["afo"]) == 1, "base com 2 pacientes e 4 fichas")
             await pg.screenshot(path=os.path.join(RAIZ, "dist", "plataforma-teste.png"))
 
             print("base: importar num navegador limpo (base única e base antiga do OLHO)")
