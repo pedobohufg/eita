@@ -38,9 +38,9 @@ export function criarArmazemFichas({ chave, formatoFicha, formatoBase, versaoApp
     // insere no topo ou substitui a de mesmo id; devolve true se gravou
     salvar(f) { const l = listar(), i = l.findIndex((x) => x.id === f.id); if (i >= 0) l[i] = f; else l.unshift(f); return gravar(l); },
     excluir(indice) { const l = listar(); l.splice(indice, 1); return gravar(l); },
-    // arquivo da base completa: { nome, conteudo }
-    exportarBase(agora = new Date()) {
-      return { nome: nomeBase ? nomeBase(agora) : `${prefixoBase}_${dataCompacta(agora)}.json`, conteudo: JSON.stringify({ formato: formatoBase, versaoApp, exportado: agora.toISOString(), fichas: listar() }) };
+    // arquivo da base completa: { nome, conteudo }; extras = campos do app acrescentados ao fim (ex.: calibração do AFO)
+    exportarBase(agora = new Date(), extras = {}) {
+      return { nome: nomeBase ? nomeBase(agora) : `${prefixoBase}_${dataCompacta(agora)}.json`, conteudo: JSON.stringify(Object.assign({ formato: formatoBase, versaoApp, exportado: agora.toISOString(), fichas: listar() }, extras)) };
     },
     // mescla uma base exportada (objeto já lido do JSON): fica a versão mais recente de cada ficha
     importarBase(b) {

@@ -845,7 +845,7 @@ async function loadBuffer(t, e) {
     const T = contarArestasDeBorda(l),
       b = V3.sub(u, h);
     (($("stats").innerHTML =
-      `<b>${e}</b><br>${(l.length / 3).toLocaleString("pt-BR")} triângulos (de ${s.toLocaleString("pt-BR")})<br>
+      `<b>${esc(e)}</b><br>${(l.length / 3).toLocaleString("pt-BR")} triângulos (de ${s.toLocaleString("pt-BR")})<br>
 ${v.componentes} partes conectadas; ${v.componentes - v.mantidos} fragmentos removidos<br>
 Dimensões: ${b.map((y) => y.toFixed(0)).join(" × ")} mm<br>
 Bordas abertas: ${T.toLocaleString("pt-BR")} arestas ${T > 0 ? '<span class="flag w">superfície aberta</span>' : '<span class="flag o">fechada</span>'}`),
@@ -1100,21 +1100,9 @@ function engraveAuto() {
     n
   );
 }
-function ageText(t) {
-  if (!t) return "";
-  const e = new Date(t + "T12:00:00"),
-    n = new Date();
-  if (isNaN(e)) return "";
-  let o = (n.getFullYear() - e.getFullYear()) * 12 + n.getMonth() - e.getMonth();
-  return (
-    n.getDate() < e.getDate() && o--,
-    o < 0
-      ? ""
-      : o < 24
-        ? o + " meses"
-        : Math.floor(o / 12) + " anos" + (o % 12 ? " e " + (o % 12) + " " + (o % 12 > 1 ? "meses" : "mês") : "")
-  );
-}
+// idade e escape de HTML do núcleo (nucleo/ficha.js; E4d)
+const ageText = (t) => EITA.idadeTexto(t, new Date(), { meses: !0 }),
+  esc = EITA.escaparHTML;
 const PAT_IDS = [
   "pName",
   "pId",
@@ -2404,7 +2392,15 @@ $("expAfo").onclick = async () => {
         " triângulos)" +
         (/\.zip$/.test(o) ? " — descompacte para fatiar." : "."));
 };
-const FICHA_KEY = "eitaAFO.fichas.v1",
+// Fichas no armazém do núcleo (nucleo/ficha.js; E4d), mesma chave e mesmos formatos da v0.14.
+const FICHAS = EITA.criarArmazemFichas({
+    chave: "eitaAFO.fichas.v1",
+    formatoFicha: "EITA! AFO ficha",
+    formatoBase: "EITA! AFO base",
+    versaoApp: "0.14",
+    prefixoBase: "base_EITA_AFO",
+    rotulo: "EITA! AFO",
+  }),
   shellInputIds = () =>
     Array.from(document.querySelectorAll("#s5 input[id],#s5 select[id],#s4 input[id],#orient"))
       .filter(
@@ -2462,7 +2458,7 @@ function pairFicha() {
     e = sideLetter();
   if (!t || !e) return null;
   const n = e === "D" ? "E" : "D";
-  return fichaList().find((o) => o.id === t + "_" + n) || null;
+  return FICHAS.listar().find((o) => o.id === t + "_" + n) || null;
 }
 function pairCopy() {
   const t = pairFicha();
@@ -2511,24 +2507,11 @@ function collectFicha() {
     })),
   };
 }
-function fichaList() {
-  try {
-    return JSON.parse(localStorage.getItem(FICHA_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-function fichaStore(t) {
-  try {
-    return (localStorage.setItem(FICHA_KEY, JSON.stringify(t)), !0);
-  } catch {
-    return !1;
-  }
-}
+let delPend = null;
 function renderFichas() {
   const t = $("fList");
   if (!t) return;
-  const e = fichaList();
+  const e = FICHAS.listar();
   if (!e.length) {
     t.innerHTML = '<div class="note">Nenhuma ficha salva neste navegador.</div>';
     return;
@@ -2536,15 +2519,24 @@ function renderFichas() {
   t.innerHTML = e
     .map(
       (n, o) =>
-        `<div class="frow"><div><b>${(n.nome || "(sem nome)").replace(/</g, "&lt;")}</b><small>${n.lado ? (n.lado === "D" ? "direito" : "esquerdo") + " · " : ""}${new Date(n.atualizado).toLocaleDateString("pt-BR")} · ${(n.scan || "").replace(/</g, "&lt;")} · ${n.versoes ? n.versoes.length : 0} versões</small></div><button type="button" data-open="${o}">Abrir</button><button type="button" data-del="${o}" title="Excluir">×</button></div>`,
+        `<div class="frow"><div><b>${esc(n.nome || "(sem nome)")}</b><small>${n.lado ? (n.lado === "D" ? "direito" : "esquerdo") + " · " : ""}${new Date(n.atualizado).toLocaleDateString("pt-BR")} · ${esc(n.scan || "")} · ${n.versoes ? n.versoes.length : 0} versões</small></div><button type="button" data-open="${o}">Abrir</button><button type="button" data-del="${o}" title="Excluir">${delPend === n.id ? "Confirmar" : "×"}</button></div>`,
     )
     .join("");
-  for (const n of t.querySelectorAll("[data-open]")) n.onclick = () => openFicha(fichaList()[+n.dataset.open]);
+  for (const n of t.querySelectorAll("[data-open]")) n.onclick = () => openFicha(FICHAS.listar()[+n.dataset.open]);
   for (const n of t.querySelectorAll("[data-del]"))
     n.onclick = () => {
-      const o = fichaList();
-      confirm('Excluir a ficha "' + (o[+n.dataset.del].nome || "") + '" deste navegador?') &&
-        (o.splice(+n.dataset.del, 1), fichaStore(o), renderFichas());
+      // confirmação em dois cliques: dentro do claude.ai a página não pode abrir caixas de diálogo (confirm)
+      const o = FICHAS.listar()[+n.dataset.del];
+      if (delPend !== o.id) {
+        delPend = o.id;
+        renderFichas();
+        status(`Clique em "Confirmar" para excluir a ficha "${esc(o.nome || "")}" deste navegador.`);
+        setTimeout(() => {
+          delPend === o.id && ((delPend = null), renderFichas());
+        }, 5e3);
+        return;
+      }
+      (FICHAS.excluir(+n.dataset.del), (delPend = null), renderFichas(), status("Ficha excluída deste navegador."));
     };
 }
 function saveFicha() {
@@ -2554,12 +2546,9 @@ function saveFicha() {
     return;
   }
   S.patient = { id: t.id, name: t.nome };
-  const e = fichaList(),
-    n = e.findIndex((o) => o.id === t.id);
-  (n >= 0 ? (e[n] = t) : e.unshift(t),
-    status(
-      fichaStore(e)
-        ? 'Ficha "' + t.nome + '" salva neste navegador. Use "Exportar ficha" para guardar uma cópia em arquivo.'
+  (status(
+      FICHAS.salvar(t)
+        ? 'Ficha "' + esc(t.nome) + '" salva neste navegador. Use "Exportar ficha" para guardar uma cópia em arquivo.'
         : 'Não foi possível salvar no navegador; use "Exportar ficha".',
     ),
     renderFichas());
@@ -2572,7 +2561,7 @@ async function exportFicha() {
 }
 let pendingFicha = null;
 function openFicha(t) {
-  if (!t || t.formato !== "EITA! AFO ficha") {
+  if (!FICHAS.ehFicha(t)) {
     status("Arquivo de ficha não reconhecido.");
     return;
   }
@@ -2594,7 +2583,7 @@ function openFicha(t) {
   ) {
     ((pendingFicha = t),
       status(
-        `Ficha "${t.nome}" aberta. Carregue o scan <b>${(t.scan || "").replace(/</g, "&lt;")}</b> (etapa 1) para aplicar pontos e parâmetros.`,
+        `Ficha "${esc(t.nome)}" aberta. Carregue o scan <b>${esc(t.scan || "")}</b> (etapa 1) para aplicar pontos e parâmetros.`,
       ));
     return;
   }
@@ -2610,7 +2599,7 @@ async function applyFicha(t) {
     renderReliefs(),
     trimInfo(),
     LM.every((e) => S.L[e.id]) && (await makeShell()),
-    status(`Ficha "${t.nome || ""}" aplicada: pontos, correção e parâmetros restaurados.`));
+    status(`Ficha "${esc(t.nome || "")}" aplicada: pontos, correção e parâmetros restaurados.`));
 }
 function renderVersions() {
   const t = $("vList");
@@ -2622,7 +2611,7 @@ function renderVersions() {
     t.innerHTML = S.versions
       .map((e, n) => {
         const o = e.stats || {};
-        return `<div class="frow${S.refIdx === n ? " sel" : ""}"><div><b>${e.label}</b><small>${new Date(e.date).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} · ${o.massa_g ?? "—"} g · ${o.rigidez || "—"}</small></div><button type="button" data-ov="${n}">${S.refIdx === n ? "Ocultar" : "Sobrepor"}</button><button type="button" data-rs="${n}">Restaurar</button></div>`;
+        return `<div class="frow${S.refIdx === n ? " sel" : ""}"><div><b>${esc(e.label)}</b><small>${new Date(e.date).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} · ${o.massa_g ?? "—"} g · ${o.rigidez || "—"}</small></div><button type="button" data-ov="${n}">${S.refIdx === n ? "Ocultar" : "Sobrepor"}</button><button type="button" data-rs="${n}">Restaurar</button></div>`;
       })
       .join("");
     for (const e of t.querySelectorAll("[data-ov]")) e.onclick = () => overlayVersion(+e.dataset.ov);
@@ -3682,51 +3671,26 @@ function renderSafety() {
       : "");
 }
 async function dbExport() {
-  const t = fichaList(),
-    e = {
-      formato: "EITA! AFO base",
-      versaoApp: "0.14",
-      exportado: new Date().toISOString(),
-      fichas: t,
-      calibracao: calibList(),
-    },
-    n = new Date(),
-    o = await saveFile(
-      "base_EITA_AFO_" +
-        n.getFullYear() +
-        String(n.getMonth() + 1).padStart(2, "0") +
-        String(n.getDate()).padStart(2, "0") +
-        ".json",
-      JSON.stringify(e),
-      "application/json",
-    );
-  o &&
-    status("Base exportada: " + t.length + " fichas e " + e.calibracao.length + " medições de bancada em " + o + ".");
+  const t = FICHAS.listar().length,
+    c = calibList(),
+    b = FICHAS.exportarBase(new Date(), { calibracao: c }),
+    o = await saveFile(b.nome, b.conteudo, "application/json");
+  o && status("Base exportada: " + t + " fichas e " + c.length + " medições de bancada em " + o + ".");
 }
 async function dbImport(t) {
   try {
-    const e = JSON.parse(await t.text());
-    if (e.formato !== "EITA! AFO base") throw new Error("arquivo não é uma base do EITA! AFO");
-    const n = fichaList(),
-      o = new Map(n.map((u) => [u.id, u]));
-    let l = 0,
-      s = 0;
-    for (const u of e.fichas || []) {
-      if (!u || u.formato !== "EITA! AFO ficha") continue;
-      const x = o.get(u.id);
-      x ? new Date(u.atualizado) > new Date(x.atualizado) && (o.set(u.id, u), s++) : (o.set(u.id, u), l++);
-    }
-    const v = calibList();
+    const e = JSON.parse(await t.text()),
+      { novas: l, atualizadas: s } = FICHAS.importarBase(e),
+      v = calibList();
     let h = 0;
     for (const u of e.calibracao || []) v.some((x) => x.data === u.data && x.EI === u.EI) || (v.push(u), h++);
-    (fichaStore([...o.values()].sort((u, x) => new Date(x.atualizado) - new Date(u.atualizado))),
-      calibStore(v),
+    (calibStore(v),
       renderFichas(),
       renderCalib(),
       S.shell && showStiff(),
       status(`Base importada: ${l} fichas novas, ${s} atualizadas, ${h} medições de bancada.`));
   } catch (e) {
-    status("Não foi possível importar a base: " + e.message);
+    status("Não foi possível importar a base: " + esc(e.message));
   }
 }
 const TOUR = [
@@ -3947,7 +3911,7 @@ function tourEnd() {
           try {
             openFicha(JSON.parse(await b.text()));
           } catch (y) {
-            status("Não foi possível ler a ficha: " + y.message);
+            status("Não foi possível ler a ficha: " + esc(y.message));
           }
           $("fImp").value = "";
         }
