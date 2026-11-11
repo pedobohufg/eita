@@ -54,3 +54,15 @@ test("Worker: o texto montado por textoDoWorker() gera a mesma casca", async () 
   // a lista do Worker cobre tudo que generateShell usa
   for (const f of A.FUNCOES_DO_WORKER) assert.equal(typeof f, "function");
 });
+
+test("vista: o alvo da câmera cai no centro da tela; câmera olha para o alvo; mul4 em precisão dupla", () => {
+  const A = E.afo, cam = { target: [10, -5, 30], dist: 400, yaw: 0.6, pitch: 0.15, fov: 35 / A.DEG, basis: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] };
+  const v = A.vetoresCamera(cam);
+  assert.ok(Math.abs(A.V3.len(A.V3.sub(v.eye, cam.target)) - 400) < 1e-9);
+  assert.ok(A.V3.dot(A.V3.norm(A.V3.sub(cam.target, v.eye)), v.f) > 1 - 1e-12);
+  const m = A.matrizesCamera(cam, 1200, 800), [x, y] = A.projetar(cam.target, m, 1200, 800);
+  assert.ok(Math.abs(x - 600) < 1e-6 && Math.abs(y - 400) < 1e-6, `${x}, ${y}`);
+  assert.ok(Array.isArray(m.mvp) && m.mvp.length === 16);
+  // ponto acima do alvo (eixo Z da base) aparece mais alto na tela
+  assert.ok(A.projetar([10, -5, 60], m, 1200, 800)[1] < 400);
+});

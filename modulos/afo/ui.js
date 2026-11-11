@@ -58,21 +58,8 @@ const LM = [
   gl = glc.getContext("webgl", { antialias: !0, preserveDrawingBuffer: !0 });
 gl || (document.getElementById("status").textContent = "WebGL indisponível neste navegador.");
 const ext32 = gl && gl.getExtension("OES_element_index_uint");
-function sh(t, e) {
-  const n = gl.createShader(t);
-  if ((gl.shaderSource(n, e), gl.compileShader(n), !gl.getShaderParameter(n, gl.COMPILE_STATUS)))
-    throw gl.getShaderInfoLog(n);
-  return n;
-}
-function prog(t, e) {
-  const n = gl.createProgram();
-  return (
-    gl.attachShader(n, sh(gl.VERTEX_SHADER, t)),
-    gl.attachShader(n, sh(gl.FRAGMENT_SHADER, e)),
-    gl.linkProgram(n),
-    n
-  );
-}
+// programa WebGL pelo núcleo (verifica a compilação, como a v0.14)
+const prog = (t, e) => EITA.ui.compilarPrograma(gl, t, e, { verificar: !0 });
 const meshP = prog(
     `
 attribute vec3 p; attribute vec3 n; attribute float h;
@@ -169,65 +156,11 @@ const cam = {
     [0, 0, 1],
   ],
 };
-function camVectors() {
-  const [t, e, n] = cam.basis,
-    o = Math.cos(cam.pitch),
-    l = Math.sin(cam.pitch),
-    s = Math.cos(cam.yaw),
-    v = Math.sin(cam.yaw),
-    h = [o * v, -o * s, l],
-    u = V3.add(V3.add(V3.mul(t, h[0]), V3.mul(e, h[1])), V3.mul(n, h[2])),
-    x = V3.add(cam.target, V3.mul(u, cam.dist)),
-    T = V3.mul(u, -1);
-  let b = V3.norm(V3.cross(T, n));
-  (!isFinite(b[0]) || V3.len(V3.cross(T, n)) < 1e-6) && (b = t);
-  const y = V3.cross(b, T);
-  return { eye: x, f: T, r: b, u: y };
-}
-function matrices() {
-  const t = glc.width,
-    e = glc.height,
-    { eye: n, f: o, r: l, u: s } = camVectors(),
-    v = [
-      l[0],
-      s[0],
-      -o[0],
-      0,
-      l[1],
-      s[1],
-      -o[1],
-      0,
-      l[2],
-      s[2],
-      -o[2],
-      0,
-      -V3.dot(l, n),
-      -V3.dot(s, n),
-      V3.dot(o, n),
-      1,
-    ],
-    h = cam.dist * 0.05,
-    u = cam.dist * 10,
-    x = 1 / Math.tan(cam.fov / 2),
-    T = t / e,
-    b = [x / T, 0, 0, 0, 0, x, 0, 0, 0, 0, (u + h) / (h - u), -1, 0, 0, (2 * u * h) / (h - u), 0],
-    y = mul4(b, v),
-    L = [...v];
-  return ((L[12] = L[13] = L[14] = 0), { mvp: y, vrot: L, eye: n, f: o, r: l, u: s });
-}
-function mul4(t, e) {
-  const n = new Array(16).fill(0);
-  for (let o = 0; o < 4; o++)
-    for (let l = 0; l < 4; l++) for (let s = 0; s < 4; s++) n[o * 4 + l] += t[s * 4 + l] * e[o * 4 + s];
-  return n;
-}
-function project(t, e) {
-  const n = e.mvp,
-    o = n[0] * t[0] + n[4] * t[1] + n[8] * t[2] + n[12],
-    l = n[1] * t[0] + n[5] * t[1] + n[9] * t[2] + n[13],
-    s = n[3] * t[0] + n[7] * t[1] + n[11] * t[2] + n[15];
-  return [((o / s) * 0.5 + 0.5) * ov.width, (1 - ((l / s) * 0.5 + 0.5)) * ov.height, s];
-}
+// contas da câmera em modulos/afo/vista.js (E4d)
+const camVectors = () => EITA.afo.vetoresCamera(cam),
+  matrices = () => EITA.afo.matrizesCamera(cam, glc.width, glc.height),
+  mul4 = EITA.afo.mul4,
+  project = (t, e) => EITA.afo.projetar(t, e, ov.width, ov.height);
 function fit() {
   if (!S.V) return;
   const t = S.V;
@@ -3536,7 +3469,7 @@ const TOUR = [
   {
     sel: "#s1",
     t: "1 · Carregar o scan",
-    h: "Abra o STL ou OBJ da perna (da ponta dos dedos até abaixo do joelho). O scan deve cobrir a parte de trás da perna e o calcanhar.",
+    h: "Abra o STL da perna (da ponta dos dedos até abaixo do joelho). O scan deve cobrir a parte de trás da perna e o calcanhar.",
   },
   {
     sel: "#s2",
@@ -3565,74 +3498,10 @@ const TOUR = [
     h: "Baixe o STL da AFO (na orientação de impressão) e o relatório em PDF com dados do paciente, parâmetros, rebites e comparações.",
   },
 ];
-let tourI = 0,
-  tourPrev = null;
-const tourRestore = () => {
-  tourPrev && (tourPrev.classList.add("collapsed"), (tourPrev = null));
-};
-function tourShow(t) {
-  tourI = t;
-  let e = document.getElementById("tour");
-  e ||
-    ((e = document.createElement("div")),
-    (e.id = "tour"),
-    (e.innerHTML = '<div class="spot"></div><div class="card" role="dialog" aria-live="polite"></div>'),
-    document.body.appendChild(e));
-  const n = TOUR[t],
-    o = e.querySelector(".spot"),
-    l = e.querySelector(".card"),
-    s = n.sel ? document.querySelector(n.sel) : null;
-  (tourRestore(),
-    s && s.classList.contains("collapsed") && s.id !== "s0" && (s.classList.remove("collapsed"), (tourPrev = s)),
-    s && s.scrollIntoView && s.scrollIntoView({ block: "nearest" }));
-  const v = s ? s.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
-  (Object.assign(
-    o.style,
-    s
-      ? {
-          left: v.left - 6 + "px",
-          top: v.top - 6 + "px",
-          width: v.width + 12 + "px",
-          height: Math.min(v.height, innerHeight - v.top - 12) + 12 + "px",
-          display: "block",
-        }
-      : { left: "50%", top: "50%", width: "0px", height: "0px" },
-  ),
-    (l.innerHTML = `<div class="k">Passo ${t + 1} de ${TOUR.length}</div><h3>${n.t}</h3><div>${n.h}</div><div class="bt"><button type="button" class="skip">Pular</button>${t ? '<button type="button" class="prev">Voltar</button>' : ""}<button type="button" class="primary next">${t === TOUR.length - 1 ? "Começar" : "Próximo"}</button></div>`));
-  const h = 340,
-    u = l.offsetHeight || 220;
-  let x, T;
-  (s
-    ? v.right + h + 24 < innerWidth
-      ? ((x = v.right + 16), (T = Math.min(Math.max(12, v.top), innerHeight - u - 12)))
-      : ((x = Math.max(12, Math.min(innerWidth - h - 12, v.left + v.width / 2 - h / 2))),
-        (T = Math.min(innerHeight - u - 12, Math.max(12, v.top + 60))))
-    : ((x = (innerWidth - h) / 2), (T = (innerHeight - u) / 2)),
-    (l.style.left = x + "px"),
-    (l.style.top = T + "px"),
-    (l.querySelector(".skip").onclick = tourEnd),
-    (l.querySelector(".next").onclick = () => (t < TOUR.length - 1 ? tourShow(t + 1) : tourEnd())));
-  const b = l.querySelector(".prev");
-  (b && (b.onclick = () => tourShow(t - 1)), l.querySelector(".next").focus());
-}
-function tourEnd() {
-  tourRestore();
-  const t = document.getElementById("tour");
-  t && t.remove();
-  try {
-    localStorage.setItem("eitaAFO.tour", "1");
-  } catch {}
-}
-(document.addEventListener("keydown", (t) => {
-  document.getElementById("tour") &&
-    (t.key === "Escape" && tourEnd(),
-    t.key === "ArrowRight" && tourI < TOUR.length - 1 && tourShow(tourI + 1),
-    t.key === "ArrowLeft" && tourI > 0 && tourShow(tourI - 1));
-}),
-  addEventListener("resize", () => {
-    document.getElementById("tour") && tourShow(tourI);
-  }),
-  (window.AFO = {
+// tour do núcleo (nucleo/interface/tour.js; E4d): abre as etapas recolhidas, menos a ficha (s0)
+const TOUR_AFO = EITA.ui.criarTour({ passos: TOUR, chave: "eitaAFO.tour", abrir: (t) => t.classList.contains("collapsed") && t.id !== "s0" }),
+  tourShow = TOUR_AFO.mostrar;
+((window.AFO = {
     S,
     cam,
     draw,
@@ -3917,6 +3786,4 @@ function tourEnd() {
   resize(),
   renderLM(),
   ($("helpB").onclick = () => tourShow(0)));
-try {
-  localStorage.getItem("eitaAFO.tour") || setTimeout(() => tourShow(0), 600);
-} catch {}
+TOUR_AFO.primeiraVez(600);

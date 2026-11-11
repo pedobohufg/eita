@@ -3,3 +3,4 @@
 export * from "./casca.js";
 export * from "./imagem-navegador.js";
 export * from "./vista3d.js";
+export * from "./tour.js";

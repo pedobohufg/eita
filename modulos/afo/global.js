@@ -8,9 +8,10 @@ import * as UI from "../../nucleo/interface/index.js";
 import * as VETOR from "./vetor.js";
 import * as ANATOMIA from "./anatomia.js";
 import * as CASCA from "./casca.js";
+import * as VISTA from "./vista.js";
 
 const E = Object.assign({}, N);
 E.ui = UI;
-E.afo = Object.assign({}, VETOR, ANATOMIA, CASCA);
+E.afo = Object.assign({}, VETOR, ANATOMIA, CASCA, VISTA);
 globalThis.EITA = E;
 export default E;
