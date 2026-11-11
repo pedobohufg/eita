@@ -3,7 +3,8 @@
    - downloads pela capacidade "downloads" do claude.ai (simulada): nomes entregues e conteúdo de cada arquivo
      (o STL vai dentro de .zip; compara-se o conteúdo descompactado, não os bytes do .zip);
    - download recusado ("declined") e download por link (sem a capacidade);
-   - leitura de STL na comparação com a AFO real e na AFO de referência (textos de #cmpInfo e #refInfo).
+   - leitura de STL na comparação com a AFO real (a própria e uma cópia girada e deslocada, para o alinhamento
+     trabalhar) e na AFO de referência (textos de #cmpInfo e #refInfo).
    Uso: python3 testes/navegador/caminhos_afo.py ANTES DEPOIS     (ex.: legado/afo dist/afo)
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
 import asyncio, base64, hashlib, io, json, os, subprocess, sys, time, zipfile
@@ -38,6 +39,20 @@ async def clicar(pg, id_):
     await pg.wait_for_timeout(800)
     if id_ == "expAfo" and await pg.evaluate("!!document.getElementById('expGo')"):
         await pg.evaluate("document.getElementById('expGo').click()"); await pg.wait_for_timeout(800)
+
+def girar_stl(b, ang=0.35, desl=(12.0, -30.0, 7.5)):
+    """STL binário girado em torno de um eixo inclinado e deslocado (normais recalculadas pelo leitor)."""
+    import math, struct
+    n = struct.unpack_from("<I", b, 80)[0]; out = bytearray(b[:84])
+    k = [0.3, 0.5, 0.81]; m = math.sqrt(sum(x * x for x in k)); k = [x / m for x in k]; c, s_ = math.cos(ang), math.sin(ang)
+    def rot(v):
+        d = sum(a * x for a, x in zip(k, v)); cr = [k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0]]
+        return [v[i] * c + cr[i] * s_ + k[i] * d * (1 - c) + desl[i] for i in range(3)]
+    for t in range(n):
+        o = 84 + t * 50; f = struct.unpack_from("<12fH", b, o)
+        vs = [rot(f[3 + 3 * j: 6 + 3 * j]) for j in range(3)]
+        out += struct.pack("<12fH", 0, 0, 0, *vs[0], *vs[1], *vs[2], 0)
+    return bytes(out)
 
 def conteudo(nome, b):
     if nome.endswith(".zip"):
@@ -74,6 +89,10 @@ async def rodar(pasta, porta, b):
                     await pg.set_input_files(f"#{inp}", files=[{"name": "afo_real.stl", "mimeType": "model/stl", "buffer": stl}])
                     await pg.wait_for_timeout(4000)
                     out[f"{inp}/{info}"] = await pg.evaluate(f"document.getElementById('{info}').innerText")
+                # a mesma peça girada e deslocada, como um scan da AFO impressa: o alinhamento tem de trabalhar
+                await pg.set_input_files("#realFile", files=[{"name": "afo_girada.stl", "mimeType": "model/stl", "buffer": girar_stl(stl)}])
+                await pg.wait_for_timeout(6000)
+                out["realFile_girada/cmpInfo"] = await pg.evaluate("document.getElementById('cmpInfo').innerText")
                 out["status_final"] = await pg.evaluate("document.getElementById('status').innerText")
             await pg.close()
     finally:

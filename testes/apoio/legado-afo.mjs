@@ -11,7 +11,7 @@ function recortar(inicio, ate = "}") {
   for (; i < html.length; i++) { if (html[i] === "{") n++; else if (html[i] === "}" && --n === 0) break; }
   return html.slice(a, i + 1);
 }
-const FUNCOES = ["sectionCentroid", "computeFrame", "addPlantar", "measure", "deform", "binCenters", "fillSmooth", "legCenterline", "footAxis", "pctl", "gauss1", "generateShell", "meshCheck", "engraveText", "nnGrid", "computeNormals", "printXf"];
+const FUNCOES = ["jacobiEig", "fitSim", "matV", "matM", "compose", "applyT", "sectionCentroid", "computeFrame", "addPlantar", "measure", "deform", "binCenters", "fillSmooth", "legCenterline", "footAxis", "pctl", "gauss1", "generateShell", "meshCheck", "engraveText", "nnGrid", "computeNormals", "printXf"];
 export function legadoAFO() {
   const v3 = recortar("const V3={"), m = html.slice(html.indexOf(v3)).match(/^const V3=\{[\s\S]*?\},DEG=([^,]+),smooth=(\(t,e,n\)=>\{[^}]*\});function /);
   if (!m || !m[0].startsWith(v3)) throw new Error("V3/DEG/smooth do legado não reconhecidos");

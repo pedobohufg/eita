@@ -2504,102 +2504,8 @@ async function loadRefStl(t) {
     status("Não foi possível ler o STL de referência: " + (e.message || e));
   }
 }
-function jacobiEig(t) {
-  const e = t.length,
-    n = t.map((v) => v.slice()),
-    o = Array.from({ length: e }, (v, h) => Array.from({ length: e }, (u, x) => (h === x ? 1 : 0)));
-  for (let v = 0; v < 60; v++) {
-    let h = 0;
-    for (let u = 0; u < e; u++) for (let x = u + 1; x < e; x++) h += n[u][x] * n[u][x];
-    if (h < 1e-18) break;
-    for (let u = 0; u < e; u++)
-      for (let x = u + 1; x < e; x++) {
-        if (Math.abs(n[u][x]) < 1e-30) continue;
-        const T = (n[x][x] - n[u][u]) / (2 * n[u][x]),
-          b = Math.sign(T || 1) / (Math.abs(T) + Math.sqrt(T * T + 1)),
-          y = 1 / Math.sqrt(b * b + 1),
-          L = b * y;
-        for (let C = 0; C < e; C++) {
-          const W = n[C][u],
-            U = n[C][x];
-          ((n[C][u] = y * W - L * U), (n[C][x] = L * W + y * U));
-        }
-        for (let C = 0; C < e; C++) {
-          const W = n[u][C],
-            U = n[x][C];
-          ((n[u][C] = y * W - L * U), (n[x][C] = L * W + y * U));
-        }
-        for (let C = 0; C < e; C++) {
-          const W = o[C][u],
-            U = o[C][x];
-          ((o[C][u] = y * W - L * U), (o[C][x] = L * W + y * U));
-        }
-      }
-  }
-  const l = n.map((v, h) => v[h]),
-    s = l.map((v, h) => h).sort((v, h) => l[h] - l[v]);
-  return { val: s.map((v) => l[v]), vec: s.map((v) => o.map((h) => h[v])) };
-}
-function fitSim(t, e, n) {
-  const o = t.length;
-  let l = [0, 0, 0],
-    s = [0, 0, 0];
-  for (let Bt = 0; Bt < o; Bt++) for (let wt = 0; wt < 3; wt++) ((l[wt] += t[Bt][wt] / o), (s[wt] += e[Bt][wt] / o));
-  const v = [
-    [0, 0, 0],
-    [0, 0, 0],
-    [0, 0, 0],
-  ];
-  let h = 0;
-  for (let Bt = 0; Bt < o; Bt++) {
-    const wt = V3.sub(t[Bt], l),
-      Kt = V3.sub(e[Bt], s);
-    h += V3.dot(wt, wt) / o;
-    for (let Gt = 0; Gt < 3; Gt++) for (let nt = 0; nt < 3; nt++) v[Gt][nt] += (wt[Gt] * Kt[nt]) / o;
-  }
-  const [[u, x, T], [b, y, L], [C, W, U]] = v,
-    j = [
-      [u + y + U, L - W, C - T, x - b],
-      [L - W, u - y - U, x + b, C + T],
-      [C - T, x + b, -u + y - U, L + W],
-      [x - b, C + T, L + W, -u - y + U],
-    ],
-    Q = jacobiEig(j),
-    [G, O, B, Z] = Q.vec[0],
-    rt = [
-      [G * G + O * O - B * B - Z * Z, 2 * (O * B - G * Z), 2 * (O * Z + G * B)],
-      [2 * (O * B + G * Z), G * G - O * O + B * B - Z * Z, 2 * (B * Z - G * O)],
-      [2 * (O * Z - G * B), 2 * (B * Z + G * O), G * G - O * O - B * B + Z * Z],
-    ];
-  let D = 1;
-  if (n) {
-    let Bt = 0;
-    for (let wt = 0; wt < o; wt++) {
-      const Kt = V3.sub(t[wt], l),
-        Gt = V3.sub(e[wt], s);
-      Bt += V3.dot(Gt, matV(rt, Kt)) / o;
-    }
-    ((D = Bt / h), (D > 0.8 && D < 1.25) || (D = 1));
-  }
-  const kt = V3.sub(s, V3.mul(matV(rt, l), D));
-  return { R: rt, s: D, t: kt };
-}
-function matV(t, e) {
-  return [
-    t[0][0] * e[0] + t[0][1] * e[1] + t[0][2] * e[2],
-    t[1][0] * e[0] + t[1][1] * e[1] + t[1][2] * e[2],
-    t[2][0] * e[0] + t[2][1] * e[1] + t[2][2] * e[2],
-  ];
-}
-function matM(t, e) {
-  return t.map((n) => [0, 1, 2].map((o) => n[0] * e[0][o] + n[1] * e[1][o] + n[2] * e[2][o]));
-}
-function compose(t, e) {
-  return { R: matM(t.R, e.R), s: t.s * e.s, t: V3.add(V3.mul(matV(t.R, e.t), t.s), t.t) };
-}
-function applyT(t, e) {
-  return V3.add(V3.mul(matV(t.R, e), t.s), t.t);
-}
+// alinhamento pelo núcleo (nucleo/alinhamento.js): autovalores, ajuste de similaridade e transformações
+const { autovaloresSimetrica, ajustarSimilaridade, matrizVetor, comporTransformacoes, aplicarTransformacao } = EITA;
 function alignScan(t, e, n = {}) {
   const o = (G, O) => {
     const B = G.length / 3,
@@ -2645,8 +2551,8 @@ function alignScan(t, e, n = {}) {
         const kt = V3.sub(D, B);
         for (let Bt = 0; Bt < 3; Bt++) for (let wt = 0; wt < 3; wt++) Z[Bt][wt] += (kt[Bt] * kt[wt]) / O;
       }
-      const rt = jacobiEig(Z);
-      return { m: B, ax: rt.vec, val: rt.val };
+      const rt = autovaloresSimetrica(Z);
+      return { m: B, ax: rt.vetores, val: rt.valores };
     },
     b = T(h),
     y = T(o(e, 6e3)),
@@ -2656,7 +2562,7 @@ function alignScan(t, e, n = {}) {
       for (let Kt = 0; Kt < B; Kt++) {
         const Gt = [];
         for (const gt of O) {
-          const Ut = applyT(Bt, gt),
+          const Ut = aplicarTransformacao(Bt, gt),
             [qt, ot] = v(Ut[0], Ut[1], Ut[2], D);
           if (qt >= 0) {
             let At = [l[qt * 3], l[qt * 3 + 1], l[qt * 3 + 2]];
@@ -2671,12 +2577,12 @@ function alignScan(t, e, n = {}) {
         Gt.sort((gt, Ut) => gt[0] - Ut[0]);
         const nt = Gt.slice(0, Math.max(10, Math.floor(Gt.length * Z)));
         wt = nt[Math.floor(nt.length / 2)][0];
-        const ge = fitSim(
+        const ge = ajustarSimilaridade(
           nt.map((gt) => gt[1]),
           nt.map((gt) => gt[2]),
           rt && Kt >= B / 3,
         );
-        if (((Bt = compose(ge, Bt)), wt < 1e-9)) break;
+        if (((Bt = comporTransformacoes(ge, Bt)), wt < 1e-9)) break;
       }
       return { T: Bt, err: wt };
     },
@@ -2704,7 +2610,7 @@ function alignScan(t, e, n = {}) {
       ];
     for (let rt = 0; rt < 3; rt++)
       for (let D = 0; D < 3; D++) for (let kt = 0; kt < 3; kt++) Z[D][kt] += B[rt][D] * O[rt][kt];
-    C(Z) < 0 || W.push(L({ R: Z, s: 1, t: V3.sub(b.m, matV(Z, y.m)) }, u, 25, 0.7, !1, 40));
+    C(Z) < 0 || W.push(L({ R: Z, s: 1, t: V3.sub(b.m, matrizVetor(Z, y.m)) }, u, 25, 0.7, !1, 40));
   }
   (n.T0 && W.push(L(n.T0, u, 10, 0.7, !1, 20)), W.sort((G, O) => G.err - O.err));
   const U = (G, O) => {
@@ -2734,8 +2640,8 @@ function alignScan(t, e, n = {}) {
       ])
         for (const D of [-0.07, 0.07]) {
           const kt = U(rt, D),
-            Bt = { R: kt, s: 1, t: V3.sub(b.m, matV(kt, b.m)) },
-            wt = L(compose(Bt, O.T), x, 8, 0.9, !1, 8, !1);
+            Bt = { R: kt, s: 1, t: V3.sub(b.m, matrizVetor(kt, b.m)) },
+            wt = L(comporTransformacoes(Bt, O.T), x, 8, 0.9, !1, 8, !1);
           wt.err < O.err * 0.97 && ((O = wt), (Z = !0));
         }
       for (const rt of [
@@ -2753,7 +2659,7 @@ function alignScan(t, e, n = {}) {
               s: 1,
               t: V3.mul(rt, D),
             },
-            Bt = L(compose(kt, O.T), x, 8, 0.9, !1, 8, !1);
+            Bt = L(comporTransformacoes(kt, O.T), x, 8, 0.9, !1, 8, !1);
           Bt.err < O.err * 0.97 && ((O = Bt), (Z = !0));
         }
       if (!Z) break;
@@ -2775,7 +2681,7 @@ function compareReal(t, e, n) {
   S.cmpT = v;
   const h = new Float64Array(t.length);
   for (let j = 0; j < t.length; j += 3) {
-    const Q = applyT(v, [t[j], t[j + 1], t[j + 2]]);
+    const Q = aplicarTransformacao(v, [t[j], t[j + 1], t[j + 2]]);
     ((h[j] = Q[0]), (h[j + 1] = Q[1]), (h[j + 2] = Q[2]));
   }
   const u = nnGrid(h, 3),

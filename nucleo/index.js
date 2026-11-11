@@ -9,3 +9,4 @@ export * from "./saida.js";
 export * from "./pdf.js";
 export * from "./ficha.js";
 export * from "./paciente.js";
+export * from "./alinhamento.js";
