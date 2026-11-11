@@ -171,3 +171,14 @@ export function rasterizar(src, vista, o) {
     proj: function (x, y, z) { return [W / 2 + ((x * r[0] + y * r[1] + z * r[2]) - cxp) * px, H / 2 - ((x * u[0] + y * u[1] + z * u[2]) - cyp) * px]; }
   };
 }
+
+// ------------------------------------------------------------------ unidade provável do STL
+// Pela maior dimensão do modelo como veio no arquivo: uma cabeça de bebê tem de ~10 a ~40 cm. → "1" (mm),
+// "10" (cm), "1000" (m) — os valores do seletor de unidade da página — ou null se o tamanho não fecha com nenhuma.
+export function unidadeProvavel(pos) {
+  const B = limites(pos), D = Math.max(B.size[0], B.size[1], B.size[2]);
+  if (D >= 60 && D <= 600) return "1";
+  if (D >= 6 && D <= 60) return "10";
+  if (D >= 0.06 && D <= 0.6) return "1000";
+  return null;
+}

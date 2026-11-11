@@ -82,3 +82,11 @@ test("idade em meses para a órtese (como a página antiga: meses de calendário
   assert.deepEqual(FX.idadeEmMeses("2026-03-15", "2026-09-15", "32"), { meses: 6, corrigida: Math.round(6 - (8 * 7) / 30.44) });
   assert.equal(FX.idadeEmMeses("", "2026-09-15", ""), null);
 });
+
+test("unidade provável do STL pelo tamanho (cabeça de ~10 a ~40 cm)", () => {
+  const cab = prismaEliptico(60, 75, 0, 160, 36);
+  assert.equal(V.unidadeProvavel(cab), "1");
+  assert.equal(V.unidadeProvavel(cab.map((v) => v / 10)), "10");
+  assert.equal(V.unidadeProvavel(cab.map((v) => v / 1000)), "1000");
+  assert.equal(V.unidadeProvavel(cab.map((v) => v * 100)), null);
+});

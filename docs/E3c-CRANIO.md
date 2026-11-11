@@ -22,7 +22,7 @@ O módulo CRÂNIO da plataforma (E3b) foi migrado da "Calculadora de Assimetria 
 1. ✔ **E3c-1 — leitura e referência** (11/11/2026). Ver "E3c-1 — feito" abaixo.
 2. ✔ **E3c-2 — cálculo puro** (11/11/2026). `CROCore` → `modulos/cranio/ortese.js`. Ver "E3c-2 — feito" abaixo.
 3. ✔ **E3c-3 — interface** (11/11/2026). As duas interfaces unidas no módulo CRÂNIO. Ver "E3c-3 — feito" abaixo.
-4. **E3c-4 — plataforma.** Conferir com um scan real do laboratório (unidade, pontos, plano, órtese e relatório); republicar no artefato atual. O teste de ponta a ponta com a cabeça sintética já existe (`teste_cranio_scan.py`).
+4. **E3c-4 — plataforma** (em andamento). Scan real conferido (ver "E3c-4" abaixo). Falta: os pontos marcados por quem é da clínica, a decisão sobre as orelhas e republicar no artefato atual.
 
 ## E3c-1 — feito (11/11/2026)
 - **Leitura:** o arquivo foi lido por inteiro (CSS, HTML e os três scripts). As 9 imagens embutidas são 4 logos repetidas: o símbolo do EITA! Crânio (192 px, 3×, também o favicon), a marca "EITA! CRÂNIO — Assimetria craniana e órteses cranianas" (900×370, oculta na página e usada no cabeçalho do relatório), Lab.EITA (2×) e UFG (3×).
@@ -56,6 +56,16 @@ O módulo CRÂNIO da plataforma (E3b) foi migrado da "Calculadora de Assimetria 
 - **Correções de layout** que já existiam: a grade das medidas e a linha da data estouravam a largura do painel.
 - **Testes:** `testes/cranio-scan.test.mjs` (Node: medidas numa elipse conhecida e na cabeça sintética alinhada, rasterizador, conversão de ficha/base antiga, idade em meses). `testes/navegador/teste_cranio_scan.py` (Chrome + three.js r128 local, ver `three_local.py`): a mesma ficha antiga aberta na página antiga e na nova, seguida do STL da cabeça sintética → mesmo plano, **STL da órtese idêntico byte a byte**, resumo técnico idêntico, mapa em vista superior idêntico (pixels) e D1/D2/AP/LL iguais; depois, na nova: ficha salva com a órtese, medição com origem, PDF com 3 páginas e as vistas, dois cliques, duplo clique no vértice e base antiga com protocolo. `teste_cranio.py` e `teste_plataforma.py` passaram a numerar as etapas novas e a servir o three.js local (`three_local.py`, que também responde às fontes); `comparar_cranio.py` continua dando "saídas idênticas".
 - **Fica para depois:** a legenda do mapa em vista superior é cortada embaixo no canvas de 340 × 390 (igual à página antiga); rótulos 3D um pouco menores que os antigos, mas ainda se sobrepõem em cabeças pequenas.
+
+## E3c-4 — em andamento (11/11/2026)
+- **Scan real** enviado pelo autor (um bebê; o arquivo e os pontos ficaram fora do repositório): STL ASCII, 76.528 triângulos, em **milímetros**, com corte plano no pescoço e orientação oblíqua (sem nenhum eixo do arquivo alinhado à cabeça).
+- **Pontos de referência para o teste** (não clínicos): plano sagital achado por busca de simetria por espelhamento (restrita a normais perpendiculares à face; a melhor sem restrição separava frente e trás, porque a calota de bebê é quase simétrica também assim); glabela logo acima do násio, opistocrânio como o ponto mais posterior da linha média (como diz a página), vértice como o mais alto e eúrios como os extremos laterais acima das orelhas. O corte do pescoço não serve de horizontal (é oblíquo).
+- **Página antiga × nova, a mesma ficha antiga e o mesmo scan:** STL da órtese idêntico byte a byte (8,2 MB), mesmo plano (passo do controle), mesmas D1/D2/AP/LL, mapa em vista superior idêntico; o resumo técnico só difere na frase que cita os botões das orelhas (agora "Marcar D/E", como na página nova). Fluxo inteiro (abrir, alinhar, analisar, gerar e exportar) em ~15 s no Chrome de teste (GPU em software); relatório com 3 páginas (~330 kB).
+- **Achados:**
+  - a página antiga começava em **metros**; com um STL em mm, o modelo ficaria 1000× maior. A nova deduz a unidade pelo tamanho do modelo (`unidadeProvavel` em `vistas.js`) quando ninguém escolheu a unidade, usa a da ficha quando há uma ficha à espera do scan e avisa quando a escolha não fecha com o tamanho;
+  - neste scan só a orelha D foi detectada (a E saiu "espelhada da direita") e a verificação acusa interferência da casca com a malha acima de 0,5 mm: é o caso de marcar as orelhas à mão, que a página indica;
+  - o índice cefálico da análise da órtese (maior largura entre 65° e 115° de azimute, sem as orelhas, sobre o comprimento entre ±15°) é diferente do IC das medidas (LL a 90° sobre AP a 0°); numa cabeça assimétrica a diferença passa de alguns pontos. A página antiga faz igual; fica a decidir se o relatório deve explicar as duas definições;
+  - a legenda do mapa no 3D quebrava em duas linhas (corrigido).
 
 ## Achados da leitura (para a E3c-2 e a E3c-3)
 - **Convenções do `CROCore`:** grade (θ, φ) de 180 × 76 (2° × 2°, φ de −60° a 90°); θ = 0° anterior, +90° direita; origem (0, 0, zRef) no plano glabela–opistocrânio. O alinhamento (bloco 1) usa os 5 pontos: z = vértice − meio dos eúrios, y = anterior − posterior, origem no meio glabela–opistocrânio em x/y e no centro da caixa em z; o plano axial vai para zRef. Na E3c-2 o alinhamento sai do three.js para uma função pura.

@@ -6,7 +6,7 @@
       o plano, analisam e reaplicam as correções sozinhas. Depois: gerar a órtese e exportar o STL.
       Confere: STL da órtese idêntico (bytes), resumo técnico idêntico, mapa em vista superior idêntico (pixels) e
       D1/D2/AP/LL extraídos do plano iguais (a página antiga usa raios do three.js; a nova, o corte da malha).
-   2) Na página nova: ficha salva com o projeto da órtese, relatório PDF com as vistas do modelo, "limpar
+   2) Na página nova: ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
       correções" em dois cliques, marcação de ponto por duplo clique e importação de uma base antiga com protocolo.
    Uso: python3 testes/navegador/teste_cranio_scan.py
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
@@ -119,8 +119,10 @@ async def main():
             await pn.click("#tabs button[data-v='3d']"); await pn.wait_for_timeout(300)
             await pn.screenshot(path=os.path.join(RAIZ, "dist", "cranio-scan-teste.png"))
             # duplo clique: novo scan, vértice no centro da vista de cima
+            await pn.evaluate("document.getElementById('stl-scale-unit').value = '1000'")   # padrão antigo (metros), sem escolha do usuário
             await pn.set_input_files("#stl-file", files=[{"name": "outra.stl", "mimeType": "model/stl", "buffer": STL}])
             await esperar_texto(pn, "status", "outra.stl")
+            ok(await pn.input_value("#stl-scale-unit") == "1" and "ajustada para" in await pn.text_content("#status"), "unidade deduzida do tamanho (mm)")
             await pn.evaluate("document.getElementById('landmark-select').value = 'vertex'"); await clicar(pn, "btn-arm-mark")
             cx = await pn.evaluate("(() => { const r = document.querySelector('#cena canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
             await pn.mouse.dblclick(cx[0], cx[1]); await pn.wait_for_timeout(200)

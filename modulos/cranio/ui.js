@@ -230,14 +230,21 @@ async function abrirSTL(arq) {
   if (!/\.stl$/i.test(arq.name)) { status("Escolha um arquivo .stl.", true); return; }
   CASCA.ocupado(true, "Lendo o scan…"); await UI.espera(30);
   try {
-    const u = $("stl-scale-unit").value, bruto = E.lerSTL(await arq.arrayBuffer()), { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
+    const bruto = E.lerSTL(await arq.arrayBuffer()), sel = $("stl-scale-unit"), NOMES_U = { 1: "milímetros", 10: "centímetros", 1000: "metros" };
+    // unidade: a da ficha aberta (se houver); senão a escolhida; sem escolha, a provável pelo tamanho do modelo
+    const daFicha = S3.pendente && S3.pendente.scan && S3.pendente.scan.unidade, provavel = V.unidadeProvavel(bruto);
+    let avisoU = "";
+    if (daFicha && NOMES_U[daFicha]) sel.value = daFicha;
+    else if (!S3.unidadeEscolhida && provavel && provavel !== sel.value) { sel.value = provavel; avisoU = ` Unidade ajustada para <b>${NOMES_U[provavel]}</b> pelo tamanho do modelo; se não for, troque a unidade e abra o arquivo de novo.`; }
+    else if (provavel && provavel !== sel.value) avisoU = ` <b>Atenção:</b> pelo tamanho, o arquivo parece estar em ${NOMES_U[provavel]}, não em ${NOMES_U[sel.value]}. Confira a unidade.`;
+    const u = sel.value, { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
     mostrarVista("3d"); iniciar3D();
     S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null;
     trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano();
     ["btn-arm-mark", "btn-clear-marks"].forEach((id) => ($(id).disabled = false));
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
     $("scanInfo").innerHTML = `<b>${esc(arq.name)}</b>: ${(pos.length / 9).toLocaleString("pt-BR")} triângulos, ${[0, 1, 2].map((q) => fmt(S3.caixa.max[q] - S3.caixa.min[q], 0)).join(" × ")} mm. Marque os 5 pontos e alinhe.`;
-    status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.`);
+    status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.${avisoU}`, !!avisoU && avisoU.includes("Atenção"));
     if (S3.pendente) {
       const want = S3.pendente.scan && S3.pendente.scan.nome;
       if (want === arq.name) { CASCA.ocupado(false); await UI.espera(30); aplicarOrtese(S3.pendente); }
@@ -247,6 +254,7 @@ async function abrirSTL(arq) {
   CASCA.ocupado(false); atualizarEstado();
 }
 UI.soltavel($("stlDrop"), $("stl-file"), abrirSTL);
+$("stl-scale-unit").addEventListener("change", () => { S3.unidadeEscolhida = true; });
 
 /* ------------------------------------------------------------------ pontos de referência e alinhamento */
 function marcarPonto(k, p) {

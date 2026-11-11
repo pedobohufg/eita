@@ -150,8 +150,8 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
 #v3d{position:absolute;inset:0}#cena{position:absolute;inset:0}#cena canvas{position:absolute;inset:0}
 #vazio3d{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;pointer-events:none;font-size:13.5px;line-height:1.6;padding:20px}#vazio3d b{display:block;font-size:17px;color:var(--ink);margin-bottom:4px}
 #vistas3d{top:14px}#camadas{top:58px}
-#legend .barraCor{display:block;width:150px;height:9px;border-radius:5px;margin:4px 0 2px;background:linear-gradient(90deg,#2B5FD0,#f2f2f2 50%,#C2281F)}
-#legend .ext{display:flex;width:150px;gap:6px;justify-content:space-between;font-size:10.5px;color:var(--muted)}
+#legend .barraCor{display:block;width:190px;height:9px;border-radius:5px;margin:4px 0 2px;background:linear-gradient(90deg,#2B5FD0,#f2f2f2 50%,#C2281F)}
+#legend .ext{display:flex;width:190px;gap:6px;white-space:nowrap;justify-content:space-between;font-size:10.5px;color:var(--muted)}
 label.ctl.dec{grid-template-columns:1fr 78px}label.ctl:has(input[type=date]){grid-template-columns:1fr 150px}label.ctl.dec input{width:78px!important;text-align:right}
 label.ctl.sel{grid-template-columns:1fr 168px}label.ctl.sel select{width:168px}
 .is-hidden{display:none!important}
@@ -214,6 +214,7 @@ pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--
   <h2><span class="n">1</span>Scan 3D <span class="pname" style="color:var(--muted)">opcional</span></h2>
   <div class="bd">
     <label class="ctl sel">Unidade do STL<select id="stl-scale-unit"><option value="1">Milímetros (mm)</option><option value="10">Centímetros (cm)</option><option value="1000" selected>Metros (m)</option></select></label>
+    <div class="note" style="margin-top:2px">Sem escolha aqui, a unidade é deduzida do tamanho do modelo ao abrir.</div>
     <div class="drop" id="stlDrop" tabindex="0" role="button" style="margin-top:8px"><b>Abrir o STL do scan</b>clique ou arraste o arquivo (malha triangulada)</div>
     <input type="file" id="stl-file" accept=".stl" hidden>
     <div class="note" id="scanInfo">Com o scan, as medidas saem do plano axial e dá para analisar a pressão e gerar a órtese. Sem ele, informe as medidas à mão (etapa 2).</div>
