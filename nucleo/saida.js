@@ -1,4 +1,5 @@
-/* EITA núcleo · saída — pacote .zip (CRC32 + deflate-raw nativo do navegador).
+/* EITA núcleo · saída — pacote .zip (CRC32 + deflate-raw nativo do navegador) e preparo de arquivos para a capacidade
+   "downloads" do claude.ai (STL só dentro de .zip).
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 
 // ------------------------------------------------------------------ zip
@@ -35,3 +36,12 @@ export async function zip(arquivos) {
   fim.setUint32(12, tamC, true); fim.setUint32(16, off, true);
   return new Blob([...partes, ...central, new Uint8Array(fim.buffer)], { type: "application/zip" });
 };
+
+// ------------------------------------------------------------------ preparo para a capacidade "downloads" do claude.ai
+// Extensões entregues como estão; as demais (STL, OBJ…) vão dentro de um .zip com o mesmo nome.
+export const EXTENSOES_DIRETAS = /\.(json|txt|csv|zip|md|html|svg|png|pdf)$/i;
+// → { nome, dados: Blob }. tipo = tipo MIME do arquivo quando ele vai sem zip.
+export async function embalarParaDownload(nome, dados, tipo) {
+  if (EXTENSOES_DIRETAS.test(nome)) return { nome, dados: new Blob([dados], { type: tipo || "application/octet-stream" }) };
+  return { nome: nome.replace(/\.[^.]+$/, "") + ".zip", dados: await zip({ [nome]: dados }) };
+}

@@ -5,3 +5,4 @@ node_modules/
 # dados de pacientes nunca entram no repositório
 fichas/
 base_EITA_*.json
+__pycache__/

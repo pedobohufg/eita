@@ -19,8 +19,9 @@ export function translacao(x, y, z) { const o = identidade4(); o[12] = x; o[13] 
 export const hexParaRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 
 // ------------------------------------------------------------------ blocos WebGL (atributos p, n, c: vec3)
-export function compilarPrograma(gl, vs, fs) {
-  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+// verificar: lança o log do compilador se um shader não compilar (padrão: não verifica)
+export function compilarPrograma(gl, vs, fs, { verificar = false } = {}) {
+  const sh = (t, src) => { const s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s); if (verificar && !gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s); return s; };
   const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr);
   return pr;
 }

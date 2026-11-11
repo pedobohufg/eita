@@ -89,3 +89,15 @@ test("calibração: SVG do marcador tem 20 mm e os bits do id 7", () => {
   assert.equal((s.match(/fill="#fff"\/>/g) || []).length, 1 + N.BITS_ID7.flat().filter(Boolean).length);
   assert.match(N.marcadorSVG(undefined, "EITA! NARIZ"), /EITA! NARIZ · marcador v2/);
 });
+
+test("ficha: exportarBase acrescenta campos do app ao fim (calibração do AFO)", () => {
+  const mem = new Map(), arm = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) };
+  const A = N.criarArmazemFichas({ chave: "t", formatoFicha: "F", formatoBase: "B", versaoApp: "0.14", prefixoBase: "base_X", rotulo: "X", armazenamento: arm });
+  A.salvar({ formato: "F", id: "a", atualizado: "2026-01-01T00:00:00Z" });
+  const b = A.exportarBase(new Date("2026-11-11T12:00:00"), { calibracao: [{ EI: 1 }] });
+  assert.equal(b.nome, "base_X_20261111.json");
+  const o = JSON.parse(b.conteudo);
+  assert.deepEqual(Object.keys(o), ["formato", "versaoApp", "exportado", "fichas", "calibracao"]);
+  assert.deepEqual(o.calibracao, [{ EI: 1 }]);
+  assert.deepEqual(Object.keys(JSON.parse(A.exportarBase().conteudo)), ["formato", "versaoApp", "exportado", "fichas"]);
+});

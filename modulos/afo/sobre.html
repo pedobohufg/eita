@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sobre · EITA! AFO</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{--accent:#6B3FD6;--soft:#EFE8FF;--ink:#1c1730;--muted:#5b546f;--line:#e4def0}
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.6 "Instrument Sans",system-ui,sans-serif;color:var(--ink);background:#faf8ff}
+  header{display:flex;align-items:center;gap:14px;padding:18px 24px;background:#fff;border-bottom:3px solid var(--accent)}
+  header img{height:44px}
+  header h1{margin:0;font-size:22px;color:var(--accent)}
+  header .ufg{margin-left:auto;height:34px}
+  main{max-width:760px;margin:0 auto;padding:28px 24px 48px}
+  h2{color:var(--accent);font-size:19px;margin:30px 0 8px}
+  .box{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px}
+  .pill{display:inline-block;background:var(--soft);color:var(--accent);border-radius:99px;padding:2px 10px;font-size:13px;font-weight:600}
+  a{color:var(--accent)}
+  footer{color:var(--muted);font-size:13px;text-align:center;padding:20px}
+  ul{padding-left:20px}
+</style>
+</head>
+<body>
+<header>
+  <img src="assets/logo-eita-afo.png" alt="EITA! AFO — Modelagem automatizada de órteses tornozelo-pé" style="height:110px">
+  <img class="ufg" src="assets/logo-ufg.png" alt="Universidade Federal de Goiás">
+</header>
+<main>
+  <p><span class="pill">versão 0.14</span></p>
+  <p>O <b>EITA! AFO</b> gera órteses tornozelo-pé (AFO) posteriores, rígidas ou articuladas, a partir do escaneamento 3D da perna, para impressão 3D em PP ou nylon. É uma ferramenta do <b>Lab.EITA — Laboratório de Estudos Inventivos em Tecnologias Assistivas</b>, da <b>Universidade Federal de Goiás</b>.</p>
+  <p><a href="index.html">Abrir o EITA! AFO →</a></p>
+
+  <h2>Privacidade e dados de pacientes</h2>
+  <div class="box">
+    <ul>
+      <li><b>Tudo é processado no seu navegador.</b> O scan da perna, a casca, os mapas e o relatório em PDF são gerados no seu computador. Nenhum arquivo é enviado a servidores.</li>
+      <li><b>As fichas ficam neste navegador</b> (armazenamento local). Elas não vão para outros computadores, a menos que você exporte o arquivo da ficha ou a base do laboratório.</li>
+      <li><b>Arquivos exportados</b> (fichas, base do laboratório, relatórios) contêm dados de pacientes. Guarde-os em local com acesso restrito à equipe, de acordo com a LGPD e as normas da instituição.</li>
+      <li>Para identificar a peça, prefira código ou iniciais em vez do nome completo.</li>
+    </ul>
+  </div>
+
+  <h2>Uso clínico</h2>
+  <div class="box">
+    <p style="margin:0">As medidas, a rigidez e os mapas de contato são estimativas de um modelo computacional. A adaptação deve ser conferida por profissional habilitado antes da entrega. A rigidez só tem valor absoluto depois da calibração com ensaios de bancada.</p>
+  </div>
+
+  <h2>Termos de uso e direitos autorais</h2>
+  <div class="box">
+    <p style="margin-top:0">© 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás (Lab.EITA/UFG). Autor: <b>Pedro Henrique Gonçalves</b>. Todos os direitos reservados.</p>
+    <ul>
+      <li>O EITA! AFO, incluindo seu código, algoritmos, interface e documentação, é protegido pela Lei de Software (Lei nº 9.609/1998) e pela Lei de Direitos Autorais (Lei nº 9.610/1998).</li>
+      <li>O uso é permitido apenas a pessoas e instituições autorizadas pelo Lab.EITA/UFG, para a finalidade autorizada.</li>
+      <li>É proibido copiar, baixar para redistribuir, modificar, fazer engenharia reversa, revender ou incorporar o código ou partes dele em outros produtos sem autorização por escrito.</li>
+      <li>Os arquivos gerados (STL, relatórios, fichas) pertencem a quem os gerou, para uso clínico e de pesquisa. Publicações que usem a ferramenta devem citar: <i>EITA! AFO — Lab.EITA/UFG</i>.</li>
+      <li>A ferramenta é fornecida como apoio à fabricação, sem garantia. A responsabilidade clínica é do profissional que prescreve e adapta a órtese.</li>
+      <li>Pedidos de autorização e parcerias: Lab.EITA — Universidade Federal de Goiás.</li>
+    </ul>
+  </div>
+
+  <h2>Requisitos</h2>
+  <div class="box">
+    <p style="margin:0">Navegador atualizado (Chrome, Edge, Firefox ou Safari) com WebGL. Recomendado: computador com 8 GB de memória para scans grandes. Scans em STL, em milímetros.</p>
+  </div>
+</main>
+<footer><img src="assets/logo-labeita-simbolo.png" alt="Lab.EITA" style="height:34px;vertical-align:middle;margin-right:8px">© 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás · Autor: Pedro Henrique Gonçalves · Todos os direitos reservados</footer>
+</body>
+</html>
