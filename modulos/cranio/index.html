@@ -221,13 +221,16 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
     <div class="drop" id="stlDrop" tabindex="0" role="button" style="margin-top:8px"><b>Abrir o STL do scan</b>clique ou arraste o arquivo (malha triangulada)</div>
     <input type="file" id="stl-file" accept=".stl" hidden>
     <div class="note" id="scanInfo">Com o scan, as medidas saem do plano axial e dá para analisar a pressão e gerar a órtese. Sem ele, informe as medidas à mão (etapa 2).</div>
+    <label class="chk" title="Tira o corte plano do pescoço (onde o bebê foi segurado) e as abas soltas que o scanner cria; a análise completa a calota ali por interpolação."><input type="checkbox" id="correcao" checked> Corrigir o pescoço (corte plano e abas soltas)</label>
+    <div class="note" id="correcaoInfo"></div>
     <div class="sub-h">Pontos de referência</div>
+    <div class="row"><button type="button" id="btn-auto-pontos" disabled>Detectar pontos automaticamente</button></div>
     <label class="ctl sel">Ponto<select id="landmark-select"><option value="anterior">Glabela (anterior)</option><option value="posterior">Opistocrânio (posterior)</option><option value="left">Eúrio esquerdo</option><option value="right">Eúrio direito</option><option value="vertex">Vértice (superior)</option></select></label>
     <div class="row"><button class="primary" id="btn-arm-mark" type="button" disabled>Marcar na malha</button><button id="btn-clear-marks" type="button" disabled>Limpar pontos</button></div>
     <ul class="pts" id="landmark-status-list"></ul>
     <button class="primary" id="btn-align-mesh" type="button" disabled>Alinhar aos eixos anatômicos</button>
     <p class="why" id="why-align"></p>
-    <div class="note">Escolha o ponto, toque em <b>Marcar na malha</b> e dê <b>duplo clique</b> no modelo. Glabela: o ponto mais anterior da testa, entre as sobrancelhas; opistocrânio: o mais posterior do crânio; eúrios: os mais laterais de cada lado; vértice: o mais alto da cabeça.</div>
+    <div class="note">Ao abrir o scan, os 5 pontos são sugeridos automaticamente e o modelo é alinhado. Para corrigir um ponto, escolha-o, toque em <b>Marcar na malha</b>, dê <b>duplo clique</b> no modelo e alinhe de novo. Glabela: o ponto mais anterior da testa, entre as sobrancelhas; opistocrânio: o mais posterior do crânio; eúrios: os mais laterais de cada lado; vértice: o mais alto da cabeça.</div>
   </div>
 </section>
 
@@ -338,7 +341,8 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
         <label class="ctl dec" id="row-cro-ear-top-l">Altura do arco E (mm)<input type="text" inputmode="decimal" id="cro-ear-top-l" value="14"></label>
       </details>
       <details class="av"><summary>Avançado: bordas e abas</summary>
-        <label class="ctl dec" id="row-cro-hf">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="-15"></label>
+        <label class="ctl dec" id="row-cro-hf" title="Altura da borda na frente em relação ao plano glabela–opistocrânio (0 = na glabela, acima dos olhos).">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="0"></label>
+        <label class="ctl dec" id="row-cro-front-arc" title="Até quantos graus para cada lado da frente a borda fica na altura da borda frontal antes de descer (0 = transição contínua, como na versão antiga). 40° deixa os olhos livres.">Frente reta até (°)<input type="text" inputmode="decimal" id="cro-front-arc" value="40"></label>
         <label class="ctl dec" id="row-cro-occ-w">Semilargura do occipício (°)<input type="text" inputmode="decimal" id="cro-occ-w" value="50"></label>
         <label class="ctl dec" id="row-cro-cheek-depth">Profundidade da bochecha (mm)<input type="text" inputmode="decimal" id="cro-cheek-depth" value="45"></label>
         <label class="ctl dec" id="row-cro-cheek-gap">Afastamento da orelha (mm)<input type="text" inputmode="decimal" id="cro-cheek-gap" value="6"></label>

@@ -29,6 +29,7 @@ export function completarEntradas(e) {
   if (o["cro-type"] == null) return o;   // ficha sem os campos da órtese: ficam os da página (protocolo atual)
   if (o["cro-bandtop-back"] == null) o["cro-bandtop-back"] = o["cro-bandtop"] != null ? o["cro-bandtop"] : "55";
   if (o["cro-hole-zone"] == null) o["cro-hole-zone"] = "all";
+  if (o["cro-front-arc"] == null) o["cro-front-arc"] = "0";
   return o;
 }
 // Valores dos campos da página antiga (todos os cro-* de projeto): base para fichas e predefinições que só citam
@@ -37,11 +38,11 @@ export const PADRAO_ANTIGO = Object.freeze({ "cro-indic": "auto", "cro-age": "",
   "cro-type": "closed", "cro-bandtop": "55", "cro-bandtop-back": "55", "cro-c0": "2", "cro-t": "3", "cro-hb": "-12", "cro-occ-drop": "8", "cro-cheek": "on", "cro-cheek-w": "30", "cro-mast": "on", "cro-mast-w": "24",
   "cro-res": "normal", "cro-split": "coronal", "cro-grow-src": "age", "cro-grow-m": "4", "cro-grow-rate": "0,8", "cro-grow-contact": "30", "cro-grow-vertex": "2", "cro-ear-mode": "auto", "cro-ear-clear": "8",
   "cro-ear-az-r": "100", "cro-ear-az-l": "100", "cro-ear-w-r": "24", "cro-ear-w-l": "24", "cro-ear-top-r": "14", "cro-ear-top-l": "14", "cro-hf": "4", "cro-occ-w": "50", "cro-cheek-depth": "32",
-  "cro-cheek-gap": "6", "cro-cheek-clear": "1,5", "cro-mast-depth": "24", "cro-mast-gap": "4", "cro-hole-d": "4", "cro-pitch": "10", "cro-margin": "8", "cro-split-pos": "-35", "cro-gap": "2", "cro-hole-zone": "all" });
+  "cro-cheek-gap": "6", "cro-cheek-clear": "1,5", "cro-mast-depth": "24", "cro-mast-gap": "4", "cro-hole-d": "4", "cro-pitch": "10", "cro-margin": "8", "cro-split-pos": "-35", "cro-gap": "2", "cro-hole-zone": "all", "cro-front-arc": "0" });
 // Protocolo do laboratório (E3c-4; padrão da página desde então): faixa de topo aberto inclinado (40° na frente,
-// 70° atrás), bordas baixas, apoio pré-auricular, sem aba atrás da orelha, peça inteira com fenda lateral E e
+// 70° atrás), borda frontal na altura da glabela até ±40° (acima dos olhos), borda de trás baixa, apoio pré-auricular, sem aba atrás da orelha, peça inteira com fenda lateral E e
 // furos só na frente e atrás. A superfície interna segue a cabeça (folga de 2 mm + reserva de crescimento).
-export const PROTOCOLO_LABEITA = Object.freeze({ "cro-type": "band", "cro-bandtop": "40", "cro-bandtop-back": "70", "cro-hf": "-15", "cro-hb": "-30", "cro-occ-drop": "10", "cro-cheek": "on", "cro-cheek-depth": "45",
+export const PROTOCOLO_LABEITA = Object.freeze({ "cro-type": "band", "cro-bandtop": "40", "cro-bandtop-back": "70", "cro-hf": "0", "cro-front-arc": "40", "cro-hb": "-30", "cro-occ-drop": "10", "cro-cheek": "on", "cro-cheek-depth": "45",
   "cro-mast": "off", "cro-split": "lateralL", "cro-gap": "2", "cro-hole-zone": "ap", "cro-c0": "2" });
 
 // Ficha antiga → ficha da plataforma (sem medições: a página antiga não as guardava na ficha).
@@ -58,7 +59,8 @@ export function converterFichaAntiga(f, agora = new Date()) {
     alinhamento: f.alinhamento || null, planoZ: typeof f.planoZ === "number" ? f.planoZ : null,
     entradas: completarEntradas(f.entradas), edicoes: (f.edicoes || []).map((e) => Object.assign({}, e)),
     earMan: f.earMan ? { r: !!f.earMan.r, l: !!f.earMan.l } : null, analisado: !!f.analisado, gerada: !!f.gerada,
-    resultado: f.resultado || null, versoes: (f.versoes || []).map((v) => Object.assign({}, v)), avaliacao: txt(pa["pt-eval"])
+    resultado: f.resultado || null, versoes: (f.versoes || []).map((v) => Object.assign({}, v)), avaliacao: txt(pa["pt-eval"]),
+    correcao: false   // a página antiga usava o scan inteiro (sem a correção do pescoço)
   };
   return { formato: FORMATO_FICHA, versaoApp: VERSAO_APP, id: txt(f.id) || "c" + agora.getTime().toString(36), nome: txt(f.nome) || p.pName || p.pId,
     paciente: p, atualizado: f.atualizado || agora.toISOString(), medicoes: [], atual: null, ortese,

@@ -89,7 +89,7 @@ async def main():
             await pg.click("[data-novo=cranio]"); await pg.wait_for_url("**/cranio/index.html")
             await esperar_status(pg, "Nova ficha para")
             ok(await pg.input_value("#pName") == "Paciente Teste" and await pg.input_value("#pBirth") == "2018-06-15", "dados preenchidos no CRÂNIO")
-            await pg.click("#stepper button[data-s=s2]"); await pg.click("#registrar"); await esperar_status(pg, "Ficha atualizada")
+            await pg.click("#stepper button[data-s=s2]"); await pg.click("#exemplo"); await pg.click("#registrar"); await esperar_status(pg, "Ficha atualizada")
             await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html"); await pg.wait_for_selector(".prot")
             ok("1 medição" in await pg.text_content(".prots"), "avaliação craniana ligada ao paciente")
 

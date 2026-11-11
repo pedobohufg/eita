@@ -6,7 +6,7 @@
       o plano, analisam e reaplicam as correções sozinhas. Depois: gerar a órtese e exportar o STL.
       Confere: STL da órtese idêntico (bytes), resumo técnico idêntico, mapa em vista superior idêntico (pixels) e
       D1/D2/AP/LL extraídos do plano iguais (a página antiga usa raios do three.js; a nova, o corte da malha).
-   2) Na página nova: ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
+   2) Na página nova: pontos automáticos, alinhamento e correção do pescoço ao abrir um scan sem ficha; ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
       correções" em dois cliques, marcação de ponto por duplo clique e importação de uma base antiga com protocolo.
    Uso: python3 testes/navegador/teste_cranio_scan.py
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
@@ -134,14 +134,16 @@ async def main():
             ok(P["type"] == "band" and P["bandTop"] == 40 and P["bandTopBack"] == 70 and P["split"] == "lateralL" and P["holeZone"] == "ap" and P["mast"] == "off", "protocolo Lab.EITA como padrão da página (campos da ficha nova)")
             await pn.evaluate("document.getElementById('stl-scale-unit').value = '1000'")   # padrão antigo (metros), sem escolha do usuário
             await pn.set_input_files("#stl-file", files=[{"name": "outra.stl", "mimeType": "model/stl", "buffer": STL}])
-            await esperar_texto(pn, "status", "outra.stl")
+            await esperar_texto(pn, "status", "sugeridos automaticamente")
             ok(await pn.input_value("#stl-scale-unit") == "1" and "ajustada para" in await pn.text_content("#status"), "unidade deduzida do tamanho (mm)")
+            st = await pn.evaluate("({ al: window.__eitaCranio.S3.alinhado, n: Object.keys(window.__eitaCranio.S3.pontos).length, dA: document.getElementById('dA').value, corr: window.__eitaCranio.S3.correcao })")
+            ok(st["al"] and st["n"] == 5 and st["dA"] != "" and st["corr"] and st["corr"]["corte"] > 0, f"scan sem ficha: pontos automáticos, alinhamento, medidas e correção do pescoço ({st['corr']})")
             await pn.evaluate("document.getElementById('landmark-select').value = 'vertex'"); await clicar(pn, "btn-arm-mark")
             cx = await pn.evaluate("(() => { const r = document.querySelector('#cena canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
             await pn.mouse.dblclick(cx[0], cx[1]); await pn.wait_for_timeout(200)
             v = await pn.evaluate("window.__eitaCranio.S3.pontos.vertex")
             ok(v and v[2] > 60, f"vértice marcado por duplo clique (z = {v and round(v[2], 1)} mm)")
-            ok("Próximo" in await pn.text_content("#status"), "sugere o próximo ponto")
+            ok("realinhar" in await pn.text_content("#status"), "ponto corrigido sobre os automáticos: pede para realinhar")
             base = {"formato": "EITA! Crânio base", "exportado": "2026-11-01T10:00:00.000Z", "fichas": [dict(FICHA, id="ts-02", nome="Outro")], "protocolos": {"Serviço X": {"cro-c0": "2,5"}}}
             await pn.set_input_files("#dbImp", files=[{"name": "base_antiga.json", "mimeType": "application/json", "buffer": json.dumps(base).encode()}])
             await esperar_texto(pn, "status", "versão antiga")

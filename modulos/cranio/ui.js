@@ -51,7 +51,7 @@ function mostrarVista(v) {
 document.querySelectorAll("#tabs button").forEach((b) => (b.onclick = () => mostrarVista(b.dataset.v)));
 
 /* ------------------------------------------------------------------ medidas */
-$("med").innerHTML = C.MEDIDAS.map((x) => `<label>${x.nome}<span class="sg">${x.sigla}</span><span class="inp"><input id="${x.id}" type="text" inputmode="decimal" autocomplete="off" value="${C.EXEMPLO[x.k]}"><span class="u" data-unidade>mm</span></span><span class="dica" id="h-${x.id}"></span></label>`).join("");
+$("med").innerHTML = C.MEDIDAS.map((x) => `<label>${x.nome}<span class="sg">${x.sigla}</span><span class="inp"><input id="${x.id}" type="text" inputmode="decimal" autocomplete="off" value=""><span class="u" data-unidade>mm</span></span><span class="dica" id="h-${x.id}"></span></label>`).join("");
 $("mData").value = hoje();
 function lerMedidas() {
   const m = {}; let erro = false;
@@ -240,16 +240,17 @@ async function abrirSTL(arq) {
     else if (provavel && provavel !== sel.value) avisoU = ` <b>Atenção:</b> pelo tamanho, o arquivo parece estar em ${NOMES_U[provavel]}, não em ${NOMES_U[sel.value]}. Confira a unidade.`;
     const u = sel.value, { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
     mostrarVista("3d"); iniciar3D();
-    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; limparPerfil();
-    trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano();
-    ["btn-arm-mark", "btn-clear-marks"].forEach((id) => ($(id).disabled = false));
+    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; S3.posPrep = pos; S3.al = null; S3.correcao = null; limparPerfil();
+    trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano(); $("correcaoInfo").textContent = "";
+    ["btn-arm-mark", "btn-clear-marks", "btn-auto-pontos"].forEach((id) => ($(id).disabled = false));
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
     $("scanInfo").innerHTML = `<b>${esc(arq.name)}</b>: ${(pos.length / 9).toLocaleString("pt-BR")} triângulos, ${[0, 1, 2].map((q) => fmt(S3.caixa.max[q] - S3.caixa.min[q], 0)).join(" × ")} mm. Marque os 5 pontos e alinhe.`;
     status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.${avisoU}`, !!avisoU && avisoU.includes("Atenção"));
-    if (S3.pendente) {
-      const want = S3.pendente.scan && S3.pendente.scan.nome;
-      if (want === arq.name) { CASCA.ocupado(false); await UI.espera(30); aplicarOrtese(S3.pendente); }
-      else if (want) status(`Scan aberto, mas a ficha aberta é do scan <b>${esc(want)}</b>: os pontos e o plano da ficha não foram aplicados.`, true);
+    const want = S3.pendente && S3.pendente.scan && S3.pendente.scan.nome;
+    if (S3.pendente && want === arq.name) { CASCA.ocupado(false); await UI.espera(30); aplicarOrtese(S3.pendente); }
+    else {
+      if (want) status(`Scan aberto, mas a ficha aberta é do scan <b>${esc(want)}</b>: os pontos e o plano da ficha não foram aplicados.`, true);
+      CASCA.ocupado(false); await pontosAutomaticos(avisoU);
     }
   } catch (e) { console.error(e); status("Não consegui ler o STL: " + esc(e.message), true); }
   CASCA.ocupado(false); atualizarEstado();
@@ -258,21 +259,41 @@ UI.soltavel($("stlDrop"), $("stl-file"), abrirSTL);
 $("stl-scale-unit").addEventListener("change", () => { S3.unidadeEscolhida = true; });
 
 /* ------------------------------------------------------------------ pontos de referência e alinhamento */
-function marcarPonto(k, p) {
-  S3.pontos[k] = [p[0], p[1], p[2]];
-  descartar(marcadores[k]);
-  const m = new T.Mesh(new T.SphereGeometry(S3.maxDim * 0.015, 16, 16), new T.MeshBasicMaterial({ color: PONTOS[k].cor }));
-  m.position.set(p[0], p[1], p[2]); cena.add(m); marcadores[k] = m;
-  listarPontos();
+// Os pontos ficam no referencial do scan preparado (antes do alinhamento): é o que a ficha guarda e o que o
+// alinhamento usa. Depois de alinhar, os marcadores continuam na tela (levados ao modelo alinhado) e qualquer ponto
+// pode ser marcado de novo; "Alinhar" refaz o alinhamento a partir do scan preparado.
+const paraBruto = (p) => { if (!S3.al) return p; const e = S3.al.rotacao, t = S3.al.translacao, u = [p[0] - t[0], p[1] - t[1], p[2] - t[2]]; return [e[0] * u[0] + e[1] * u[1] + e[2] * u[2], e[4] * u[0] + e[5] * u[1] + e[6] * u[2], e[8] * u[0] + e[9] * u[1] + e[10] * u[2]]; };
+const naTela = (p) => (S3.al ? O.pontoAlinhado(S3.al, p) : p);
+function desenharPonto(k) {
+  descartar(marcadores[k]); delete marcadores[k];
+  const p = S3.pontos[k]; if (!p) return;
+  const q = naTela(p), m = new T.Mesh(new T.SphereGeometry(S3.maxDim * 0.015, 16, 16), new T.MeshBasicMaterial({ color: PONTOS[k].cor, depthTest: false }));
+  m.renderOrder = 1002; m.position.set(q[0], q[1], q[2]); cena.add(m); marcadores[k] = m;
 }
+function marcarPonto(k, pTela) { S3.pontos[k] = paraBruto([pTela[0], pTela[1], pTela[2]]); desenharPonto(k); listarPontos(); }
+function definirPontosBrutos(pts) { limparPontos(); O.PONTOS_DE_REFERENCIA.forEach((k) => { if (pts[k]) S3.pontos[k] = [+pts[k][0], +pts[k][1], +pts[k][2]]; desenharPonto(k); }); listarPontos(); }
 function limparPontos() { Object.keys(marcadores).forEach((k) => descartar(marcadores[k])); marcadores = {}; S3.pontos = {}; listarPontos(); }
 function listarPontos() {
   const hex = (c) => "#" + c.toString(16).padStart(6, "0");
-  $("landmark-status-list").innerHTML = O.PONTOS_DE_REFERENCIA.map((k) => `<li class="${S3.pontos[k] ? "ok" : ""}"><i style="background:${hex(PONTOS[k].cor)}"></i>${PONTOS[k].nome}: ${S3.pontos[k] ? "marcado" : "pendente"}</li>`).join("");
+  $("landmark-status-list").innerHTML = O.PONTOS_DE_REFERENCIA.map((k) => `<li class="${S3.pontos[k] ? "ok" : ""}"><i style="background:${hex(PONTOS[k].cor)}"></i>${PONTOS[k].nome}: ${S3.pontos[k] ? (S3.pontosAuto && S3.pontosAuto[k] ? "automático" : "marcado") : "pendente"}</li>`).join("");
   const n = O.PONTOS_DE_REFERENCIA.filter((k) => S3.pontos[k]).length;
   $("btn-align-mesh").disabled = n < 5;
   $("why-align").textContent = !S3.pos ? "Abra o STL do scan primeiro." : n < 5 ? `Faltam ${5 - n} ponto(s) de referência.` : "";
 }
+// pontos sugeridos automaticamente (pontos.js) → alinha e extrai as medidas
+async function pontosAutomaticos(prefixo) {
+  if (!S3.posPrep) return false;
+  CASCA.ocupado(true, "Procurando os pontos de referência…"); await UI.espera(30);
+  let r = null; try { r = C.pontos.detectarPontos(S3.posPrep); } catch (e) { console.error(e); }
+  CASCA.ocupado(false);
+  if (!r) { status(`Não consegui sugerir os pontos neste scan: marque os 5 pontos na malha e toque em <b>Alinhar aos eixos anatômicos</b>.${prefixo || ""}`, true); return false; }
+  definirPontosBrutos(r.pontos); S3.pontosAuto = Object.assign({}, r.pontos); listarPontos();
+  alinhar(); extrairMedidas(true);
+  status(`Pontos de referência sugeridos automaticamente (simetria do espelho: erro médio ${fmt(r.erroEspelho, 1)} mm${r.nasio ? "" : "; násio não achado, glabela estimada"}) e modelo alinhado; medidas extraídas no plano glabela–opistocrânio.${S3.correcao ? ` Pescoço corrigido: ${fmt(S3.correcao.area / 100, 1)} cm² de corte e abas soltas fora da análise.` : ""} <b>Confira os pontos</b> no modelo: para corrigir um, escolha-o na etapa 1, marque de novo e alinhe.${prefixo || ""}`);
+  return true;
+}
+$("btn-auto-pontos").onclick = () => { if (!doisCliquesSeAlinhado()) return; pontosAutomaticos(); };
+function doisCliquesSeAlinhado() { return !S3.alinhado || doisCliques("autoPontos", $("btn-auto-pontos"), "Confirmar: trocar os pontos", "Os pontos atuais serão trocados pelos automáticos e o modelo, realinhado (a análise de pressão recomeça). Toque de novo para confirmar."); }
 $("btn-arm-mark").onclick = () => {
   if (!S3.pos) return;
   S3.armado = !S3.armado; const k = $("landmark-select").value;
@@ -281,10 +302,27 @@ $("btn-arm-mark").onclick = () => {
   if (S3.armado) mostrarVista("3d");
 };
 $("btn-clear-marks").onclick = () => { limparPontos(); status("Pontos de referência apagados."); };
+// correção do pescoço (pontos.js): sem o corte plano e as abas soltas; a análise completa a calota ali
+function corrigirPescoco(pos, zRef) {
+  S3.correcao = null;
+  if (!$("correcao").checked) { $("correcaoInfo").textContent = "Correção desligada: a análise usa o scan inteiro."; return pos; }
+  const sc = C.pontos.semCortePlano(pos), base = sc ? sc.pos : pos, sa = C.pontos.semAbas(base, zRef, { corte: sc });
+  const nt = pos.length / 9, fica = sa.pos.length / 9, area = (sc ? sc.area : 0);
+  if (fica === nt) { $("correcaoInfo").textContent = "Nada a corrigir: sem corte plano nem abas soltas."; return pos; }
+  S3.correcao = { corte: sc ? sc.removidos : 0, abas: sa.removidos, area: area, triangulos: nt - fica };
+  $("correcaoInfo").textContent = `${sc ? `Corte plano: ${fmt(sc.area / 100, 1)} cm² (${sc.removidos.toLocaleString("pt-BR")} triângulos)` : "Sem corte plano"}; abas soltas: ${sa.removidos.toLocaleString("pt-BR")} triângulos. Fora da análise; a calota é completada por interpolação.`;
+  return sa.pos;
+}
+$("correcao").addEventListener("change", () => {
+  if (!S3.alinhado || !S3.posAlinhado) return;
+  trocarMalha(corrigirPescoco(S3.posAlinhado, S3.zRef0), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO(); mostrarPlano(); atualizarEstado();
+  status($("correcao").checked ? "Correção do pescoço ligada: analise a pressão de novo." : "Correção do pescoço desligada: a análise usa o scan inteiro. Analise a pressão de novo.");
+});
 function alinhar() {
-  const r = O.alinharPorPontos(S3.pos, S3.pontos); if (!r) return false;
+  const r = O.alinharPorPontos(S3.posPrep || S3.pos, S3.pontos); if (!r) return false;
   S3.alinhamento = {}; O.PONTOS_DE_REFERENCIA.forEach((k) => (S3.alinhamento[k] = S3.pontos[k].map((v) => +v.toFixed(4))));
-  trocarMalha(r.pos, false); limparPontos(); S3.alinhado = true; S3.zRef0 = r.zRef; limparPerfil(); resetCRO();
+  S3.al = r; S3.posAlinhado = r.pos; S3.alinhado = true; S3.zRef0 = r.zRef;
+  trocarMalha(corrigirPescoco(r.pos, r.zRef), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO();
   ajustarFaixaPlano();
   if (S3.eixo === "axial") { const sl = $("plane-offset"); sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), r.zRef)); lerPlano(); }
   ETP.feito("s1"); atualizarEstado();
@@ -348,7 +386,8 @@ function legenda() {
   if (S3.medidas) { lg.innerHTML = Object.entries(COR_MED).map(([k, c]) => `<div><i style="background:${c}"></i>${k}${(k === "LL" ? S3.medidas.largura : S3.medidas[k]) != null ? " " + fmt(k === "LL" ? S3.medidas.largura : S3.medidas[k], 1) + " mm" : ""}</div>`).join(""); lg.hidden = false; return; }
   lg.hidden = true;
 }
-$("btn-extract-3d").onclick = () => {
+$("btn-extract-3d").onclick = () => extrairMedidas(false);
+function extrairMedidas(silencioso) {
   if (!S3.pos) return;
   if (S3.eixo !== "axial") { status('Mude o corte para <b>Axial</b> para extrair as medidas.', true); return; }
   const md = V.medidasNoPlano(S3.pos, null, S3.z);
@@ -360,9 +399,9 @@ $("btn-extract-3d").onclick = () => {
   if (mx) S.origem.maiorAssimetria = { dz: mx.dz, cvai: +mx.cvai.toFixed(2), cva: +mx.cva.toFixed(2), D1: +mx.D1.toFixed(1), D2: +mx.D2.toFixed(1) };
   mostrarOrigem();
   const ehMax = mx && Math.abs(z0 + mx.dz - S3.z) < 1;
-  status(`Medidas extraídas do scan no plano z = ${fmt(S3.z, 1)} mm: D1 ${fmt(md.D1 || 0, 1)}, D2 ${fmt(md.D2 || 0, 1)}, AP ${fmt(md.AP || 0, 1)}, LL ${fmt(md.largura || 0, 1)} mm.` +
+  if (!silencioso) status(`Medidas extraídas do scan no plano z = ${fmt(S3.z, 1)} mm: D1 ${fmt(md.D1 || 0, 1)}, D2 ${fmt(md.D2 || 0, 1)}, AP ${fmt(md.AP || 0, 1)}, LL ${fmt(md.largura || 0, 1)} mm.` +
     (mx && !ehMax ? ` A maior assimetria está ${mx.dz > 0 ? "+" : ""}${fmt(mx.dz, 0)} mm do plano de referência (CVAI ${fmt(mx.cvai, 1)} %): veja <b>Assimetria por altura</b>.` : "") + " Confira em <b>Resultados</b> e registre a medição.");
-};
+}
 // ------------------------------------------------------------------ assimetria por altura (E3c-4)
 // planos paralelos ao de referência (glabela–opistocrânio do alinhamento; sem alinhamento, o plano atual)
 function limparPerfil() { S3.perfil = null; $("perfil").hidden = true; $("perfilBox").hidden = true; }
@@ -451,7 +490,7 @@ function readParams() {
     cheekGap: g("cro-cheek-gap", 6, 0, 20), cheekClear: g("cro-cheek-clear", 1.5, 0, 6),
     holeD: g("cro-hole-d", 4, 0, 8), pitch: g("cro-pitch", 10, 5, 25), margin: g("cro-margin", 8, 2, 20), holeZone: $("cro-hole-zone").value, holeArc: 50,
     split: $("cro-split").value, splitPos: g("cro-split-pos", -35, -80, 80), gap: g("cro-gap", 2, 1.5, 6),
-    occDrop: g("cro-occ-drop", 8, 0, 30), occWidth: g("cro-occ-w", 50, 20, 90), occSoft: 0.6,
+    occDrop: g("cro-occ-drop", 8, 0, 30), occWidth: g("cro-occ-w", 50, 20, 90), occSoft: 0.6, frontArc: g("cro-front-arc", 0, 0, 90),
     mast: $("cro-mast").value, mastWidth: g("cro-mast-w", 24, 8, 50), mastDepth: g("cro-mast-depth", 24, 5, 50), mastGap: g("cro-mast-gap", 4, 0, 20), legRound: 0.45,
     res: $("cro-res").value
   };
@@ -645,10 +684,10 @@ function ligarCliques() {
   el.addEventListener("dblclick", (e) => {
     if (!S3.armado || !malha) return;
     const h = acerto(e); if (!h) return;
-    const k = $("landmark-select").value; marcarPonto(k, [h.point.x, h.point.y, h.point.z]);
+    const k = $("landmark-select").value; marcarPonto(k, [h.point.x, h.point.y, h.point.z]); if (S3.pontosAuto) { delete S3.pontosAuto[k]; listarPontos(); }
     S3.armado = false; $("btn-arm-mark").textContent = "Marcar na malha";
     const prox = O.PONTOS_DE_REFERENCIA.find((q) => !S3.pontos[q]); if (prox) $("landmark-select").value = prox;
-    status(`Ponto <b>${PONTOS[k].nome}</b> marcado.${prox ? ` Próximo: ${PONTOS[prox].nome}.` : " Os 5 pontos estão marcados: toque em <b>Alinhar aos eixos anatômicos</b>."}`);
+    status(`Ponto <b>${PONTOS[k].nome}</b> marcado.${prox ? ` Próximo: ${PONTOS[prox].nome}.` : S3.alinhado ? " Toque em <b>Alinhar aos eixos anatômicos</b> para realinhar com ele." : " Os 5 pontos estão marcados: toque em <b>Alinhar aos eixos anatômicos</b>."}`);
   });
   let down = null;
   el.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; });
@@ -787,7 +826,7 @@ $("vistas3d").addEventListener("click", (e) => {
 });
 
 // ------------------------------------------------------------------ predefinições (protocolos do serviço)
-const WL = ["cro-type", "cro-bandtop", "cro-bandtop-back", "cro-hole-zone", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
+const WL = ["cro-type", "cro-bandtop", "cro-bandtop-back", "cro-hole-zone", "cro-front-arc", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
 const DEF = {}; WL.forEach((id) => { DEF[id] = $(id).value; });
 const BUILT = {   // valores que não aparecem aqui voltam ao padrão da página (protocolo Lab.EITA)
   b0: { n: "Lab.EITA (faixa inclinada, peça inteira)", v: FX.PROTOCOLO_LABEITA },
@@ -857,7 +896,7 @@ function coletarOrtese() {
     if (S3.pendente) return Object.assign({}, S3.pendente, { entradas: lerEntradas(), versoes: S3.versoes });
     return S3.versoes.length ? { scan: null, alinhamento: null, planoZ: null, entradas: lerEntradas(), edicoes: [], earMan: null, analisado: false, gerada: false, resultado: null, versoes: S3.versoes } : null;
   }
-  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento }, retrato(), { versoes: S3.versoes });
+  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked }, retrato(), { versoes: S3.versoes });
 }
 function coletar() {
   if (!S.fichaId) S.fichaId = E.novoIdFicha("c");
@@ -911,9 +950,10 @@ function abrirFicha(f) {
 function aplicarOrtese(o) {
   S3.pendente = null;
   try {
-    if (o.alinhamento && !S3.alinhado) {
+    if (o.correcao != null) $("correcao").checked = !!o.correcao;
+    if (o.alinhamento) {   // os pontos da ficha prevalecem sobre os automáticos
       if (o.scan && o.scan.unidade && S3.unidade && o.scan.unidade !== S3.unidade) status("Atenção: a unidade do STL é diferente da usada na ficha; confira antes de alinhar.", true);
-      limparPontos(); Object.keys(o.alinhamento).forEach((k) => { if (PONTOS[k]) marcarPonto(k, o.alinhamento[k]); }); alinhar();
+      S3.pontosAuto = null; definirPontosBrutos(o.alinhamento); alinhar();
     }
     escreverEntradas(o.entradas);
     if (o.planoZ != null) { if ($("plane-axis").value !== "axial") { $("plane-axis").value = "axial"; ajustarFaixaPlano(); } $("plane-offset").value = o.planoZ; lerPlano(); }
@@ -939,7 +979,7 @@ function restaurarVersao(v) {
   else status("Parâmetros da versão " + esc(v.rotulo) + " restaurados. Faça a análise para reaplicar as correções manuais.");
   atualizarEstado();
 }
-function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); CRO.icTouched = false; escreverEntradas(Object.fromEntries(Object.entries(PADRAO_PAGINA).filter(([k]) => k !== "cro-preset-name"))); $("mData").value = hoje(); preencher(C.EXEMPLO); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
+function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); CRO.icTouched = false; $("correcao").checked = true; escreverEntradas(Object.fromEntries(Object.entries(PADRAO_PAGINA).filter(([k]) => k !== "cro-preset-name"))); $("mData").value = hoje(); preencher(null); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
 async function exportarFicha() { const f = coletar(); if (!f.nome) { status("Dê um nome ou código à ficha antes de exportar.", true); return; } if (await salvar(`${E.nomeArquivo(f.paciente.pId || E.iniciais(f.paciente.pName) || "paciente")}_ficha_CRANIO.json`, new Blob([JSON.stringify(f, null, 1)], { type: "application/json" }))) status("Ficha exportada."); }
 function importarBase(b) {
   const antiga = FX.ehBaseAntiga(b); if (antiga) b = FX.converterBaseAntiga(b);

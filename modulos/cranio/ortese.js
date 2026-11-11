@@ -75,7 +75,8 @@ export function nomeDaRegiao(th, ph) {
 }
 
 /* ---------------- Análise de assimetria por espelhamento ---------------- */
-// opcoes.icLegado: índice cefálico como na página antiga (maior corda entre 65° e 115°); ver indiceCefalico
+// opcoes.icLegado (ou legado): índice cefálico e detecção das orelhas como na página antiga; ver indiceCefalico e
+// detectarOrelhas
 export function analisar(pos, zRef, opcoes) {
   const NT = GRADE.NT, NP = GRADE.NP, N = NT * NP;
   const sum = new Float64Array(N), cnt = new Uint32Array(N);
@@ -151,7 +152,7 @@ export function analisar(pos, zRef, opcoes) {
     }
   }
   an.cheekCoverage = cn ? cc / cn : 0;
-  an.ears = detectarOrelhas(rs);
+  an.ears = detectarOrelhas(rs, !(opcoes && (opcoes.legado || opcoes.icLegado)));
   an.rsNoEar = an.ears.rsNoEar; delete an.ears.rsNoEar;
   const ci = indiceCefalico(rs, an.rsNoEar, !!(opcoes && opcoes.icLegado));
   an.ic = ci.ic; an.width = ci.w; an.length = ci.l;
@@ -163,7 +164,10 @@ export function analisar(pos, zRef, opcoes) {
 
 /* Detecção do pavilhão auricular por lado: abertura morfológica (mín→máx) do raio remove
    saliências estreitas (orelha) e preserva o crânio; o que sobra acima do limiar é a orelha. */
-export function detectarOrelhas(rs) {
+// plausivel (E3c-4): entre os calombos de cada lado, fica o maior que seja plausível como orelha (a página antiga
+// pegava o maior e, se não fosse plausível, dava a orelha como não detectada — p. ex. quando o resto da mão que
+// segurou o bebê forma um calombo maior perto da orelha)
+export function detectarOrelhas(rs, plausivel) {
   const NT = GRADE.NT, NP = GRADE.NP, N = NT * NP;
   const wT = Math.round(20 / GRADE.dT), wP = Math.round(20 / GRADE.dP);
   const tmp = new Float32Array(N), mn = new Float32Array(N), op = new Float32Array(N);
@@ -195,8 +199,7 @@ export function detectarOrelhas(rs) {
         if (b >= thr) { mask[i] = 1; bump[i] = b; }
       }
     }
-    const seen = new Uint8Array(N);
-    let best = null;
+    const seen = new Uint8Array(N), grupos = [];
     for (let i0 = 0; i0 < N; i0++) {
       if (!mask[i0] || seen[i0]) continue;
       const q = [i0]; seen[i0] = 1; const cells = []; let sum = 0;
@@ -209,20 +212,31 @@ export function detectarOrelhas(rs) {
           if (mask[j] && !seen[j]) { seen[j] = 1; q.push(j); }
         });
       }
-      if (!best || sum > best.sum) best = { cells: cells, sum: sum };
+      grupos.push({ cells: cells, sum: sum });
     }
+    const medir = function (g) {
+      let tmin = 1e9, tmax = -1e9, pmin = 1e9, pmax = -1e9, topH = -1e9;
+      g.cells.forEach(function (i) {
+        const ip = (i / NT) | 0, it = i % NT, ph = GRADE.PMIN + ip * GRADE.dP;
+        let th = it * GRADE.dT; if (side === 'L') th = 360 - th;
+        tmin = Math.min(tmin, th); tmax = Math.max(tmax, th);
+        pmin = Math.min(pmin, ph); pmax = Math.max(pmax, ph);
+        topH = Math.max(topH, rs[i] * Math.sin(ph * GRAU));
+      });
+      const az = (tmin + tmax) / 2, w = (tmax - tmin) / 2 + GRADE.dT / 2;
+      const plaus = az >= 60 && az <= 140 && w <= 32 && topH >= -20 && topH <= 35;      // orelha plausível: perto do plano de referência
+      return { ok: plaus, az: az, w: w, top: topH, phiTop: pmax, phiBot: pmin, cells: g.cells.length, doubtful: !plaus };
+    };
+    let best = null;
+    for (const g of grupos) if (!best || g.sum > best.sum) best = g;
     if (!best || best.cells.length < 40) { out[side] = { ok: false }; return; }
-    let tmin = 1e9, tmax = -1e9, pmin = 1e9, pmax = -1e9, topH = -1e9;
-    best.cells.forEach(function (i) {
-      const ip = (i / NT) | 0, it = i % NT, ph = GRADE.PMIN + ip * GRADE.dP;
-      let th = it * GRADE.dT; if (side === 'L') th = 360 - th;
-      tmin = Math.min(tmin, th); tmax = Math.max(tmax, th);
-      pmin = Math.min(pmin, ph); pmax = Math.max(pmax, ph);
-      topH = Math.max(topH, rs[i] * Math.sin(ph * GRAU));
-    });
-    const az = (tmin + tmax) / 2, w = (tmax - tmin) / 2 + GRADE.dT / 2;
-    const plaus = az >= 60 && az <= 140 && w <= 32 && topH >= -20 && topH <= 35;      // orelha plausível: perto do plano de referência
-    out[side] = { ok: plaus, az: az, w: w, top: topH, phiTop: pmax, phiBot: pmin, cells: best.cells.length, doubtful: !plaus };
+    let r = medir(best);
+    if (!r.ok && plausivel) {
+      let alt = null;
+      for (const g of grupos) { if (g.cells.length < 40 || g === best) continue; const m = medir(g); if (m.ok && (!alt || g.sum > alt.sum)) alt = { sum: g.sum, m: m }; }
+      if (alt) r = alt.m;
+    }
+    out[side] = r;
   });
   return out;
 }
@@ -455,8 +469,13 @@ export function resolverOrelhas(an, P) {
 
 // altura (mm, relativa ao plano de referência) da borda inferior em cada azimute
 export function funcaoDaBorda(P, ears, noLegs) {
+  // frontArc (E3c-4): a borda fica na altura da frente (hf) até ±frontArc graus e só então desce para a de trás,
+  // para não passar sobre os olhos; sem ele, a transição em cosseno da página antiga
+  const fa = P.frontArc > 0 ? Math.min(P.frontArc, 170) : 0;
   return function (th) {
-    let h = P.hb + (P.hf - P.hb) * (1 + Math.cos(th * GRAU)) / 2;
+    let h;
+    if (fa) { const d = diferencaAzimute(th, 0), t = d <= fa ? 1 : (1 + Math.cos(Math.PI * (d - fa) / (180 - fa))) / 2; h = P.hb + (P.hf - P.hb) * t; }
+    else h = P.hb + (P.hf - P.hb) * (1 + Math.cos(th * GRAU)) / 2;
     if (P.occDrop > 0) {                                                                       // descida extra da borda no occipício
       const dd = diferencaAzimute(th, 180), ow = P.occWidth || 50;
       if (dd < ow) h -= P.occDrop * degrauSuave((ow - dd) / ((P.occSoft == null ? 0.6 : P.occSoft) * ow));

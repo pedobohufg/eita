@@ -27,6 +27,8 @@ async def main():
             pg.on("pageerror", lambda e: erros.append(str(e)))
             pg.on("console", lambda m: m.type == "error" and "404" not in m.text and erros.append(m.text))
             await pg.goto("http://localhost:8770/index.html")
+            ok(await pg.input_value("#dA") == "" and await pg.text_content("#p-ci") == "Sem dados", "a página abre sem medidas (sem o exemplo)")
+            await pg.click("#exemplo")
             ok(await pg.text_content("#resumo") == "Diagonal A 148,0 mm | Diagonal B 138,0 mm | Comprimento 165,0 mm | Largura 138,0 mm\nCVA: 10,0 mm (moderada)\nCVAI: 6,8 % (moderada)\nÍndice cefálico: 83,6 (braquicefálico)", "resumo do exemplo igual ao da calculadora")
             ok(await pg.text_content("#p-cvai") == "Moderada" and await pg.text_content("#v-ci") == "83,6", "cartões classificados")
             await pg.click("#uni button[data-u=cm]"); ok(await pg.input_value("#dA") == "14,8", "troca para cm"); await pg.click("#uni button[data-u=mm]")
