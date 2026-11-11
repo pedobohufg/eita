@@ -8,10 +8,12 @@
          orelha D marcada à mão, 3 correções manuais (uma removida), resolução alta;
      C — braquicefalia aos 3 meses (alvo pela idade), orelhas manuais, sem furos e sem divisão.
    Uso: python3 testes/navegador/comparar_cranio.py ANTES DEPOIS [--api EXPR]
-        python3 testes/navegador/comparar_cranio.py ANTES             (compara com testes/referencia/cranio-ortese-ui8.json)
+        python3 testes/navegador/comparar_cranio.py PASTA [--api EXPR] (compara com testes/referencia/cranio-ortese-ui8.json)
         python3 testes/navegador/comparar_cranio.py ANTES --referencia (grava a referência)
    ANTES/DEPOIS: pastas com index.html (ex.: legado/cranio-ortese, dist/cranio). --api: expressão JS que dá o
-   objeto com as funções do CROCore na página nova (padrão: window.CROCore).
+   objeto com as funções do CROCore na página nova (padrão: window.CROCore, ou EITA.cranio.ortese se a página não
+   tiver CROCore — desde a E3c-2 o cálculo é modulos/cranio/ortese.js, com nomes em português, traduzidos aqui).
+   Cenários e nomes: testes/apoio/cranio-ortese.json.
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
 import asyncio, base64, gzip, json, os, subprocess, sys, time
 from playwright.async_api import async_playwright
@@ -26,28 +28,13 @@ RELOGIO = """(() => { const T = Date.UTC(2026, 10, 11, 15, 0, 0), D = Date;
 STL = gzip.decompress(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sintetica.stl.gz"), "rb").read())
 CABECA = json.load(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sintetica.json")))
 
-# parâmetros padrão da página (readParams com os valores iniciais dos campos; crescimento manual 0,8 mm/mês)
-P0 = {"type": "closed", "bandTop": 55, "mode": "passive", "relief": 1, "reliefMax": 6, "compMax": 1.5, "c0": 2, "t": 3,
-      "growMonths": 4, "growRate": 0.8, "growContactPct": 30, "growVertex": 2, "hf": 4, "hb": -12,
-      "earMode": "auto", "earClear": 8, "earWR": 24, "earWL": 24, "earTopR": 14, "earTopL": 14, "earAzR": 100, "earAzL": 100,
-      "earManR": False, "earManL": False, "cheek": "on", "cheekWidth": 30, "cheekDepth": 32, "cheekGap": 6, "cheekClear": 1.5,
-      "holeD": 4, "pitch": 10, "margin": 8, "split": "coronal", "splitPos": -35, "gap": 2, "occDrop": 8, "occWidth": 50, "occSoft": 0.6,
-      "mast": "on", "mastWidth": 24, "mastDepth": 24, "mastGap": 4, "legRound": 0.45, "res": "normal"}
-CENARIOS = {
-    "A": {"indicacao": {"mode": "auto"}, "edicoes": [], "P": P0},
-    "B": {"indicacao": {"mode": "both", "age": 6, "icTarget": 0.82},
-          "edicoes": [{"kind": "contact", "th": 300, "ph": 20, "radiusMm": 25, "mm": 3}, {"kind": "relief", "th": 150, "ph": 40, "radiusMm": 30, "mm": 2},
-                      {"pico": 0}, {"remover": 2}, {"kind": "relief", "th": 215, "ph": 30, "radiusMm": 20, "mm": 1.5}],
-          "P": {**P0, "type": "band", "mode": "active", "relief": 0.8, "reliefMax": 5, "compMax": 1.2, "growRate": 0.55, "growVertex": 3,
-                "earManR": True, "earAzR": 98, "earTopR": 12, "cheek": "off", "mast": "off", "holeD": 5, "pitch": 11,
-                "split": "sagittal", "splitPos": 0, "gap": 2.5, "occDrop": 0, "res": "high"}},
-    "C": {"indicacao": {"mode": "brachy", "age": 3}, "edicoes": [],
-          "P": {**P0, "earMode": "manual", "earWR": 20, "earWL": 26, "earTopL": 10, "cheekWidth": 26, "hb": -8, "hf": 6,
-                "holeD": 0, "split": "none", "growMonths": 6, "growContactPct": 50}},
-}
+# cenários (A, B, C) e nomes antigos → novos: testes/apoio/cranio-ortese.json, os mesmos do teste no Node
+CONFIG = json.load(open(os.path.join(RAIZ, "testes", "apoio", "cranio-ortese.json"), encoding="utf-8"))
+CENARIOS, NOMES = CONFIG["cenarios"], CONFIG["nomes"]
 
-COLETAR = """async ({ stl, zRef, cenarios, api }) => {
-  const C = eval(api); if (!C) return { erro: 'objeto CROCore não encontrado: ' + api };
+COLETAR = """async ({ stl, zRef, cenarios, api, nomes }) => {
+  let C = eval(api); if (!C) return { erro: 'objeto CROCore não encontrado: ' + api };
+  if (!C.analyze && C.analisar) { const O = C; C = {}; for (const [antigo, novo] of Object.entries(nomes)) C[antigo] = O[novo]; }   // modulos/cranio/ortese.js
   const hex = async (x) => { const u = x instanceof ArrayBuffer ? new Uint8Array(x) : new Uint8Array(x.buffer, x.byteOffset, x.byteLength);
     return 'sha256:' + [...new Uint8Array(await crypto.subtle.digest('SHA-256', u))].map(b => b.toString(16).padStart(2, '0')).join('') + ' (' + u.length + ' B)'; };
   // STL binário → posições soltas (9 floats por triângulo), como o STLLoader
@@ -86,6 +73,8 @@ COLETAR = """async ({ stl, zRef, cenarios, api }) => {
   }
   return o; }"""
 
+PADRAO = "window.CROCore || (window.EITA && EITA.cranio && EITA.cranio.ortese)"
+
 async def saidas(pasta, porta, b, api):
     srv = subprocess.Popen([sys.executable, "-m", "http.server", str(porta)], cwd=pasta, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1); erros = []
@@ -98,7 +87,7 @@ async def saidas(pasta, porta, b, api):
         pg.on("console", lambda m: m.type == "error" and "net::ERR_FAILED" not in m.text and erros.append(m.text))
         await pg.goto(f"http://localhost:{porta}/index.html"); await pg.evaluate("localStorage.clear()"); await pg.reload()
         await pg.wait_for_load_state("load")
-        r = await pg.evaluate(COLETAR, {"stl": base64.b64encode(STL).decode(), "zRef": CABECA["zRef"], "cenarios": CENARIOS, "api": api})
+        r = await pg.evaluate(COLETAR, {"stl": base64.b64encode(STL).decode(), "zRef": CABECA["zRef"], "cenarios": CENARIOS, "api": api, "nomes": NOMES})
         await pg.close()
     finally:
         srv.terminate()
@@ -109,11 +98,11 @@ def mostrar(A):
 
 async def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    api = sys.argv[sys.argv.index("--api") + 1] if "--api" in sys.argv else "window.CROCore"
+    api = sys.argv[sys.argv.index("--api") + 1] if "--api" in sys.argv else PADRAO
     if "--api" in sys.argv: args.remove(api)
     async with async_playwright() as p:
         b = await p.chromium.launch(executable_path=CHROME)
-        A, eA = await saidas(args[0], 8793, b, "window.CROCore")
+        A, eA = await saidas(args[0], 8793, b, PADRAO if len(args) > 1 else api)
         B, eB = (await saidas(args[1], 8794, b, api)) if len(args) > 1 else (None, [])
         await b.close()
     if "--referencia" in sys.argv:
