@@ -30,7 +30,7 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 
 ## Passos sugeridos (cada um termina com `comparar_afo.py` idêntico + `npm test`)
 1. ✔ **E4a — fonte legível** (10/11/2026; detalhes em "Feito na E4a", abaixo): separar a página em `modulos/afo/index.html` + `modulos/afo/ui.js` (o script como está), com a ponte (`ids` comuns já existem: `top`, `status`, `busy`, `s0`, `fList` com `data-open`, `pName`…); montar `dist/afo/`; comparar. Ler o código inteiro nesta etapa (também é a condição para publicar).
-2. **E4b — núcleo de malha e saída:** STL (leitura/escrita), solda, componentes, normais, zip e downloads do núcleo.
+2. ✔ **E4b — núcleo de malha e saída** (10/11/2026; detalhes em "Feito na E4b", abaixo): STL (leitura/escrita), solda, componentes, normais, zip e downloads do núcleo.
 3. **E4c — cálculo puro:** anatomia/correção e casca em módulos puros testáveis no Node (teste de regressão no Node como no MAMILO e no OLHO: STL da casca idêntico ao do navegador, se não houver canvas no caminho).
 4. **E4d — interface:** ficha, PDF e visualizador sobre o núcleo; tour para `nucleo/interface/`.
 5. **E4e — plataforma:** AFO entra em `PLATAFORMA.modulos` (deixa de ser legado); republicar a Plataforma EITA.
@@ -51,6 +51,13 @@ Migrar o EITA! AFO v0.14 (`legado/afo/index.html`, arquivo único de 238 KB; ~19
 - **Ids da ponte:** a página do AFO não tem `pAlerg` (a ponte ignora ids ausentes); os demais existem.
 - **Temporizadores:** três `setInterval` de interface (pré-visualização da gravação 1,5 s, checagem de segurança 2 s, par de fichas 1,5 s) e o do estado das etapas (300 ms). Ao portar, trocar por atualização por evento onde for simples.
 - **Texto:** o tour fala em "STL ou OBJ", mas a página só aceita STL.
+
+## Feito na E4b (10/11/2026)
+- **Núcleo, `nucleo/malha.js`** (novas, com a mesma aritmética do legado): `lerSTL` (binário ou ASCII → sopa de triângulos), `soldar` (→ `{ V, F }`), `filtrarComponentes` (→ `{ V, F, componentes, mantidos }`), `contarArestasDeBorda`, `separarVincos` (→ `{ V, F, mapa }`) e `normaisDeVertices` (autocontida: o Worker da casca a recebe como texto). A escrita do STL do AFO passou a ser o `stl()` que já existia no núcleo, por um adaptador `stlAFO` no `ui.js` (transformação de ponto `[x, y, z]` e cabeçalho cortado em 79 caracteres, como na v0.14).
+- **Núcleo, saída:** `embalarParaDownload(nome, dados, tipo)` em `nucleo/saida.js` (regra do AFO: o que não for json/txt/csv/zip/md/html/svg/png/pdf vai dentro de um .zip com o mesmo nome) e, em `nucleo/interface/casca.js`, `capacidadeDownloads()`, `salvarPelaCapacidade()` e `baixarPorLink()`, que o `criarCasca().salvar` passou a usar (mesmas mensagens para MAMILO, OLHO e CRÂNIO).
+- **AFO:** saíram do `ui.js` `parseSTL`, `weld`, `componentsFilter`, `boundaryEdges`, `splitCrease`, `computeNormals`, `toBinarySTL`, `getDownloads`, `CRC_T`, `crc32`, `makeZip` e `SAVE_OK`; `saveFile` ficou como uma camada fina sobre o núcleo (mesmos nomes de arquivo e mesmas mensagens em `#expnote`). O Worker da casca recebe `normaisDeVertices` no lugar de `computeNormals`.
+- **Mudança intencional (só no recipiente):** o .zip entregue pela capacidade `downloads` agora é o do núcleo — comprimido (deflate) e com data fixa — em vez de "store" com a data do momento. O STL dentro dele é o mesmo, byte a byte.
+- **Conferências:** `comparar_afo.py legado/afo dist/afo` → saídas idênticas (A e B); novo `testes/navegador/caminhos_afo.py legado/afo dist/afo` (Worker criado e sem erro; downloads com a capacidade simulada — nomes e conteúdo descompactado —, download recusado, download por link, comparação com a AFO real e AFO de referência) → mesmos caminhos; novo `testes/malha-stl.test.mjs` compara no Node, bit a bit, as funções do núcleo com as do `legado/afo/index.html` na perna sintética (e um cubo para os vincos); `npm test` (43), `teste_mamilo.py`, `teste_olho.py`, `teste_cranio.py` e `teste_plataforma.py` passam.
 
 ## Cuidados
 - A casca roda num Worker criado a partir do texto das funções (`makeWorker`). Ao modularizar, o Worker precisa receber o mesmo código (gerar o script do Worker a partir do bundle do módulo, ou um arquivo `casca-worker.js` montado junto).

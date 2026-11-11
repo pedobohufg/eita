@@ -7,30 +7,49 @@ export const espera = (ms = 20) => new Promise((r) => setTimeout(r, ms));
 // número com vírgula decimal ("—" se vazio)
 export const formatar = (v, d = 1) => (v == null || isNaN(v) ? "—" : Number(v).toFixed(d).replace(".", ","));
 
+// Capacidade "downloads" do claude.ai (null fora dele). Pedida uma vez; se falhar, é pedida de novo na próxima chamada.
+let pedidoDownloads = null;
+export function capacidadeDownloads() {
+  if (!pedidoDownloads) {
+    let w = null; try { w = globalThis.window; } catch (e) {}
+    if (!(w && w.claude && w.claude.use)) return Promise.resolve(null);
+    pedidoDownloads = w.claude.use("downloads").catch(() => null).then((ns) => { if (!ns) pedidoDownloads = null; return ns; });
+  }
+  return pedidoDownloads;
+}
+// Entrega pela capacidade. → { ok: true } ou { ok: false, codigo: "declined" | "rate_limited" | …, erro }
+export async function salvarPelaCapacidade(dl, nome, dados) {
+  try { await dl.save({ filename: nome, data: dados }); return { ok: true }; }
+  catch (e) { return { ok: false, codigo: e && e.code, erro: e }; }
+}
+// Download comum por link (fora do claude.ai). → true se o clique foi disparado.
+export function baixarPorLink(nome, dados, documento = globalThis.document) {
+  try {
+    const blob = dados instanceof Blob ? dados : new Blob([dados]);
+    const url = URL.createObjectURL(blob), a = documento.createElement("a");
+    a.href = url; a.download = nome; documento.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    return true;
+  } catch (e) { return false; }
+}
+
 // Linha de status, aviso de ocupado e entrega de arquivos (capacidade "downloads" do claude.ai, ou link comum).
 export function criarCasca({ ids = {}, documento = globalThis.document } = {}) {
   const I = Object.assign({ status: "status", ocupado: "busy", ocupadoTexto: "busyT" }, ids);
   const $ = (id) => documento.getElementById(id);
   function status(msg, aviso) { const s = $(I.status); s.innerHTML = msg; s.classList.toggle("warn", !!aviso); }
   function ocupado(on, txt) { $(I.ocupado).style.display = on ? "grid" : "none"; if (txt) $(I.ocupadoTexto).textContent = txt; }
-  let dl = null;
-  try { const w = globalThis.window; if (w && w.claude && w.claude.use) w.claude.use("downloads").then((ns) => { dl = ns; }).catch(() => {}); } catch (e) {}
+  capacidadeDownloads();
   async function salvar(nome, dados) {
-    if (!dl) { try { const w = globalThis.window; if (w && w.claude && w.claude.use) dl = await w.claude.use("downloads"); } catch (e) {} }
+    const dl = await capacidadeDownloads();
     if (dl) {
-      try { await dl.save({ filename: nome, data: dados }); status(`Arquivo entregue: <b>${nome}</b>`); return true; }
-      catch (e) {
-        if (e && e.code === "declined") { status("Download cancelado."); return false; }
-        if (e && e.code === "rate_limited") { status("Já há uma confirmação de download aberta. Responda a ela e tente de novo.", true); return false; }
-      }
+      const r = await salvarPelaCapacidade(dl, nome, dados);
+      if (r.ok) { status(`Arquivo entregue: <b>${nome}</b>`); return true; }
+      if (r.codigo === "declined") { status("Download cancelado."); return false; }
+      if (r.codigo === "rate_limited") { status("Já há uma confirmação de download aberta. Responda a ela e tente de novo.", true); return false; }
     }
-    try {
-      const blob = dados instanceof Blob ? dados : new Blob([dados]);
-      const url = URL.createObjectURL(blob), a = documento.createElement("a");
-      a.href = url; a.download = nome; documento.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      status(`Download iniciado: <b>${nome}</b>`); return true;
-    } catch (e) { status("Este visualizador bloqueou o download. Abra a página no claude.ai.", true); return false; }
+    if (baixarPorLink(nome, dados, documento)) { status(`Download iniciado: <b>${nome}</b>`); return true; }
+    status("Este visualizador bloqueou o download. Abra a página no claude.ai.", true); return false;
   }
   return { $, status, ocupado, salvar };
 }

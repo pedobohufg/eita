@@ -176,3 +176,128 @@ export function stlTriangulos(partes, cabecalho = "Lab.EITA/UFG") {
   }
   return new Uint8Array(buf);
 }
+
+// ------------------------------------------------------------------ malhas indexadas lidas de arquivo (EITA! AFO)
+// { V: coordenadas (3 por vértice), F: Uint32Array (3 índices por triângulo) }, a mesma forma usada por stl() e volume().
+
+// Lê STL binário ou ASCII → sopa de triângulos (Float32Array, 9 números por triângulo).
+// Binário só quando o tamanho bate exatamente com o número de triângulos do cabeçalho.
+export function lerSTL(buf) {
+  const dv = new DataView(buf);
+  if (buf.byteLength >= 84) {
+    const nt = dv.getUint32(80, true);
+    if (84 + nt * 50 === buf.byteLength) {
+      const out = new Float32Array(nt * 9);
+      for (let t = 0; t < nt; t++) { const o = 84 + t * 50 + 12; for (let k = 0; k < 9; k++) out[t * 9 + k] = dv.getFloat32(o + k * 4, true); }
+      return out;
+    }
+  }
+  const texto = new TextDecoder().decode(buf), re = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g, v = [];
+  let m;
+  while ((m = re.exec(texto))) v.push(+m[1], +m[2], +m[3]);
+  if (v.length < 9 || v.length % 9) throw new Error("Arquivo STL não reconhecido");
+  return new Float32Array(v);
+}
+
+// Solda os vértices de uma sopa de triângulos numa grade de passo tol (mm) e descarta triângulos degenerados.
+// → { V: Float64Array, F: Uint32Array }. A ordem dos vértices é a da primeira ocorrência.
+export function soldar(sopa, tol = 1e-4) {
+  const mapa = new Map(), V = [], nt = sopa.length / 9, idx = new Uint32Array(nt * 3);
+  for (let i = 0; i < nt * 3; i++) {
+    const x = sopa[i * 3], y = sopa[i * 3 + 1], z = sopa[i * 3 + 2];
+    const chave = Math.round(x / tol) + "_" + Math.round(y / tol) + "_" + Math.round(z / tol);
+    let k = mapa.get(chave);
+    if (k === undefined) { k = V.length / 3; mapa.set(chave, k); V.push(x, y, z); }
+    idx[i] = k;
+  }
+  const F = [];
+  for (let t = 0; t < nt; t++) { const a = idx[t * 3], b = idx[t * 3 + 1], c = idx[t * 3 + 2]; if (a !== b && b !== c && a !== c) F.push(a, b, c); }
+  return { V: new Float64Array(V), F: new Uint32Array(F) };
+}
+
+// Partes conectadas (união-busca pelos triângulos): mantém as que têm pelo menos fracao × (triângulos da maior)
+// e reindexa os vértices na ordem de uso. → { V: Float64Array, F, componentes, mantidos }
+export function filtrarComponentes(V, F, fracao) {
+  const nv = V.length / 3, pai = new Int32Array(nv);
+  for (let i = 0; i < nv; i++) pai[i] = i;
+  const raiz = (i) => { while (pai[i] !== i) { pai[i] = pai[pai[i]]; i = pai[i]; } return i; };
+  const unir = (a, b) => { a = raiz(a); b = raiz(b); if (a !== b) pai[a] = b; };
+  for (let t = 0; t < F.length; t += 3) { unir(F[t], F[t + 1]); unir(F[t + 1], F[t + 2]); }
+  const tam = new Map();
+  for (let t = 0; t < F.length; t += 3) { const r = raiz(F[t]); tam.set(r, (tam.get(r) || 0) + 1); }
+  const maior = Math.max(...tam.values()), ficam = new Set([...tam].filter(([, n]) => n >= fracao * maior).map(([r]) => r));
+  const Fsel = [];
+  for (let t = 0; t < F.length; t += 3) if (ficam.has(raiz(F[t]))) Fsel.push(F[t], F[t + 1], F[t + 2]);
+  const novo = new Int32Array(nv).fill(-1), V2 = [], F2 = new Uint32Array(Fsel.length);
+  for (let i = 0; i < Fsel.length; i++) {
+    const v = Fsel[i];
+    if (novo[v] < 0) { novo[v] = V2.length / 3; V2.push(V[v * 3], V[v * 3 + 1], V[v * 3 + 2]); }
+    F2[i] = novo[v];
+  }
+  return { V: new Float64Array(V2), F: F2, componentes: tam.size, mantidos: ficam.size };
+}
+
+// Número de arestas que pertencem a um só triângulo (0 = superfície fechada).
+export function contarArestasDeBorda(F) {
+  const conta = new Map();
+  for (let t = 0; t < F.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = F[t + k], b = F[t + (k + 1) % 3], c = a < b ? a * 4294967296 + b : b * 4294967296 + a;
+    conta.set(c, (conta.get(c) || 0) + 1);
+  }
+  let n = 0;
+  for (const c of conta.values()) if (c === 1) n++;
+  return n;
+}
+
+// Duplica os vértices em quinas mais vivas que "angulo" (graus), para o sombreamento suave não borrar as quinas.
+// → { V, F, mapa } — mapa[i] = vértice original do i-ésimo vértice acrescentado (null se nada mudou; aí V é o próprio).
+export function separarVincos(V, F, angulo) {
+  const nv = V.length / 3, nt = F.length / 3, lim = Math.cos((angulo / 180) * Math.PI), N = new Float32Array(nt * 3);
+  for (let t = 0; t < nt; t++) {
+    const a = F[t * 3] * 3, b = F[t * 3 + 1] * 3, c = F[t * 3 + 2] * 3;
+    const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2], vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
+    let x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+    const l = Math.hypot(x, y, z) || 1;
+    N[t * 3] = x / l; N[t * 3 + 1] = y / l; N[t * 3 + 2] = z / l;
+  }
+  // cantos de cada vértice (CSR)
+  const ini = new Uint32Array(nv + 1);
+  for (let i = 0; i < F.length; i++) ini[F[i] + 1]++;
+  for (let i = 0; i < nv; i++) ini[i + 1] += ini[i];
+  const cantos = new Uint32Array(F.length), pos = ini.slice(0, nv);
+  for (let i = 0; i < F.length; i++) cantos[pos[F[i]]++] = i;
+  const F2 = Uint32Array.from(F), extra = [], mapa = [];
+  let prox = nv;
+  for (let v = 0; v < nv; v++) {
+    const grupos = [];
+    for (let j = ini[v]; j < ini[v + 1]; j++) {
+      const canto = cantos[j], t = (canto / 3) | 0;
+      let g = -1;
+      for (let q = 0; q < grupos.length; q++) { const n = grupos[q].n; if (n[0] * N[t * 3] + n[1] * N[t * 3 + 1] + n[2] * N[t * 3 + 2] > lim) { g = q; break; } }
+      if (g < 0) {
+        grupos.push({ n: [N[t * 3], N[t * 3 + 1], N[t * 3 + 2]], id: grupos.length ? prox++ : v });
+        if (grupos.length > 1) { extra.push(V[v * 3], V[v * 3 + 1], V[v * 3 + 2]); mapa.push(v); }
+        g = grupos.length - 1;
+      }
+      F2[canto] = grupos[g].id;
+    }
+  }
+  if (!extra.length) return { V, F, mapa: null };
+  const V2 = new Float32Array(V.length + extra.length);
+  V2.set(V); V2.set(extra, V.length);
+  return { V: V2, F: F2, mapa };
+}
+
+// Normais por vértice (soma das normais de face, com peso pela área) → Float32Array, 3 por vértice.
+// Autocontida: o AFO a copia como texto para o Worker da casca.
+export function normaisDeVertices(V, F) {
+  const n = new Float32Array(V.length);
+  for (let t = 0; t < F.length; t += 3) {
+    const a = F[t] * 3, b = F[t + 1] * 3, c = F[t + 2] * 3;
+    const ux = V[b] - V[a], uy = V[b + 1] - V[a + 1], uz = V[b + 2] - V[a + 2], vx = V[c] - V[a], vy = V[c + 1] - V[a + 1], vz = V[c + 2] - V[a + 2];
+    const x = uy * vz - uz * vy, y = uz * vx - ux * vz, z = ux * vy - uy * vx;
+    for (const i of [a, b, c]) { n[i] += x; n[i + 1] += y; n[i + 2] += z; }
+  }
+  for (let i = 0; i < n.length; i += 3) { const l = Math.hypot(n[i], n[i + 1], n[i + 2]) || 1; n[i] /= l; n[i + 1] /= l; n[i + 2] /= l; }
+  return n;
+}

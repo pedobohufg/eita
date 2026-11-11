@@ -35,189 +35,10 @@ const V3 = {
     const o = Math.min(1, Math.max(0, (n - t) / (e - t)));
     return o * o * (3 - 2 * o);
   };
-function parseSTL(t) {
-  const e = new DataView(t);
-  if (t.byteLength >= 84) {
-    const v = e.getUint32(80, !0);
-    if (84 + v * 50 === t.byteLength) {
-      const h = new Float32Array(v * 9);
-      for (let u = 0; u < v; u++) {
-        const x = 84 + u * 50 + 12;
-        for (let T = 0; T < 9; T++) h[u * 9 + T] = e.getFloat32(x + T * 4, !0);
-      }
-      return h;
-    }
-  }
-  const n = new TextDecoder().decode(t),
-    o = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g,
-    l = [];
-  let s;
-  for (; (s = o.exec(n)); ) l.push(+s[1], +s[2], +s[3]);
-  if (l.length < 9 || l.length % 9) throw new Error("Arquivo STL não reconhecido");
-  return new Float32Array(l);
-}
-function weld(t, e = 1e-4) {
-  const n = new Map(),
-    o = [],
-    l = t.length / 9,
-    s = new Uint32Array(l * 3);
-  for (let h = 0; h < l * 3; h++) {
-    const u = t[h * 3],
-      x = t[h * 3 + 1],
-      T = t[h * 3 + 2],
-      b = Math.round(u / e) + "_" + Math.round(x / e) + "_" + Math.round(T / e);
-    let y = n.get(b);
-    (y === void 0 && ((y = o.length / 3), n.set(b, y), o.push(u, x, T)), (s[h] = y));
-  }
-  const v = [];
-  for (let h = 0; h < l; h++) {
-    const u = s[h * 3],
-      x = s[h * 3 + 1],
-      T = s[h * 3 + 2];
-    u !== x && x !== T && u !== T && v.push(u, x, T);
-  }
-  return { V: new Float64Array(o), F: new Uint32Array(v) };
-}
-function componentsFilter(t, e, n) {
-  const o = t.length / 3,
-    l = new Int32Array(o);
-  for (let C = 0; C < o; C++) l[C] = C;
-  const s = (C) => {
-      for (; l[C] !== C; ) ((l[C] = l[l[C]]), (C = l[C]));
-      return C;
-    },
-    v = (C, W) => {
-      ((C = s(C)), (W = s(W)), C !== W && (l[C] = W));
-    };
-  for (let C = 0; C < e.length; C += 3) (v(e[C], e[C + 1]), v(e[C + 1], e[C + 2]));
-  const h = new Map();
-  for (let C = 0; C < e.length; C += 3) {
-    const W = s(e[C]);
-    h.set(W, (h.get(W) || 0) + 1);
-  }
-  const u = Math.max(...h.values()),
-    x = new Set([...h].filter(([, C]) => C >= n * u).map(([C]) => C)),
-    T = [];
-  for (let C = 0; C < e.length; C += 3) x.has(s(e[C])) && T.push(e[C], e[C + 1], e[C + 2]);
-  const b = new Int32Array(o).fill(-1),
-    y = [],
-    L = new Uint32Array(T.length);
-  for (let C = 0; C < T.length; C++) {
-    const W = T[C];
-    (b[W] < 0 && ((b[W] = y.length / 3), y.push(t[W * 3], t[W * 3 + 1], t[W * 3 + 2])), (L[C] = b[W]));
-  }
-  return { V: new Float64Array(y), F: L, comps: h.size, kept: x.size };
-}
-function boundaryEdges(t) {
-  const e = new Map();
-  for (let o = 0; o < t.length; o += 3)
-    for (let l = 0; l < 3; l++) {
-      const s = t[o + l],
-        v = t[o + ((l + 1) % 3)],
-        h = s < v ? s * 4294967296 + v : v * 4294967296 + s;
-      e.set(h, (e.get(h) || 0) + 1);
-    }
-  let n = 0;
-  for (const o of e.values()) o === 1 && n++;
-  return n;
-}
-function splitCrease(t, e, n) {
-  const o = t.length / 3,
-    l = e.length / 3,
-    s = Math.cos((n / 180) * Math.PI),
-    v = new Float32Array(l * 3);
-  for (let W = 0; W < l; W++) {
-    const U = e[W * 3] * 3,
-      j = e[W * 3 + 1] * 3,
-      Q = e[W * 3 + 2] * 3,
-      G = t[j] - t[U],
-      O = t[j + 1] - t[U + 1],
-      B = t[j + 2] - t[U + 2],
-      Z = t[Q] - t[U],
-      rt = t[Q + 1] - t[U + 1],
-      D = t[Q + 2] - t[U + 2];
-    let kt = O * D - B * rt,
-      Bt = B * Z - G * D,
-      wt = G * rt - O * Z;
-    const Kt = Math.hypot(kt, Bt, wt) || 1;
-    ((v[W * 3] = kt / Kt), (v[W * 3 + 1] = Bt / Kt), (v[W * 3 + 2] = wt / Kt));
-  }
-  const h = new Uint32Array(o + 1);
-  for (let W = 0; W < e.length; W++) h[e[W] + 1]++;
-  for (let W = 0; W < o; W++) h[W + 1] += h[W];
-  const u = new Uint32Array(e.length),
-    x = h.slice(0, o);
-  for (let W = 0; W < e.length; W++) u[x[e[W]]++] = W;
-  const T = Uint32Array.from(e),
-    b = [],
-    y = [];
-  let L = o;
-  for (let W = 0; W < o; W++) {
-    const U = [];
-    for (let j = h[W]; j < h[W + 1]; j++) {
-      const Q = u[j],
-        G = (Q / 3) | 0;
-      let O = -1;
-      for (let B = 0; B < U.length; B++) {
-        const Z = U[B].n;
-        if (Z[0] * v[G * 3] + Z[1] * v[G * 3 + 1] + Z[2] * v[G * 3 + 2] > s) {
-          O = B;
-          break;
-        }
-      }
-      (O < 0 &&
-        (U.push({ n: [v[G * 3], v[G * 3 + 1], v[G * 3 + 2]], id: U.length ? L++ : W }),
-        U.length > 1 && (b.push(t[W * 3], t[W * 3 + 1], t[W * 3 + 2]), y.push(W)),
-        (O = U.length - 1)),
-        (T[Q] = U[O].id));
-    }
-  }
-  if (!b.length) return { V: t, F: e, map: null };
-  const C = new Float32Array(t.length + b.length);
-  return (C.set(t), C.set(b, t.length), { V: C, F: T, map: y });
-}
-function computeNormals(t, e) {
-  const n = new Float32Array(t.length);
-  for (let o = 0; o < e.length; o += 3) {
-    const l = e[o] * 3,
-      s = e[o + 1] * 3,
-      v = e[o + 2] * 3,
-      h = t[s] - t[l],
-      u = t[s + 1] - t[l + 1],
-      x = t[s + 2] - t[l + 2],
-      T = t[v] - t[l],
-      b = t[v + 1] - t[l + 1],
-      y = t[v + 2] - t[l + 2],
-      L = u * y - x * b,
-      C = x * T - h * y,
-      W = h * b - u * T;
-    for (const U of [l, s, v]) ((n[U] += L), (n[U + 1] += C), (n[U + 2] += W));
-  }
-  for (let o = 0; o < n.length; o += 3) {
-    const l = Math.hypot(n[o], n[o + 1], n[o + 2]) || 1;
-    ((n[o] /= l), (n[o + 1] /= l), (n[o + 2] /= l));
-  }
-  return n;
-}
-function toBinarySTL(t, e, n, o) {
-  const l = e.length / 3,
-    s = new ArrayBuffer(84 + l * 50),
-    v = new DataView(s),
-    h = (o || "EITA AFO").slice(0, 79);
-  for (let x = 0; x < h.length; x++) v.setUint8(x, h.charCodeAt(x) & 127);
-  v.setUint32(80, l, !0);
-  const u = (x) => n([t[x * 3], t[x * 3 + 1], t[x * 3 + 2]]);
-  for (let x = 0; x < l; x++) {
-    const T = u(e[x * 3]),
-      b = u(e[x * 3 + 1]),
-      y = u(e[x * 3 + 2]),
-      L = V3.norm(V3.cross(V3.sub(b, T), V3.sub(y, T)));
-    let C = 84 + x * 50;
-    for (const W of [L, T, b, y]) for (let U = 0; U < 3; U++) (v.setFloat32(C, W[U], !0), (C += 4));
-    v.setUint16(C, 0, !0);
-  }
-  return s;
-}
+// Malha e STL pelo núcleo (nucleo/malha.js; E4b). O STL do AFO usa transformações de ponto [x, y, z] e
+// cabeçalho de até 79 caracteres, como na v0.14.
+const { lerSTL, soldar, filtrarComponentes, contarArestasDeBorda, separarVincos, normaisDeVertices } = EITA;
+const stlAFO = (V, F, xf, cab) => EITA.stl({ V, F }, (x, y, z) => xf([x, y, z]), (cab || "EITA AFO").slice(0, 79));
 const LM = [
     { id: "ML", nm: "Maléolo lateral", hint: "ponto mais saliente do maléolo lateral", col: "#e2483d" },
     { id: "MM", nm: "Maléolo medial", hint: "ponto mais saliente do maléolo medial", col: "#2f6fdb" },
@@ -360,7 +181,7 @@ function uploadGhost() {
   (gl.bindBuffer(gl.ARRAY_BUFFER, buf.gpos),
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(S.V0), gl.STATIC_DRAW),
     gl.bindBuffer(gl.ARRAY_BUFFER, buf.gnor),
-    gl.bufferData(gl.ARRAY_BUFFER, computeNormals(S.V0, S.F), gl.STATIC_DRAW),
+    gl.bufferData(gl.ARRAY_BUFFER, normaisDeVertices(S.V0, S.F), gl.STATIC_DRAW),
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf.idx),
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, S.F, gl.STATIC_DRAW),
     (nIdx = S.F.length));
@@ -1140,7 +961,7 @@ function generateShell(t, e, n, o) {
     v = performance.now();
   let h = null;
   if (o.dbg) {
-    const a = computeNormals(t, e),
+    const a = normaisDeVertices(t, e),
       r = 4,
       d = new Map(),
       m = (i, p, f) => (i * 73856093) ^ (p * 19349663) ^ (f * 83492791);
@@ -4612,12 +4433,12 @@ function update() {
 async function loadBuffer(t, e) {
   (($("busy").style.display = "grid"), await new Promise((n) => setTimeout(n, 30)));
   try {
-    const n = parseSTL(t);
-    let { V: o, F: l } = weld(n);
+    const n = lerSTL(t);
+    let { V: o, F: l } = soldar(n);
     const s = n.length / 9;
-    let v = { comps: 1, kept: 1 };
+    let v = { componentes: 1, mantidos: 1 };
     if ($("frag").checked) {
-      const y = componentsFilter(o, l, 0.02);
+      const y = filtrarComponentes(o, l, 0.02);
       ((o = y.V), (l = y.F), (v = y));
     }
     let h = [1e9, 1e9, 1e9],
@@ -4644,17 +4465,17 @@ async function loadBuffer(t, e) {
       !ext32 && o.length / 3 > 65535)
     )
       throw new Error("Malha grande demais para este navegador");
-    ((S.N = computeNormals(S.V, S.F)),
+    ((S.N = normaisDeVertices(S.V, S.F)),
       uploadGhost(),
       uploadMesh(),
       (cam.basis = pcaBasis(o)),
       (cam.yaw = 0.6),
       (cam.pitch = 0.1));
-    const T = boundaryEdges(l),
+    const T = contarArestasDeBorda(l),
       b = V3.sub(u, h);
     (($("stats").innerHTML =
       `<b>${e}</b><br>${(l.length / 3).toLocaleString("pt-BR")} triângulos (de ${s.toLocaleString("pt-BR")})<br>
-${v.comps} partes conectadas; ${v.comps - v.kept} fragmentos removidos<br>
+${v.componentes} partes conectadas; ${v.componentes - v.mantidos} fragmentos removidos<br>
 Dimensões: ${b.map((y) => y.toFixed(0)).join(" × ")} mm<br>
 Bordas abertas: ${T.toLocaleString("pt-BR")} arestas ${T > 0 ? '<span class="flag w">superfície aberta</span>' : '<span class="flag o">fechada</span>'}`),
       $("s2").classList.remove("off"),
@@ -4787,7 +4608,7 @@ function applyCorrection(t) {
   ((S.V = u), (S.L = l), (S.corrected = !0), (S.disp = new Float32Array(u.length / 3)));
   for (let b = 0; b < S.disp.length; b++)
     S.disp[b] = Math.hypot(u[b * 3] - S.V0[b * 3], u[b * 3 + 1] - S.V0[b * 3 + 1], u[b * 3 + 2] - S.V0[b * 3 + 2]);
-  ((S.N = computeNormals(S.V, S.F)), uploadMesh(), (S.frame = s), (S.meas = measure(S.L, s)));
+  ((S.N = normaisDeVertices(S.V, S.F)), uploadMesh(), (S.frame = s), (S.meas = measure(S.L, s)));
   const x = S.meas;
   let T = 0;
   for (const b of S.disp) T = Math.max(T, b);
@@ -4810,90 +4631,14 @@ function resetCorrection() {
     for (const t in S.L0) S.L[t] = S.L0[t].slice();
     ((S.corrected = !1),
       (S.disp = null),
-      (S.N = computeNormals(S.V, S.F)),
+      (S.N = normaisDeVertices(S.V, S.F)),
       uploadMesh(),
       ($("corrnote").textContent = ""),
       update(),
       renderLM());
   }
 }
-let downloadsP = null;
-function getDownloads() {
-  return (
-    downloadsP ||
-      (downloadsP =
-        window.claude && window.claude.use ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null)),
-    downloadsP
-  );
-}
-getDownloads();
-const CRC_T = (() => {
-  const t = new Uint32Array(256);
-  for (let e = 0; e < 256; e++) {
-    let n = e;
-    for (let o = 0; o < 8; o++) n = n & 1 ? 3988292384 ^ (n >>> 1) : n >>> 1;
-    t[e] = n >>> 0;
-  }
-  return t;
-})();
-function crc32(t) {
-  let e = 4294967295;
-  for (let n = 0; n < t.length; n++) e = CRC_T[(e ^ t[n]) & 255] ^ (e >>> 8);
-  return (e ^ 4294967295) >>> 0;
-}
-function makeZip(t) {
-  const e = new TextEncoder(),
-    n = [],
-    o = [];
-  let l = 0;
-  const s = new Date(),
-    v = ((s.getHours() << 11) | (s.getMinutes() << 5) | (s.getSeconds() >> 1)) & 65535,
-    h = (((s.getFullYear() - 1980) << 9) | ((s.getMonth() + 1) << 5) | s.getDate()) & 65535;
-  for (const T of t) {
-    const b = e.encode(T.name),
-      y = T.data,
-      L = crc32(y),
-      C = new DataView(new ArrayBuffer(30));
-    (C.setUint32(0, 67324752, !0),
-      C.setUint16(4, 20, !0),
-      C.setUint16(6, 2048, !0),
-      C.setUint16(8, 0, !0),
-      C.setUint16(10, v, !0),
-      C.setUint16(12, h, !0),
-      C.setUint32(14, L, !0),
-      C.setUint32(18, y.length, !0),
-      C.setUint32(22, y.length, !0),
-      C.setUint16(26, b.length, !0),
-      C.setUint16(28, 0, !0),
-      n.push(new Uint8Array(C.buffer), b, y));
-    const W = new DataView(new ArrayBuffer(46));
-    (W.setUint32(0, 33639248, !0),
-      W.setUint16(4, 20, !0),
-      W.setUint16(6, 20, !0),
-      W.setUint16(8, 2048, !0),
-      W.setUint16(10, 0, !0),
-      W.setUint16(12, v, !0),
-      W.setUint16(14, h, !0),
-      W.setUint32(16, L, !0),
-      W.setUint32(20, y.length, !0),
-      W.setUint32(24, y.length, !0),
-      W.setUint16(28, b.length, !0),
-      W.setUint32(42, l, !0),
-      o.push(new Uint8Array(W.buffer), b),
-      (l += 30 + b.length + y.length));
-  }
-  let u = 0;
-  for (const T of o) u += T.length;
-  const x = new DataView(new ArrayBuffer(22));
-  return (
-    x.setUint32(0, 101010256, !0),
-    x.setUint16(8, t.length, !0),
-    x.setUint16(10, t.length, !0),
-    x.setUint32(12, u, !0),
-    x.setUint32(16, l, !0),
-    new Blob([...n, ...o, new Uint8Array(x.buffer)], { type: "application/zip" })
-  );
-}
+EITA.ui.capacidadeDownloads();
 function anatXf() {
   const t = S.frame,
     e = V3.cross(t.Y, t.Z);
@@ -4902,52 +4647,32 @@ function anatXf() {
     return [V3.dot(o, e), V3.dot(o, t.Y), V3.dot(o, t.Z)];
   };
 }
-const SAVE_OK = /\.(json|txt|csv|zip|md|html|svg|png|pdf)$/i;
+// Entrega pela capacidade "downloads" do claude.ai (STL e outros vão dentro de .zip; nucleo/saida.js) ou por link.
+// → nome do arquivo entregue, ou false (o motivo vai para #expnote).
 async function saveFile(t, e, n) {
-  let o = t,
-    l;
-  const s = await getDownloads();
-  if (s && !SAVE_OK.test(t)) {
-    const v =
-      typeof e == "string" ? new TextEncoder().encode(e) : new Uint8Array(e instanceof ArrayBuffer ? e : e.buffer);
-    ((l = makeZip([{ name: t, data: v }])), (o = t.replace(/\.[^.]+$/, "") + ".zip"));
-  } else l = new Blob([e], { type: n || "application/octet-stream" });
-  if (s)
-    try {
-      return (await s.save({ filename: o, data: l }), o);
-    } catch (v) {
-      const h = v && v.code;
-      return (
-        ($("expnote").textContent =
-          h === "declined"
-            ? "Download cancelado."
-            : h === "rate_limited"
-              ? "Já há um pedido de download aberto — confirme ou aguarde e tente de novo."
-              : "Não foi possível salvar o arquivo (" + (h || (v && v.message) || "erro") + ")."),
-        !1
-      );
-    }
-  try {
-    const v = URL.createObjectURL(l),
-      h = document.createElement("a");
-    return (
-      (h.href = v),
-      (h.download = o),
-      document.body.appendChild(h),
-      h.click(),
-      h.remove(),
-      setTimeout(() => URL.revokeObjectURL(v), 4e3),
-      o
-    );
-  } catch {
-    return (($("expnote").textContent = "O download não está disponível nesta visualização."), !1);
+  const dl = await EITA.ui.capacidadeDownloads();
+  if (!dl) {
+    if (EITA.ui.baixarPorLink(t, new Blob([e], { type: n || "application/octet-stream" }))) return t;
+    $("expnote").textContent = "O download não está disponível nesta visualização.";
+    return !1;
   }
+  const { nome, dados } = await EITA.embalarParaDownload(t, e, n),
+    r = await EITA.ui.salvarPelaCapacidade(dl, nome, dados);
+  if (r.ok) return nome;
+  const h = r.codigo;
+  $("expnote").textContent =
+    h === "declined"
+      ? "Download cancelado."
+      : h === "rate_limited"
+        ? "Já há um pedido de download aberto — confirme ou aguarde e tente de novo."
+        : "Não foi possível salvar o arquivo (" + (h || (r.erro && r.erro.message) || "erro") + ").";
+  return !1;
 }
 function baseName() {
   return (S.name || "scan").replace(/\.stl$/i, "");
 }
 (($("expStl").onclick = async () => {
-  const t = toBinarySTL(S.V, S.F, anatXf(), "EITA AFO " + baseName()),
+  const t = stlAFO(S.V, S.F, anatXf(), "EITA AFO " + baseName()),
     e = await saveFile(baseName() + (S.corrected ? "_corrigido" : "_alinhado") + ".stl", t, "model/stl");
   e &&
     ($("expnote").textContent =
@@ -5491,22 +5216,22 @@ async function makeShell(t = {}) {
         O = u.shell.V[j + 2];
       for (let B = 0; B < 3; B++) b[j + B] = x.AJC[B] + T[B] * Q + x.Y[B] * G + x.Z[B] * O;
     }
-    const y = splitCrease(b, u.shell.F, 55);
+    const y = separarVincos(b, u.shell.F, 55);
     let L = u.heat;
     if (
-      (y.map &&
+      (y.mapa &&
         ((L = new Float32Array(y.V.length / 3)),
         L.set(u.heat),
-        y.map.forEach((j, Q) => (L[u.heat.length + Q] = u.heat[j]))),
+        y.mapa.forEach((j, Q) => (L[u.heat.length + Q] = u.heat[j]))),
       gl.bindBuffer(gl.ARRAY_BUFFER, buf.apos),
       gl.bufferData(gl.ARRAY_BUFFER, y.V, gl.STATIC_DRAW),
       gl.bindBuffer(gl.ARRAY_BUFFER, buf.anor),
-      gl.bufferData(gl.ARRAY_BUFFER, computeNormals(y.V, y.F), gl.STATIC_DRAW),
+      gl.bufferData(gl.ARRAY_BUFFER, normaisDeVertices(y.V, y.F), gl.STATIC_DRAW),
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf.aidx),
       gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, y.F, gl.STATIC_DRAW),
       gl.bindBuffer(gl.ARRAY_BUFFER, buf.aheat),
       gl.bufferData(gl.ARRAY_BUFFER, L, gl.STATIC_DRAW),
-      (S.shell = { ...u, nIdx: u.shell.F.length, dispMap: y.map }),
+      (S.shell = { ...u, nIdx: u.shell.F.length, dispMap: y.mapa }),
       setTimeout(refInfo, 0),
       setTimeout(showStiff, 0),
       setTimeout(renderSafety, 0),
@@ -6539,7 +6264,7 @@ $("expAfo").onclick = async () => {
   }
   ((expForce = !1), ($("expConfirm").innerHTML = ""));
   const e = $("orient") ? $("orient").value : "anat",
-    n = toBinarySTL(S.shell.shell.V, S.shell.shell.F, printXf(e, S.shell.shell.V), "EITA AFO " + baseName()),
+    n = stlAFO(S.shell.shell.V, S.shell.shell.F, printXf(e, S.shell.shell.V), "EITA AFO " + baseName()),
     o = await saveFile(baseName() + "_AFO.stl", n, "model/stl");
   o && S.shell.check && S.shell.check.n
     ? ($("expnote").innerHTML =
@@ -6811,7 +6536,7 @@ function setRef(t, e, n) {
   (gl.bindBuffer(gl.ARRAY_BUFFER, buf.rpos),
     gl.bufferData(gl.ARRAY_BUFFER, s, gl.STATIC_DRAW),
     gl.bindBuffer(gl.ARRAY_BUFFER, buf.rnor),
-    gl.bufferData(gl.ARRAY_BUFFER, computeNormals(s, t.F), gl.STATIC_DRAW));
+    gl.bufferData(gl.ARRAY_BUFFER, normaisDeVertices(s, t.F), gl.STATIC_DRAW));
   const v = t.F instanceof Uint32Array ? t.F : Uint32Array.from(t.F);
   (gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf.ridx), gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, v, gl.STATIC_DRAW));
   let h = 0;
@@ -6888,8 +6613,8 @@ async function restoreVersion(t) {
 async function loadRefStl(t) {
   try {
     const e = await t.arrayBuffer(),
-      n = parseSTL(e),
-      o = weld(n);
+      n = lerSTL(e),
+      o = soldar(n);
     if (!S.frame) {
       status("Marque os pontos antes de carregar uma AFO de referência.");
       return;
@@ -7076,7 +6801,7 @@ function alignScan(t, e, n = {}) {
     const G = n.F,
       O = G.length / 3,
       B = new Float64Array(t.length + O * 3),
-      Z = computeNormals(t, G);
+      Z = normaisDeVertices(t, G);
     ((s = new Float32Array(B.length)), s.set(Z), B.set(t));
     for (let rt = 0; rt < O; rt++) {
       const D = G[rt * 3] * 3,
@@ -7241,7 +6966,7 @@ function compareReal(t, e, n) {
     ((h[j] = Q[0]), (h[j + 1] = Q[1]), (h[j + 2] = Q[2]));
   }
   const u = nnGrid(h, 3),
-    x = computeNormals(l, o.shell.F),
+    x = normaisDeVertices(l, o.shell.F),
     T = l.length / 3,
     b = new Float32Array(T).fill(-999),
     y = o.grid.NI * o.grid.NJ,
@@ -7388,8 +7113,8 @@ async function loadRealAfo(t) {
       return;
     }
     (status("Alinhando a AFO real ao modelo…"), await new Promise((o) => setTimeout(o, 30)));
-    const e = parseSTL(await t.arrayBuffer()),
-      n = weld(e);
+    const e = lerSTL(await t.arrayBuffer()),
+      n = soldar(e);
     compareReal(n.V, n.F, t.name);
   } catch (e) {
     status("Não foi possível comparar: " + (e.message || e));
@@ -7651,7 +7376,7 @@ function makeWorker() {
         meshCheck,
         engraveText,
         nnGrid,
-        computeNormals,
+        normaisDeVertices,
       ].map((o) => o.toString()).join(`
 `),
       e =
@@ -8108,9 +7833,9 @@ function tourEnd() {
     resetCorrection,
     setView,
     exportData,
-    stl: () => toBinarySTL(S.V, S.F, anatXf(), "t"),
+    stl: () => stlAFO(S.V, S.F, anatXf(), "t"),
     makeShell,
-    afoStl: (t) => toBinarySTL(S.shell.shell.V, S.shell.shell.F, printXf(t || "anat", S.shell.shell.V), "t"),
+    afoStl: (t) => stlAFO(S.shell.shell.V, S.shell.shell.F, printXf(t || "anat", S.shell.shell.V), "t"),
     report: () => buildReport(!0),
   }),
   (() => {
