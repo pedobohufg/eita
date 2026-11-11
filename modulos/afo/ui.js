@@ -1517,172 +1517,13 @@ async function makeShell(t = {}) {
       $("contact").checked && ($("showLimb").checked = !1),
       draw());
   }));
-const CP1252 = {
-  "€": 128,
-  "‚": 130,
-  ƒ: 131,
-  "„": 132,
-  "…": 133,
-  "†": 134,
-  "‡": 135,
-  ˆ: 136,
-  "‰": 137,
-  Š: 138,
-  "‹": 139,
-  Œ: 140,
-  Ž: 142,
-  "‘": 145,
-  "’": 146,
-  "“": 147,
-  "”": 148,
-  "•": 149,
-  "–": 150,
-  "—": 151,
-  "˜": 152,
-  "™": 153,
-  š: 154,
-  "›": 155,
-  œ: 156,
-  ž: 158,
-  Ÿ: 159,
-};
-function pdfEsc(t) {
-  let e = "";
-  for (const n of String(t)) {
-    let o = n.charCodeAt(0);
-    o > 255 && (o = CP1252[n] || 63);
-    const l = String.fromCharCode(o);
-    e += l === "(" || l === ")" || l === "\\" ? "\\" + l : l;
-  }
-  return e;
-}
-function pdfW(t, e) {
-  let n = 0;
-  for (const o of String(t))
-    n += /[ilI.,;:'|!]/.test(o) ? 0.28 : /[mwMW@]/.test(o) ? 0.85 : /[A-Z0-9]/.test(o) ? 0.64 : 0.52;
-  return n * e;
-}
-class PdfPage {
-  constructor() {
-    this.c = "";
-  }
-  rect(e, n, o, l, s) {
-    this.c += `${s.map((v) => v.toFixed(3)).join(" ")} rg ${e} ${n} ${o} ${l} re f
-`;
-  }
-  line(e, n, o, l, s, v = 0.6) {
-    this.c += `${s.map((h) => h.toFixed(3)).join(" ")} RG ${v} w ${e} ${n} m ${o} ${l} l S
-`;
-  }
-  text(e, n, o, l, s, v = [0.11, 0.09, 0.19]) {
-    this.c += `BT /${s ? "F2" : "F1"} ${o} Tf ${v.map((h) => h.toFixed(3)).join(" ")} rg ${e} ${n} Td (${pdfEsc(l)}) Tj ET
-`;
-  }
-  image(e, n, o, l, s) {
-    this.c += `q ${l} 0 0 ${s} ${n} ${o} cm /${e} Do Q
-`;
-  }
-}
-function makePDF(t, e) {
-  const n = (U) => {
-      const j = new Uint8Array(U.length);
-      for (let Q = 0; Q < U.length; Q++) j[Q] = U.charCodeAt(Q) & 255;
-      return j;
-    },
-    o = [],
-    l = [];
-  let s = 0;
-  const v = (U) => {
-    (o.push(U), (s += U.length));
-  };
-  v(
-    n(`%PDF-1.4
-%âãÏÓ
-`),
-  );
-  const h = e.length,
-    u = 5 + h,
-    x = 4 + h + t.length * 2,
-    T = (U, j) => {
-      ((l[U] = s),
-        j instanceof Uint8Array
-          ? v(j)
-          : v(
-              n(`${U} 0 obj
-${j}
-endobj
-`),
-            ));
-    };
-  (T(1, "<< /Type /Catalog /Pages 2 0 R >>"),
-    T(2, `<< /Type /Pages /Kids [${t.map((U, j) => u + j * 2 + " 0 R").join(" ")}] /Count ${t.length} >>`),
-    T(3, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"),
-    T(4, "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"));
-  const b = e.map((U, j) => `/${U.name} ${5 + j} 0 R`).join(" ");
-  (e.forEach((U, j) => {
-    const Q = 5 + j,
-      G = n(`${Q} 0 obj
-<< /Type /XObject /Subtype /Image /Width ${U.w} /Height ${U.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${U.bytes.length} >>
-stream
-`),
-      O = n(`
-endstream
-endobj
-`),
-      B = new Uint8Array(G.length + U.bytes.length + O.length);
-    (B.set(G), B.set(U.bytes, G.length), B.set(O, G.length + U.bytes.length), T(Q, B));
-  }),
-    t.forEach((U, j) => {
-      const Q = u + j * 2,
-        G = n(U.c);
-      T(
-        Q,
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> /XObject << ${b} >> >> /Contents ${Q + 1} 0 R >>`,
-      );
-      const O = n(`${Q + 1} 0 obj
-<< /Length ${G.length} >>
-stream
-`),
-        B = n(`
-endstream
-endobj
-`),
-        Z = new Uint8Array(O.length + G.length + B.length);
-      (Z.set(O), Z.set(G, O.length), Z.set(B, O.length + G.length), T(Q + 1, Z));
-    }));
-  const y = s;
-  let L = `xref
-0 ${x + 1}
-0000000000 65535 f 
-`;
-  for (let U = 1; U <= x; U++)
-    L +=
-      String(l[U]).padStart(10, "0") +
-      ` 00000 n 
-`;
-  v(
-    n(
-      L +
-        `trailer
-<< /Size ${x + 1} /Root 1 0 R >>
-startxref
-${y}
-%%EOF
-`,
-    ),
-  );
-  const C = new Uint8Array(s);
-  let W = 0;
-  for (const U of o) (C.set(U, W), (W += U.length));
-  return C;
-}
-function jpegOf(t, e = 0.88) {
-  const n = t.toDataURL("image/jpeg", e),
-    o = atob(n.split(",")[1]),
-    l = new Uint8Array(o.length);
-  for (let s = 0; s < o.length; s++) l[s] = o.charCodeAt(s);
-  return { bytes: l, w: t.width, h: t.height };
-}
+// PDF pelo núcleo (nucleo/pdf.js e nucleo/interface/imagem-navegador.js; E4d): mesmo gerador da v0.14; o texto
+// passa por textoPDF, que troca → ≥ ≤ ⚠ ≈ por equivalentes ASCII (antes saíam como "?").
+const PdfPage = EITA.PaginaPDF,
+  pdfW = EITA.larguraTexto,
+  makePDF = EITA.montarPDF,
+  jpegOf = EITA.ui.jpegDe,
+  logoJpeg = () => EITA.ui.logoJpeg("assets/eita-afo-simbolo.png");
 function captureViews(t, e = {}) {
   const n = {
       yaw: cam.yaw,
@@ -1880,18 +1721,6 @@ function contactMapImage() {
     }),
     { img: jpegOf(rt, 0.9), st: Bt, side0: nt, side1: ge, aspect: B / Z }
   );
-}
-async function logoJpeg() {
-  try {
-    const t = new Image();
-    ((t.src = "assets/eita-afo-simbolo.png"), await t.decode());
-    const e = document.createElement("canvas");
-    e.width = e.height = 160;
-    const n = e.getContext("2d");
-    return ((n.fillStyle = "#fff"), n.fillRect(0, 0, 160, 160), n.drawImage(t, 0, 0, 160, 160), jpegOf(e, 0.92));
-  } catch {
-    return null;
-  }
 }
 async function buildReport(t) {
   if (!S.shell) return null;
