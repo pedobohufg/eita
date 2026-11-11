@@ -1,0 +1,67 @@
+{
+ "_origem": "ferramentas/cabeca_sintetica.py (sintética, sem dados de paciente)",
+ "referencial": "x = direita do paciente, y = anterior, z = superior; mm; plano glabela–opistocrânio em z = 0",
+ "triangulos": 62976,
+ "zRef": 2.0,
+ "pontos_mm": {
+  "anterior": [
+   0.0,
+   71.7203,
+   2.0
+  ],
+  "posterior": [
+   -2.0,
+   -79.1436,
+   2.0
+  ],
+  "left": [
+   -64.0,
+   -10.0,
+   12.3191
+  ],
+  "right": [
+   64.0,
+   -10.0,
+   12.3191
+  ],
+  "vertex": [
+   0.0,
+   -4.0,
+   78.0
+  ]
+ },
+ "assimetria": {
+  "descricao": "achatamento parieto-occipital direito (plagiocefalia posicional à direita)",
+  "plano": {
+   "azimute": 140,
+   "elevacao": 12,
+   "distancia": 60,
+   "suave": 10
+  },
+  "raio_D_mm": 64.76,
+  "raio_E_espelho_mm": 74.09,
+  "diferenca_mm": 9.33
+ },
+ "calota": {
+  "centro": [
+   0,
+   -4,
+   8
+  ],
+  "raios": [
+   64,
+   76,
+   70
+  ]
+ },
+ "orelhas": {
+  "centro_x": 67,
+  "y": -8,
+  "z": -12,
+  "raios": [
+   7,
+   14,
+   22
+  ]
+ }
+}
