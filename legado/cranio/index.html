@@ -1,0 +1,493 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Calculadora de Assimetria Craniana</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Instrument+Serif&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: medidas e esquema em vista superior à esquerda, resultados classificados à direita; uma coluna no celular. */
+:root {
+  --bg: #F2F5F6;
+  --surface: #FFFFFF;
+  --surface-2: #E8EEF0;
+  --ink: #13232A;
+  --ink-2: #47606A;
+  --line: #D3DCE0;
+  --line-strong: #93A8B1;
+  --accent: #1B5B70;
+  --accent-ink: #FFFFFF;
+  --b: #A35F1F;
+  --s0: #25774F;
+  --s1: #86650A;
+  --s2: #B04E0C;
+  --s3: #B3261E;
+  --s4: #80195C;
+  --font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  --font-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1A1F; --surface: #15262D; --surface-2: #1C3039; --ink: #E6EFF2; --ink-2: #9DB4BD;
+    --line: #274049; --line-strong: #4E6B76; --accent: #7DB8CE; --accent-ink: #0E1A1F; --b: #E3A15F;
+    --s0: #6CD3A0; --s1: #E6C54F; --s2: #F4A15F; --s3: #FF8F86; --s4: #E69BCB;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1A1F; --surface: #15262D; --surface-2: #1C3039; --ink: #E6EFF2; --ink-2: #9DB4BD;
+  --line: #274049; --line-strong: #4E6B76; --accent: #7DB8CE; --accent-ink: #0E1A1F; --b: #E3A15F;
+  --s0: #6CD3A0; --s1: #E6C54F; --s2: #F4A15F; --s3: #FF8F86; --s4: #E69BCB;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+p { margin: 0; }
+
+header { display: grid; gap: 8px; margin-bottom: 24px; max-width: 62ch; }
+.eyebrow { font: 500 0.72rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font: 400 clamp(2rem, 5vw, 2.8rem)/1.08 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; }
+.lead { color: var(--ink-2); max-width: 60ch; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 20px; align-items: start; }
+.col { display: grid; gap: 20px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; min-width: 0; }
+.panel h2 { margin: 0 0 14px; font: 600 0.78rem var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+
+/* Formulário */
+.units { border: 0; padding: 0; margin: 0 0 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.units legend { padding: 0; float: left; margin-right: 12px; font-weight: 500; }
+.seg-ctl { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; }
+.seg-ctl input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-ctl label { padding: 6px 16px; font: 500 0.85rem var(--font-mono); cursor: pointer; color: var(--ink-2); }
+.seg-ctl input:checked + label { background: var(--accent); color: var(--accent-ink); }
+.seg-ctl input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 16px; }
+.field { min-width: 0; display: grid; gap: 6px; align-content: start; }
+.field label { font-weight: 500; }
+.field .sym { font: 400 0.8rem var(--font-mono); color: var(--ink-2); margin-left: 4px; }
+.inp { display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--bg); }
+.inp:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.inp input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); padding: 10px 0 10px 12px; font: 500 1.1rem var(--font-mono); font-variant-numeric: tabular-nums; outline: none; }
+.inp input[aria-invalid="true"] { color: var(--s3); }
+.inp .unit { padding: 0 12px; font: 400 0.85rem var(--font-mono); color: var(--ink-2); }
+.hint { font-size: 0.8rem; color: var(--ink-2); }
+.hint[data-state="err"] { color: var(--s3); }
+.hint[data-state="warn"] { color: var(--s2); }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.btn { border: 1px solid var(--line-strong); background: transparent; color: var(--ink); border-radius: 6px; padding: 8px 14px; font: 500 0.88rem var(--font-body); cursor: pointer; }
+.btn:hover { background: var(--surface-2); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.08); }
+
+/* Esquema */
+.fig-wrap { display: grid; gap: 12px; justify-items: center; }
+#fig { width: 100%; max-width: 300px; height: auto; display: block; }
+.fig-head { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1.5; }
+.fig-ax { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 4; fill: none; }
+.fig-a, .fig-b { stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.fig-a { stroke: var(--accent); }
+.fig-b { stroke: var(--b); }
+.fig-t { font: 500 11px var(--font-mono); paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.fig-t.ta { fill: var(--accent); }
+.fig-t.tb { fill: var(--b); }
+.fig-t.tn { fill: var(--ink-2); font-size: 10px; letter-spacing: 0.1em; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; font-size: 0.82rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 22px; height: 0; border-top: 3px solid var(--accent); border-radius: 2px; }
+.legend i.lb { border-top-color: var(--b); }
+.legend em { font-style: normal; width: 100%; text-align: center; }
+
+/* Resultados */
+.res { display: grid; gap: 16px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; display: grid; gap: 10px; min-width: 0; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.lbl { font: 500 0.72rem var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.ttl { font-size: 0.9rem; color: var(--ink-2); }
+.num { display: flex; align-items: baseline; gap: 8px; font: 400 3rem/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.num small { font: 400 1rem var(--font-mono); color: var(--ink-2); }
+.formula { font: 400 0.78rem var(--font-mono); color: var(--ink-2); }
+
+[data-sev="0"] { --sev: var(--s0); }
+[data-sev="1"] { --sev: var(--s1); }
+[data-sev="2"] { --sev: var(--s2); }
+[data-sev="3"] { --sev: var(--s3); }
+[data-sev="4"] { --sev: var(--s4); }
+[data-sev="none"] { --sev: var(--ink-2); }
+.pill { display: inline-block; padding: 3px 11px; border-radius: 99px; font-size: 0.8rem; font-weight: 600; background: color-mix(in srgb, var(--sev) 15%, var(--surface)); color: var(--sev); border: 1px solid color-mix(in srgb, var(--sev) 40%, transparent); white-space: nowrap; }
+
+.scale { position: relative; margin: 8px 0 0; padding-bottom: 22px; }
+.bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; }
+.seg { background: color-mix(in srgb, var(--sev) 42%, var(--surface)); }
+.seg + .seg { box-shadow: -2px 0 0 var(--surface); }
+.tick { position: absolute; top: 15px; transform: translateX(-50%); font: 400 0.7rem var(--font-mono); color: var(--ink-2); }
+.mk { position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); transform: translateX(-50%); }
+.mk[hidden] { display: none; }
+
+.ratio { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ratio b { font: 500 1.1rem var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* Resumo e critérios */
+.summary { margin: 0 0 12px; padding: 12px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font: 400 0.82rem/1.6 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.status { font-size: 0.82rem; color: var(--ink-2); align-self: center; }
+details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 20px; margin-top: 20px; }
+summary { cursor: pointer; font-weight: 600; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.tbl { overflow-x: auto; margin-top: 14px; }
+table { border-collapse: collapse; width: 100%; min-width: 460px; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.72rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.notes { margin: 14px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 0.88rem; display: grid; gap: 6px; max-width: 70ch; }
+.disclaimer { margin-top: 20px; font-size: 0.82rem; color: var(--ink-2); max-width: 70ch; }
+
+@media (prefers-reduced-motion: no-preference) { .mk { transition: left 0.25s ease; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Antropometria craniana</p>
+    <h1>Calculadora de assimetria craniana</h1>
+    <p class="lead">Informe as duas diagonais, o comprimento e a largura do crânio. O resultado sai na hora, com CVA, CVAI e índice cefálico classificados.</p>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel" aria-labelledby="h-med">
+        <h2 id="h-med">Medidas</h2>
+        <fieldset class="units">
+          <legend>Unidade</legend>
+          <div class="seg-ctl">
+            <input type="radio" name="unit" id="u-mm" value="mm" checked><label for="u-mm">mm</label>
+            <input type="radio" name="unit" id="u-cm" value="cm"><label for="u-cm">cm</label>
+          </div>
+        </fieldset>
+        <div class="fields">
+          <div class="field">
+            <label for="dA">Diagonal A<span class="sym">D1</span></label>
+            <div class="inp"><input id="dA" type="text" inputmode="decimal" autocomplete="off" value="148"><span class="unit" data-unit>mm</span></div>
+            <p class="hint" id="h-dA"></p>
+          </div>
+          <div class="field">
+            <label for="dB">Diagonal B<span class="sym">D2</span></label>
+            <div class="inp"><input id="dB" type="text" inputmode="decimal" autocomplete="off" value="138"><span class="unit" data-unit>mm</span></div>
+            <p class="hint" id="h-dB"></p>
+          </div>
+          <div class="field">
+            <label for="len">Comprimento<span class="sym">AP</span></label>
+            <div class="inp"><input id="len" type="text" inputmode="decimal" autocomplete="off" value="165"><span class="unit" data-unit>mm</span></div>
+            <p class="hint" id="h-len"></p>
+          </div>
+          <div class="field">
+            <label for="wid">Largura<span class="sym">LL</span></label>
+            <div class="inp"><input id="wid" type="text" inputmode="decimal" autocomplete="off" value="138"><span class="unit" data-unit>mm</span></div>
+            <p class="hint" id="h-wid"></p>
+          </div>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn" id="btn-example">Carregar exemplo</button>
+          <button type="button" class="btn" id="btn-clear">Limpar</button>
+        </div>
+        <p class="hint" style="margin-top:12px">Os valores iniciais são um exemplo. Substitua pelas medidas do paciente.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="h-fig">
+        <h2 id="h-fig">Esquema em vista superior</h2>
+        <div class="fig-wrap">
+          <svg id="fig" viewBox="0 0 260 300" role="img" aria-label="Esquema do crânio em vista superior com as diagonais A e B"></svg>
+          <div class="legend">
+            <span><i></i>Diagonal A</span>
+            <span><i class="lb"></i>Diagonal B</span>
+            <em id="fig-note">Esquema ilustrativo, proporcional às medidas informadas.</em>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="res" aria-label="Resultados" id="results"></section>
+
+      <section class="panel" aria-labelledby="h-sum">
+        <h2 id="h-sum">Resumo</h2>
+        <pre class="summary" id="summary" tabindex="0"></pre>
+        <div class="actions" style="margin-top:0">
+          <button type="button" class="btn primary" id="btn-copy">Copiar resumo</button>
+          <span class="status" id="copy-status" role="status" aria-live="polite"></span>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <details>
+    <summary>Critérios de classificação usados</summary>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Classe</th><th>CVAI (%)</th><th>CVA (mm)</th><th>Índice cefálico</th></tr></thead>
+        <tbody>
+          <tr><td>Normal</td><td>&lt; 3,5</td><td>&lt; 3</td><td>76 a &lt; 81 (mesocefálico)</td></tr>
+          <tr><td>Leve</td><td>3,5 a &lt; 6,25</td><td>3 a &lt; 6</td><td>&lt; 76 (dolicocefálico)<br>81 a &lt; 85,5 (braquicefálico)</td></tr>
+          <tr><td>Moderada</td><td>6,25 a &lt; 8,75</td><td>6 a &lt; 12</td><td>≥ 85,5 (hiperbraquicefálico)</td></tr>
+          <tr><td>Grave</td><td>8,75 a &lt; 11</td><td>≥ 12</td><td>—</td></tr>
+          <tr><td>Muito grave</td><td>≥ 11</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="notes">
+      <li>CVA é a diferença absoluta entre as duas diagonais, em milímetros. CVAI é essa diferença dividida pela maior diagonal, em porcentagem.</li>
+      <li>O índice cefálico é a largura dividida pelo comprimento, vezes 100. Ele descreve a forma do crânio e não mede assimetria.</li>
+      <li>Os limiares variam entre serviços e publicações, e o índice cefálico muda com a idade e a população estudada.</li>
+    </ul>
+  </details>
+
+  <p class="disclaimer">Ferramenta de apoio ao cálculo. A interpretação dos valores e a conduta dependem da avaliação clínica do paciente.</p>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var IDS = { a: 'dA', b: 'dB', l: 'len', w: 'wid' };
+  var HINTS = {
+    a: 'Diagonal a 30° da linha média, em um sentido.',
+    b: 'A outra diagonal, no sentido oposto.',
+    l: 'Da glabela ao opistocrânio.',
+    w: 'Largura máxima entre os dois euríon.'
+  };
+  var RANGE = { a: [80, 260], b: [80, 260], l: [100, 260], w: [80, 200] };
+  var EXAMPLE = { a: '148', b: '138', l: '165', w: '138' };
+  var unit = 'mm';
+
+  var SPECS = {
+    cvai: { min: 0, max: 14, cuts: [3.5, 6.25, 8.75, 11], names: ['Normal', 'Leve', 'Moderada', 'Grave', 'Muito grave'], sev: [0, 1, 2, 3, 4] },
+    cva:  { min: 0, max: 16, cuts: [3, 6, 12], names: ['Normal', 'Leve', 'Moderada', 'Grave'], sev: [0, 1, 2, 3] },
+    ci:   { min: 65, max: 95, cuts: [76, 81, 85.5], names: ['Dolicocefálico', 'Mesocefálico', 'Braquicefálico', 'Hiperbraquicefálico'], sev: [1, 0, 1, 2] }
+  };
+  var CARDS = [
+    { key: 'cvai', label: 'CVAI', title: 'Índice de assimetria da volta craniana', formula: '|A − B| ÷ maior diagonal × 100', unit: '%' },
+    { key: 'cva', label: 'CVA', title: 'Assimetria da volta craniana', formula: '|A − B|', unit: 'mm' },
+    { key: 'ci', label: 'Índice cefálico', title: 'Forma do crânio', formula: 'largura ÷ comprimento × 100', unit: '' }
+  ];
+
+  function parse(s) {
+    var t = String(s == null ? '' : s).trim().replace(',', '.');
+    if (!t) return NaN;
+    var n = Number(t);
+    return isFinite(n) ? n : NaN;
+  }
+  function fmt(n, d) {
+    if (d == null) d = 1;
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+  function classify(spec, v) {
+    var i = 0;
+    while (i < spec.cuts.length && v >= spec.cuts[i]) i++;
+    return i;
+  }
+  function compute(m) {
+    var r = {};
+    if (m.a > 0 && m.b > 0) {
+      var mx = Math.max(m.a, m.b), mn = Math.min(m.a, m.b), diff = mx - mn;
+      r.cva = diff;
+      r.cvai = diff / mx * 100;
+      r.ratio = mn / mx * 100;
+      r.longer = m.a === m.b ? null : (m.a > m.b ? 'A' : 'B');
+    }
+    if (m.l > 0 && m.w > 0) r.ci = m.w / m.l * 100;
+    return r;
+  }
+  window.__calc = { compute: compute, classify: classify, SPECS: SPECS };
+
+  // Cartões de resultado
+  var res = $('results');
+  res.innerHTML = CARDS.map(function (c) {
+    return '<article class="card"><div class="card-top"><div><p class="lbl">' + c.label + '</p><p class="ttl">' + c.title +
+      '</p></div><span class="pill" id="p-' + c.key + '" data-sev="none">Sem dados</span></div>' +
+      '<p class="num"><span id="v-' + c.key + '">—</span><small>' + c.unit + '</small></p>' +
+      '<div class="scale" id="sc-' + c.key + '"></div><p class="formula">' + c.formula + '</p></article>';
+  }).join('') +
+  '<article class="card"><div class="ratio"><span class="ttl">Razão entre as diagonais (menor ÷ maior)</span><b id="v-ratio">—</b></div>' +
+  '<p class="ttl" id="longer">Informe as duas diagonais.</p></article>';
+
+  function buildScale(key) {
+    var s = SPECS[key], root = $('sc-' + key), span = s.max - s.min;
+    var bounds = [s.min].concat(s.cuts, [s.max]);
+    var html = '<div class="bar">';
+    for (var i = 0; i < s.names.length; i++) {
+      html += '<div class="seg" data-sev="' + s.sev[i] + '" title="' + s.names[i] + '" style="width:' + ((bounds[i + 1] - bounds[i]) / span * 100) + '%"></div>';
+    }
+    html += '</div>';
+    s.cuts.forEach(function (c) {
+      html += '<span class="tick" style="left:' + ((c - s.min) / span * 100) + '%">' + String(c).replace('.', ',') + '</span>';
+    });
+    html += '<span class="mk" id="mk-' + key + '" hidden></span>';
+    root.innerHTML = html;
+  }
+  CARDS.forEach(function (c) { buildScale(c.key); });
+
+  function setCard(key, value, shown) {
+    var s = SPECS[key], pill = $('p-' + key), mk = $('mk-' + key);
+    if (value == null) {
+      $('v-' + key).textContent = '—';
+      pill.textContent = 'Sem dados';
+      pill.setAttribute('data-sev', 'none');
+      mk.hidden = true;
+      return null;
+    }
+    var idx = classify(s, value);
+    $('v-' + key).textContent = shown;
+    pill.textContent = s.names[idx];
+    pill.setAttribute('data-sev', String(s.sev[idx]));
+    var pos = Math.min(1, Math.max(0, (value - s.min) / (s.max - s.min))) * 100;
+    mk.style.left = pos + '%';
+    mk.hidden = false;
+    return s.names[idx];
+  }
+
+  // Esquema
+  function drawFig(m, r) {
+    var svg = $('fig'), cx = 130, cy = 160;
+    var hasHead = m.l > 0 && m.w > 0;
+    var L = hasHead ? m.l : 165, W = hasHead ? m.w : 138;
+    var k = 232 / Math.max(L, W), rx = W * k / 2, ry = L * k / 2;
+    var h = '';
+    h += '<ellipse class="fig-head" cx="' + cx + '" cy="' + cy + '" rx="' + rx.toFixed(1) + '" ry="' + ry.toFixed(1) + '"' + (hasHead ? '' : ' style="stroke-dasharray:5 4"') + '/>';
+    h += '<ellipse class="fig-head" cx="' + (cx - rx).toFixed(1) + '" cy="' + (cy + ry * 0.06).toFixed(1) + '" rx="5" ry="14"/>';
+    h += '<ellipse class="fig-head" cx="' + (cx + rx).toFixed(1) + '" cy="' + (cy + ry * 0.06).toFixed(1) + '" rx="5" ry="14"/>';
+    h += '<path class="fig-head" d="M' + (cx - 9) + ' ' + (cy - ry + 1).toFixed(1) + ' L' + cx + ' ' + (cy - ry - 14).toFixed(1) + ' L' + (cx + 9) + ' ' + (cy - ry + 1).toFixed(1) + '"/>';
+    h += '<line class="fig-ax" x1="' + cx + '" y1="' + (cy - ry).toFixed(1) + '" x2="' + cx + '" y2="' + (cy + ry).toFixed(1) + '"/>';
+    h += '<line class="fig-ax" x1="' + (cx - rx).toFixed(1) + '" y1="' + cy + '" x2="' + (cx + rx).toFixed(1) + '" y2="' + cy + '"/>';
+    function diag(len, sign, cls, tcls, tag, anchor) {
+      var half = len * k / 2, dx = half * 0.5, dy = half * 0.8660254;
+      var x1 = cx + sign * dx, y1 = cy - dy, x2 = cx - sign * dx, y2 = cy + dy;
+      var tx = x1 + (sign < 0 ? -6 : 6);
+      return '<line class="' + cls + '" x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"/>' +
+        '<text class="fig-t ' + tcls + '" x="' + tx.toFixed(1) + '" y="' + (y1 - 2).toFixed(1) + '" text-anchor="' + anchor + '">' + tag + ' ' + fmt(len, 1) + '</text>';
+    }
+    if (m.a > 0) h += diag(m.a, -1, 'fig-a', 'ta', 'A', 'end');
+    if (m.b > 0) h += diag(m.b, 1, 'fig-b', 'tb', 'B', 'start');
+    h += '<text class="fig-t tn" x="' + cx + '" y="12" text-anchor="middle">FRONTAL</text>';
+    h += '<text class="fig-t tn" x="' + cx + '" y="294" text-anchor="middle">OCCIPITAL</text>';
+    svg.innerHTML = h;
+    var d = r.cva != null ? ' Diferença entre as diagonais: ' + fmt(r.cva, 1) + ' mm.' : '';
+    svg.setAttribute('aria-label', 'Esquema do crânio em vista superior com as diagonais A e B.' + d);
+  }
+
+  function render() {
+    var m = {}, key;
+    Object.keys(IDS).forEach(function (k) {
+      var el = $(IDS[k]), hint = $('h-' + IDS[k]), raw = el.value.trim(), mm = NaN, msg = HINTS[k], state = '';
+      if (raw) {
+        var n = parse(raw);
+        if (!(n > 0)) {
+          state = 'err';
+          msg = 'Digite um número maior que zero.';
+        } else {
+          mm = unit === 'cm' ? n * 10 : n;
+          if (mm < RANGE[k][0] || mm > RANGE[k][1]) {
+            state = 'warn';
+            var f = unit === 'cm' ? 10 : 1;
+            msg = 'Valor incomum. Faixa usual: ' + fmt(RANGE[k][0] / f, unit === 'cm' ? 0 : 0) + ' a ' + fmt(RANGE[k][1] / f, 0) + ' ' + unit + '. Confira a unidade.';
+          }
+        }
+      }
+      el.setAttribute('aria-invalid', state === 'err' ? 'true' : 'false');
+      hint.textContent = msg;
+      hint.setAttribute('data-state', state);
+      m[k] = state === 'err' ? NaN : mm;
+    });
+
+    var r = compute(m);
+    var nCvai = setCard('cvai', r.cvai, r.cvai != null ? fmt(r.cvai, 1) : '');
+    var nCva = setCard('cva', r.cva, r.cva != null ? fmt(r.cva, 1) : '');
+    var nCi = setCard('ci', r.ci, r.ci != null ? fmt(r.ci, 1) : '');
+
+    $('v-ratio').textContent = r.ratio != null ? fmt(r.ratio, 1) + ' %' : '—';
+    var lg = $('longer');
+    if (r.cva == null) lg.textContent = 'Informe as duas diagonais.';
+    else if (r.longer == null) lg.textContent = 'As duas diagonais têm o mesmo valor.';
+    else lg.textContent = 'A diagonal ' + r.longer + ' é a mais longa, por ' + fmt(r.cva, 1) + ' mm.';
+
+    drawFig(m, r);
+
+    var lines = [];
+    if (m.a > 0 || m.b > 0 || m.l > 0 || m.w > 0) {
+      var parts = [];
+      if (m.a > 0) parts.push('Diagonal A ' + fmt(m.a, 1) + ' mm');
+      if (m.b > 0) parts.push('Diagonal B ' + fmt(m.b, 1) + ' mm');
+      if (m.l > 0) parts.push('Comprimento ' + fmt(m.l, 1) + ' mm');
+      if (m.w > 0) parts.push('Largura ' + fmt(m.w, 1) + ' mm');
+      lines.push(parts.join(' | '));
+    }
+    if (r.cva != null) {
+      lines.push('CVA: ' + fmt(r.cva, 1) + ' mm (' + nCva.toLowerCase() + ')');
+      lines.push('CVAI: ' + fmt(r.cvai, 1) + ' % (' + nCvai.toLowerCase() + ')');
+    }
+    if (r.ci != null) lines.push('Índice cefálico: ' + fmt(r.ci, 1) + ' (' + nCi.toLowerCase() + ')');
+    $('summary').textContent = lines.length ? lines.join('\n') : 'Informe as medidas para gerar o resumo.';
+  }
+
+  function fmtInput(n) {
+    return String(Math.round(n * 100) / 100).replace('.', ',');
+  }
+  function setUnit(next) {
+    if (next === unit) return;
+    var f = next === 'cm' ? 0.1 : 10;
+    Object.keys(IDS).forEach(function (k) {
+      var el = $(IDS[k]), n = parse(el.value);
+      if (n > 0) el.value = fmtInput(n * f);
+    });
+    unit = next;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-unit]'), function (u) { u.textContent = unit; });
+    render();
+  }
+  function fill(obj) {
+    if (unit !== 'mm') {
+      $('u-mm').checked = true;
+      unit = 'mm';
+      Array.prototype.forEach.call(document.querySelectorAll('[data-unit]'), function (u) { u.textContent = 'mm'; });
+    }
+    Object.keys(IDS).forEach(function (k) { $(IDS[k]).value = obj ? obj[k] : ''; });
+    render();
+  }
+
+  Object.keys(IDS).forEach(function (k) { $(IDS[k]).addEventListener('input', render); });
+  $('u-mm').addEventListener('change', function () { setUnit('mm'); });
+  $('u-cm').addEventListener('change', function () { setUnit('cm'); });
+  $('btn-example').addEventListener('click', function () { fill(EXAMPLE); $('dA').focus(); });
+  $('btn-clear').addEventListener('click', function () { fill(null); $('dA').focus(); });
+
+  var statusTimer;
+  function say(t) {
+    $('copy-status').textContent = t;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(function () { $('copy-status').textContent = ''; }, 3500);
+  }
+  $('btn-copy').addEventListener('click', function () {
+    var text = $('summary').textContent;
+    var p;
+    try { p = navigator.clipboard.writeText(text); } catch (e) { p = Promise.reject(e); }
+    p.then(function () { say('Resumo copiado.'); }).catch(function () {
+      var rg = document.createRange();
+      rg.selectNodeContents($('summary'));
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(rg);
+      say('Texto selecionado. Use Ctrl+C para copiar.');
+    });
+  });
+
+  render();
+})();
+</script>
+
+</body></html>

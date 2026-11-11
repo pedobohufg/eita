@@ -1,27 +1,27 @@
 # Plataforma EITA — plano de arquitetura (v0.1, 10/11/2026)
 
-*Lab.EITA / UFG.* A proposta é um sistema único para as próteses e órteses do laboratório. Já existem módulos para AFO, olho e mamilo; nariz, orelha e face são os próximos. Todos compartilham um núcleo comum e usam uma ficha única do paciente.
+*Lab.EITA / UFG.* A proposta é um sistema único para as próteses e órteses do laboratório. Já existem módulos para AFO, olho, mamilo e crânio (assimetria craniana); nariz, orelha e face são os próximos. Todos compartilham um núcleo comum e usam uma ficha única do paciente.
 
 ## 1. Inventário dos apps existentes
 
-Levantamento feito no código publicado em 10/11/2026: EITA! AFO v0.14 (~236 KB, arquivo único), EITA! OLHO v0.2 (~56 KB + ~28 KB de ficha e relatório) e EITA! MAMILO v0.2-web (~134 KB). *Correção na E2: o OLHO publicado já tinha ficha, base e PDF num segundo arquivo (`ficha.js`), que tinha ficado fora do primeiro levantamento.*
+Levantamento feito no código publicado em 10/11/2026: EITA! AFO v0.14 (~236 KB, arquivo único), EITA! OLHO v0.2 (~56 KB + ~28 KB de ficha e relatório) e EITA! MAMILO v0.2-web (~134 KB). *Correção na E2: o OLHO publicado já tinha ficha, base e PDF num segundo arquivo (`ficha.js`), que tinha ficado fora do primeiro levantamento.* *Acréscimo na E3b: a "Calculadora de Assimetria Craniana" (EITA! CRÂNIO, ~26 KB, https://claude.ai/artifact/TNoE7VCMhWDsKWW42cbk4d) também estava fora do levantamento; é uma calculadora (CVA, CVAI e índice cefálico), sem ficha, sem arquivos e sem o visual Lab.EITA.*
 
-| Recurso | AFO | OLHO | MAMILO | Observação |
-|---|---|---|---|---|
-| Layout Lab.EITA (topo, etapas, painel de seções, status, ocupado) | ✔ | ✔ | ✔ | três cópias do mesmo CSS, com pequenas diferenças |
-| Downloads pela plataforma + zip com CRC32 | ✔ | ✔ | ✔ | três implementações; só o MAMILO comprime (deflate) |
-| STL binário | ✔ | ✔ | ✔ | |
-| Relatório PDF (gerador próprio) | ✔ | ✔ | ✔ | três cópias do mesmo gerador; o OLHO sem a troca de → ≥ ≤ |
-| Ficha do paciente + base do laboratório | ✔ | ✔ | ✔ | formatos diferentes ("EITA! AFO ficha", "EITA! OLHO ficha", "EITA! MAMILO ficha") |
-| Visualizador WebGL próprio | ✔ | ✔ | ✔ | três versões |
-| Zoom/arrasto na foto ou no modelo | ✔ | ✔ | ✔ | |
-| Escala | scan em mm | diâmetro da íris ou régua de 2 pontos | marcador ArUco v2 | candidato a um módulo único de calibração |
-| Cor | — | clique em área neutra | anel cinza do marcador | idem |
-| Espelhamento do lado | detecção pelo scan | ✔ | ✔ | |
-| Campo de altura → sólido | — | ✔ (íris) | ✔ (prótese e moldes) | |
-| Moldes em 2 partes | — | — | ✔ | |
-| Checagem de segurança | ✔ | — | ✔ | |
-| Tour de ajuda | ✔ | — | — | |
+| Recurso | AFO | OLHO | MAMILO | CRÂNIO (calculadora) | Observação |
+|---|---|---|---|---|---|
+| Layout Lab.EITA (topo, etapas, painel de seções, status, ocupado) | ✔ | ✔ | ✔ | — (visual próprio) | três cópias do mesmo CSS, com pequenas diferenças |
+| Downloads pela plataforma + zip com CRC32 | ✔ | ✔ | ✔ | — | três implementações; só o MAMILO comprime (deflate) |
+| STL binário | ✔ | ✔ | ✔ | — | |
+| Relatório PDF (gerador próprio) | ✔ | ✔ | ✔ | — (resumo para copiar) | três cópias do mesmo gerador; o OLHO sem a troca de → ≥ ≤ |
+| Ficha do paciente + base do laboratório | ✔ | ✔ | ✔ | — | formatos diferentes ("EITA! AFO ficha", "EITA! OLHO ficha", "EITA! MAMILO ficha") |
+| Visualizador WebGL próprio | ✔ | ✔ | ✔ | — (esquema SVG) | três versões |
+| Zoom/arrasto na foto ou no modelo | ✔ | ✔ | ✔ | — | |
+| Escala | scan em mm | diâmetro da íris ou régua de 2 pontos | marcador ArUco v2 | medidas digitadas (mm/cm) | candidato a um módulo único de calibração |
+| Cor | — | clique em área neutra | anel cinza do marcador | — | idem |
+| Espelhamento do lado | detecção pelo scan | ✔ | ✔ | — | |
+| Campo de altura → sólido | — | ✔ (íris) | ✔ (prótese e moldes) | — | |
+| Moldes em 2 partes | — | — | ✔ | — | |
+| Checagem de segurança | ✔ | — | ✔ | classificação CVA/CVAI/IC | |
+| Tour de ajuda | ✔ | — | — | — | |
 
 **Conclusão:** cerca de metade do código de cada app é infraestrutura repetida. Hoje uma correção feita no zip, no PDF ou no download precisa ser repetida três vezes.
 
@@ -38,7 +38,7 @@ eita-nucleo/              (biblioteca comum, ES modules)
   malha/                  campo de altura → sólido, verificação de estanqueidade, volume, moldes
   seguranca/              checagens comuns (pele, radioterapia, alergias…) + checagens do módulo
 modulos/
-  afo/  olho/  mamilo/    migrados dos apps atuais
+  afo/  olho/  mamilo/  cranio/    migrados dos apps atuais
   nariz/  orelha/  face/  novos
 portal/                   lista de pacientes, histórico de próteses, abre o módulo
 ```
@@ -77,26 +77,28 @@ portal/                   lista de pacientes, histórico de próteses, abre o m�
 | E1b ✔ | Interface comum extraída do MAMILO: `nucleo/pdf.js` (gerador + layout de relatório), `nucleo/ficha.js` (armazém de fichas e base), `nucleo/interface/` (casca, imagem no navegador, vista 3D). PDF, STL, ficha e telas 3D idênticos à E1a |
 | E2 ✔ | OLHO v0.2 sobre o núcleo: `modulos/olho/` (processamento puro + interface). Núcleo ganhou gaussiano exato, escala por diâmetro/régua, balanço de branco por clique, sólidos de revolução, STL de triângulos, tabela de PDF configurável, idade em meses, blocos WebGL. Pacote, PDF, ficha e telas idênticos ao publicado em dois cenários |
 | E3 ✔ | Portal de pacientes + ficha única (`nucleo/paciente.js`, "EITA paciente v1" e "EITA base v1") + ponte para os módulos (`modulos/portal/ponte.js`) + importadores das bases e fichas antigas do AFO, OLHO e MAMILO. Plataforma montada como um só app (`dist/plataforma/`) e publicada como artefato |
+| E3b ✔ | EITA! CRÂNIO como quarto módulo (`modulos/cranio/`): mesmos cálculos, limiares e resumo da calculadora publicada (testados contra o código dela), no visual Lab.EITA, com ficha do paciente, medições por data (acompanhamento, idade corrigida para prematuros, gráfico do CVAI), relatório PDF e ligação com o portal. Plataforma republicada com o CRÂNIO |
 | E4 | AFO migrado (sem mudar os resultados: comparar STL e PDF antes e depois) |
 | E5 | Módulo NARIZ/ORELHA: revisão de literatura, captura 3D e moldes multipartes |
 
-## 6. Situação do repositório (10/11/2026, após a E3)
+## 6. Situação do repositório (10/11/2026, após a E3b)
 - `nucleo/` — processamento comum, em ES modules, sem dependências: imagem (inclui gaussiano exato), calibração (marcador v2; diâmetro de referência; régua de 2 pontos; balanço de branco por clique), malha (campos de altura, sólidos de revolução, STL), zip, **PDF** (gerador + layout de relatório) e **ficha** (armazém no navegador, base do laboratório).
 - `nucleo/interface/` — partes de navegador: casca Lab.EITA (status, ocupado, downloads, etapas, área de soltar), abrir fotos/JPEG, visualizador WebGL e seus blocos (programa, malhas, matrizes) — o OLHO monta a própria câmera sobre esses blocos.
 - `modulos/portal/` — portal de pacientes (`ui.js`, `index.html`) e `ponte.js`.
+- `modulos/cranio/` — `processamento.js` (CVA, CVAI, índice cefálico, classificação, resumo, idade corrigida, evolução; puro), `ui.js` (medidas, cartões, esquema, ficha com medições por data, gráfico, PDF), `index.html` e imagens. O símbolo do módulo é provisório (desenhado nesta etapa).
 - `modulos/olho/` — `processamento.js` (detecção da íris/pupila, íris desenrolada e limpa, textura, relevo, casca e malhas; puro), `ui.js` (interface, ficha e relatório; antes `app.js` + `ficha.js`), `index.html` e imagens.
 - `modulos/mamilo/` — processamento específico (`processamento.js`), interface (`ui.js`, 880 → 650 linhas: ficou só o que é do MAMILO — editor da foto, perfil lateral, cena 3D, conteúdo do relatório, checagens), `index.html` e imagens.
 - `ferramentas/montar.mjs` — gera `dist/<modulo>/` com um `app.js` único, pronto para publicar como artefato.
-- `testes/` — `npm test`: 34 testes (núcleo, PDF/ficha, ficha única, MAMILO e OLHO). OLHO: detecção, medidas, esclera e pupila idênticas à v0.2 publicada (STL byte a byte); a íris tem referência própria no Node porque, no navegador, a textura volta do canvas com alfa pré-multiplicado na borda do limbo. O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py` e `teste_olho.py` (fumaça), `teste_plataforma.py` (portal → módulos → portal, bases), `comparar_saidas.py` e `comparar_olho.py` (duas montagens → arquivos e telas idênticos).
+- `testes/` — `npm test`: 38 testes (núcleo, PDF/ficha, ficha única, MAMILO, OLHO e CRÂNIO; o CRÂNIO é comparado com as funções da calculadora publicada). OLHO: detecção, medidas, esclera e pupila idênticas à v0.2 publicada (STL byte a byte); a íris tem referência própria no Node porque, no navegador, a textura volta do canvas com alfa pré-multiplicado na borda do limbo. O teste de regressão confere que os STL saem idênticos, byte a byte, aos da v0.2 publicada, e o gerador de PDF é comparado byte a byte com o da v0.2. No navegador (opcional, Playwright): `teste_mamilo.py`, `teste_olho.py` e `teste_cranio.py` (fumaça), `teste_plataforma.py` (portal → módulos → portal, bases), `comparar_saidas.py` e `comparar_olho.py` (duas montagens → arquivos e telas idênticos).
 - Mudanças de comportamento do OLHO na E2 (os arquivos gerados não mudam): o download funciona também fora do claude.ai (link comum, como no MAMILO); o pacote .zip passa a ser comprimido (deflate); no PDF, os símbolos → ≥ ≤ ⚠ ≈ viram -> >= <= ! ~ em vez de "?"; a base exportada continua com o mesmo formato e nome.
-- `legado/` — código dos apps publicados (AFO v0.14 com imagens e `sobre.html`, OLHO v0.2, MAMILO v0.2) como referência para a migração.
+- `legado/` — código dos apps publicados (AFO v0.14 com imagens e `sobre.html`, OLHO v0.2, MAMILO v0.2, calculadora de assimetria craniana) como referência para a migração.
 - Próximo: **E4**, AFO migrado para o núcleo; com ele o AFO entra na plataforma publicada (hoje abre o artefato à parte).
 
 ## 7. Ficha única e portal (E3, 10/11/2026)
 - **Formato:** cada paciente ("EITA paciente v1") guarda os dados comuns — nome, prontuário/código, nascimento, sexo, profissional, alergias, observações — e a lista das próteses, cada uma um vínculo `{modulo, fichaId}` com a ficha completa que continua no módulo (pontos, parâmetros, resultados). Assim os módulos não mudaram, e o AFO legado funciona igual.
 - **Sincronização:** ao abrir o portal (e ao voltar de um módulo), cada ficha de módulo sem paciente é ligada a um: primeiro pelo pedido pendente ("abri o OLHO para este paciente"), depois pelo prontuário, depois por nome + nascimento; sem correspondência, nasce um paciente novo. Campos vazios do paciente são completados pelas fichas; o portal nunca sobrescreve um campo já preenchido. Ficha apagada no módulo → o vínculo sai.
 - **Ponte** (`ponte.js`, acrescentada pela montagem em cada página de módulo): botão "‹ Pacientes"; abre a ficha pedida pelo portal ou preenche nome, prontuário, nascimento, sexo, profissional e alergias numa ficha nova. Usa só os ids comuns das páginas Lab.EITA.
-- **Base única** ("EITA base v1"): pacientes + fichas dos três módulos + medições de bancada do AFO. O portal importa também as bases e fichas antigas de cada módulo (migração dos apps publicados à parte).
+- **Base única** ("EITA base v1"): pacientes + fichas dos módulos (AFO, OLHO, MAMILO, CRÂNIO) + medições de bancada do AFO. O portal importa também as bases e fichas antigas de cada módulo (migração dos apps publicados à parte).
 - **Juntar** pacientes duplicados; **excluir** apaga o paciente e as fichas dele (confirmação em dois cliques: o claude.ai recusa `confirm()`; o OLHO passou a usar a mesma confirmação).
-- **Publicação:** artefato "Plataforma EITA" (https://claude.ai/artifact/CthWngqti2LVBFsk3wTTwW), privado, com a capacidade `downloads`. Montado com `node ferramentas/montar.mjs plataforma-sem-legado`: portal, MAMILO e OLHO. O AFO legado não foi incluído porque o arquivo publicado (240 KB) não pôde ser revisado inteiro nesta etapa; localmente (`plataforma`) ele entra com a ponte e passa no teste.
+- **Publicação:** artefato "Plataforma EITA" (https://claude.ai/artifact/CthWngqti2LVBFsk3wTTwW), privado, com a capacidade `downloads`. Montado com `node ferramentas/montar.mjs plataforma-sem-legado`: portal, MAMILO, OLHO e CRÂNIO (desde a E3b). O AFO legado não foi incluído porque o arquivo publicado (240 KB) não pôde ser revisado inteiro nesta etapa; localmente (`plataforma`) ele entra com a ponte e passa no teste.
 - **Limites conhecidos:** as fichas ficam só no navegador (a plataforma pode apagar esse armazenamento; exportar a base é a cópia de segurança); os apps antigos publicados à parte guardam as fichas deles separadamente (cada artefato tem seu armazenamento) — trazê-las é exportar a base em cada um e importar no portal.

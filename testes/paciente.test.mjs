@@ -70,7 +70,7 @@ test("arquivos: base única, bases e fichas antigas; mesclas", () => {
   assert.throws(() => N.lerArquivoEITA({ formato: "outra coisa" }), /não reconhecido/);
   const p = N.novoPaciente({ nome: "X" }, T0), base = N.montarBase({ pacientes: [p], fichas: { olho: [olho("o", { pName: "X" })] }, calibracaoAFO: [] }, T0);
   const lida = N.lerArquivoEITA(JSON.parse(JSON.stringify(base)));
-  assert.equal(lida.tipo, "base única"); assert.equal(lida.pacientes[0].id, p.id); assert.deepEqual(Object.keys(lida.fichas), ["afo", "olho", "mamilo"]);
+  assert.equal(lida.tipo, "base única"); assert.equal(lida.pacientes[0].id, p.id); assert.deepEqual(Object.keys(lida.fichas), ["afo", "olho", "mamilo", "cranio"]);
   const f1 = olho("o", { pName: "X" }), f2 = { ...f1, atualizado: "2026-12-01T00:00:00.000Z" };
   assert.deepEqual(N.mesclarFichas([f1], [f2, { formato: "x" }], "EITA! OLHO ficha").atualizadas, 1);
   const p2 = { ...p, atualizado: "2027-01-01T00:00:00.000Z", dados: { ...p.dados, nome: "X novo" }, proteses: [{ modulo: "afo", fichaId: "k" }] };

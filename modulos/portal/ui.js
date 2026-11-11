@@ -7,7 +7,7 @@ const E = window.EITA, UI = E.ui, M = E.MODULOS;
 const $ = (id) => document.getElementById(id);
 const esc = E.escaparHTML;
 const CASCA = UI.criarCasca(), status = CASCA.status, salvar = CASCA.salvar;
-const SIMBOLO = { afo: "assets/eita-afo-simbolo.png", olho: "assets/eita-olho-simbolo.png", mamilo: "assets/eita-mamilo-simbolo.png" };
+const SIMBOLO = { afo: "assets/eita-afo-simbolo.png", olho: "assets/eita-olho-simbolo.png", mamilo: "assets/eita-mamilo-simbolo.png", cranio: "assets/eita-cranio-simbolo.png" };
 const CHAVE_PENDENTES = "eita.pendentes.v1", VALIDADE_PENDENTE = 2 * 864e5;   // 2 dias
 // módulos montados junto com o portal (meta "eita-modulos"); os outros abrem pelo artefato publicado à parte
 const PRESENTES = (() => { const m = document.querySelector('meta[name="eita-modulos"]'); return new Set(m ? m.content.split(",").filter(Boolean) : Object.keys(M)); })();
@@ -60,7 +60,7 @@ function renderInicio() {
   $("detalhe").innerHTML = `
   <div class="cartao boas"><h2>Plataforma EITA</h2>
     <p>Um lugar para os pacientes do laboratório e todas as próteses e órteses de cada um. Escolha um paciente à esquerda para ver as fichas e abrir o módulo certo já com os dados dele.</p>
-    <p class="note">${n ? `${n} paciente${n > 1 ? "s" : ""} e ${np} ficha${np === 1 ? "" : "s"} de prótese neste navegador.` : "Ainda não há pacientes neste navegador. As fichas que você já tem nos apps EITA! AFO, OLHO e MAMILO publicados à parte ficam guardadas em cada app: para trazê-las, exporte a base em cada um e importe aqui, em <b>Base do laboratório</b>."}</p>
+    <p class="note">${n ? `${n} paciente${n > 1 ? "s" : ""} e ${np} ficha${np === 1 ? "" : "s"} de prótese neste navegador.` : "Ainda não há pacientes neste navegador. As fichas que você já tem nos apps EITA! AFO, OLHO e MAMILO publicados à parte ficam guardadas em cada app: para trazê-las, exporte a base em cada um e importe aqui, em <b>Base do laboratório</b>. (A calculadora de assimetria craniana antiga não guardava fichas.)"}</p>
     ${semArmazenamento ? '<div class="warnbox">Este navegador não está deixando gravar: as fichas podem se perder ao fechar a página. Exporte a base com frequência.</div>' : ""}</div>
   <div class="cartao"><h3>Módulos</h3><div class="mods3">
     ${Object.entries(M).map(([m, X]) => `<div class="mod"><img src="${SIMBOLO[m]}" alt=""><b>${esc(X.nome)}</b><small>${esc(X.peca[0].toUpperCase() + X.peca.slice(1))}</small>${presente(m) ? `<button type="button" data-abrir="${m}">Abrir sem paciente</button>` : `<a class="ext" href="${esc(X.externo)}" target="_blank" rel="noopener">Abrir o app à parte ↗</a>`}</div>`).join("")}

@@ -21,6 +21,7 @@ nucleo/                 processamento comum (ES modules, sem dependências)
 modulos/
   mamilo/               EITA! MAMILO (processamento, interface, página e imagens)
   olho/                 EITA! OLHO (idem)
+  cranio/               EITA! CRÂNIO (assimetria craniana: cálculo, ficha com acompanhamento, relatório)
   portal/               portal de pacientes (ficha única) e ponte.js para as páginas dos módulos
 ferramentas/montar.mjs  gera dist/<modulo>/ (app.js único, pronto para publicar)
 testes/                 testes automáticos (npm test) e fixtures sintéticas
@@ -34,10 +35,11 @@ Requer Node.js 20 ou mais novo. Não há dependências para instalar.
 
 ```bash
 npm test                 # testes do núcleo e dos módulos
-npm run montar           # gera dist/mamilo/, dist/olho/ e dist/plataforma/ (abrir o index.html por um servidor local)
+npm run montar           # gera dist/mamilo/, dist/olho/, dist/cranio/ e dist/plataforma/ (abrir o index.html por um servidor local)
 node ferramentas/montar.mjs plataforma-sem-legado   # plataforma para publicar (sem o AFO legado)
 python3 testes/navegador/teste_mamilo.py   # opcional: teste no navegador (Playwright + Chrome)
 python3 testes/navegador/teste_olho.py     # idem, OLHO
+python3 testes/navegador/teste_cranio.py   # idem, CRÂNIO
 python3 testes/navegador/teste_plataforma.py   # portal de pacientes de ponta a ponta
 python3 testes/navegador/comparar_saidas.py ANTES/ dist/mamilo/   # opcional: saídas idênticas entre duas montagens (MAMILO)
 python3 testes/navegador/comparar_olho.py ANTES/ dist/olho/       # idem, OLHO (ANTES pode ser legado/olho + assets)

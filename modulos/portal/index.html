@@ -135,7 +135,7 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
 .prot b{display:block}.prot small{display:block;color:var(--muted);font:500 11.5px var(--f-mono);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .novos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .novos button{display:flex;align-items:center;gap:8px}.novos img{width:22px;height:22px}
-.mods3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.mods3{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
 .mod{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;border:1px solid var(--line);border-radius:12px;padding:18px 12px;background:var(--bg)}
 .mod img{width:58px;height:58px}.mod b{font-size:15px}.mod small{color:var(--muted);font-size:12px;line-height:1.4;min-height:34px}
 .boas h2{margin:0 0 6px;font:700 22px var(--f-body)}.boas p{margin:0 0 6px;color:var(--muted);line-height:1.5}
@@ -150,7 +150,7 @@ a.ext{display:inline-flex;align-items:center;gap:8px;font:500 13px var(--f-body)
 <header id="top">
   <div class="brand">
     <span class="logo"><img src="assets/logo-labeita-simbolo.png" alt="Lab.EITA"></span>
-    <div class="ttl"><h1>Plataforma <em>EITA</em></h1><div class="sub">Pacientes e próteses do Lab.EITA · AFO · OLHO · MAMILO · protótipo v0.3</div></div>
+    <div class="ttl"><h1>Plataforma <em>EITA</em></h1><div class="sub">Pacientes e próteses do Lab.EITA · AFO · OLHO · MAMILO · CRÂNIO · protótipo v0.3</div></div>
   </div>
   <span class="grow"></span>
   <span class="vsep"></span>
@@ -171,7 +171,7 @@ a.ext{display:inline-flex;align-items:center;gap:8px;font:500 13px var(--f-body)
       <div class="note">As fichas ficam <b>só neste navegador</b>. Para levar a outro computador, ou para ter uma cópia de segurança, exporte a base e guarde o arquivo num lugar seguro: ele tem dados de pacientes.</div>
       <div class="row"><button class="primary" id="exp" type="button">Exportar base</button><button id="impB" type="button">Importar arquivos</button></div>
       <input type="file" id="imp" accept=".json,application/json" multiple hidden>
-      <div class="drop" id="drop" tabindex="0" role="button"><b>Solte aqui bases ou fichas</b>Base única da plataforma, bases e fichas antigas do EITA! AFO, OLHO e MAMILO.</div>
+      <div class="drop" id="drop" tabindex="0" role="button"><b>Solte aqui bases ou fichas</b>Base única da plataforma, bases e fichas antigas do EITA! AFO, OLHO, MAMILO e CRÂNIO.</div>
       <div id="impInfo"></div>
     </div>
   </section>

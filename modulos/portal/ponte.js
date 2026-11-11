@@ -1,4 +1,4 @@
-/* Plataforma EITA — ponte entre o portal de pacientes e as páginas dos módulos (AFO, OLHO, MAMILO).
+/* Plataforma EITA — ponte entre o portal de pacientes e as páginas dos módulos (AFO, OLHO, MAMILO, CRÂNIO).
    Script clássico, acrescentado pela montagem da plataforma no fim de cada página de módulo:
      <script src="../ponte.js" data-modulo="olho"></script>
    Não depende do código do módulo: usa só os ids comuns das páginas Lab.EITA (top, status, busy, s0, fList,
@@ -11,7 +11,7 @@
 (function () {
   "use strict";
   const eu = document.currentScript, MOD = eu && eu.dataset.modulo;
-  const CHAVES = { afo: "eitaAFO.fichas.v1", olho: "eitaOLHO.fichas.v1", mamilo: "eitaMAMILO.fichas.v1" };
+  const CHAVES = { afo: "eitaAFO.fichas.v1", olho: "eitaOLHO.fichas.v1", mamilo: "eitaMAMILO.fichas.v1", cranio: "eitaCRANIO.fichas.v1" };
   const $ = (id) => document.getElementById(id);
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 

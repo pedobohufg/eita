@@ -5,6 +5,7 @@ Cópias dos apps publicados como artefatos em 10/11/2026, guardadas para orienta
 | Pasta | App | Versão | Artefato |
 |---|---|---|---|
 | `afo/` | EITA! AFO | v0.14 | https://claude.ai/artifact/Kod5SXvjeJGGCfs4jzWwxr |
+| `cranio/` | Calculadora de Assimetria Craniana (EITA! CRÂNIO) | v1 (calculadora) | https://claude.ai/artifact/TNoE7VCMhWDsKWW42cbk4d |
 | `olho/` | EITA! OLHO | v0.2 (`app.js` + `ficha.js` + `index.html`) | https://claude.ai/artifact/NSrZpWFq5LTAMqbjoxViRb |
 | `mamilo-v0.2/` | EITA! MAMILO | v0.2-web | https://claude.ai/artifact/FNrKDdQZs55b4i8wRj9dcq |
 

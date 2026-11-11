@@ -75,12 +75,20 @@ async def main():
             ok(await pg.input_value("#pName") == "Paciente Teste" and await pg.input_value("#pBirth") == "2018-06-15", "dados preenchidos no AFO")
             await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html")
 
+            print("CRÂNIO: ficha nova com os dados do portal, medição e volta")
+            await pg.click("[data-novo=cranio]"); await pg.wait_for_url("**/cranio/index.html")
+            await esperar_status(pg, "Nova ficha para")
+            ok(await pg.input_value("#pName") == "Paciente Teste" and await pg.input_value("#pBirth") == "2018-06-15", "dados preenchidos no CRÂNIO")
+            await pg.click("#stepper button[data-s=s1]"); await pg.click("#registrar"); await esperar_status(pg, "Ficha atualizada")
+            await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html"); await pg.wait_for_selector(".prot")
+            ok("1 medição" in await pg.text_content(".prots"), "avaliação craniana ligada ao paciente")
+
             print("base: exportar")
             await pg.click("#sBase h2")
             async with pg.expect_download() as d: await pg.click("#exp")
             caminho = await (await d.value).path(); base = json.load(open(caminho))
             ok((await d.value).suggested_filename.startswith("base_EITA_"), "nome do arquivo sem nome de paciente")
-            ok(base["formato"] == "EITA base v1" and len(base["pacientes"]) == 2 and len(base["fichas"]["olho"]) == 1 and len(base["fichas"]["mamilo"]) == 1, "base com 2 pacientes e 2 fichas")
+            ok(base["formato"] == "EITA base v1" and len(base["pacientes"]) == 2 and len(base["fichas"]["olho"]) == 1 and len(base["fichas"]["mamilo"]) == 1 and len(base["fichas"]["cranio"]) == 1, "base com 2 pacientes e 3 fichas")
             await pg.screenshot(path=os.path.join(RAIZ, "dist", "plataforma-teste.png"))
 
             print("base: importar num navegador limpo (base única e base antiga do OLHO)")
