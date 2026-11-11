@@ -7,6 +7,8 @@
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
 import asyncio, json, os, subprocess, sys, time
 from playwright.async_api import async_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import three_local   # three.js r128 local no lugar do CDN (EITA! CRÂNIO)
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 CHROME = sys.argv[1] if len(sys.argv) > 1 else "/usr/bin/google-chrome"
@@ -27,6 +29,7 @@ async def main():
         async with async_playwright() as p:
             b = await p.chromium.launch(executable_path=CHROME, args=["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist"])
             ctx = await b.new_context(viewport={"width": 1440, "height": 900}, accept_downloads=True)
+            await three_local.ligar(ctx)
             pg = await ctx.new_page()
             pg.on("pageerror", lambda e: erros.append(str(e)))
             pg.on("console", lambda m: m.type == "error" and "404" not in m.text and erros.append(m.text))
@@ -86,7 +89,7 @@ async def main():
             await pg.click("[data-novo=cranio]"); await pg.wait_for_url("**/cranio/index.html")
             await esperar_status(pg, "Nova ficha para")
             ok(await pg.input_value("#pName") == "Paciente Teste" and await pg.input_value("#pBirth") == "2018-06-15", "dados preenchidos no CRÂNIO")
-            await pg.click("#stepper button[data-s=s1]"); await pg.click("#registrar"); await esperar_status(pg, "Ficha atualizada")
+            await pg.click("#stepper button[data-s=s2]"); await pg.click("#registrar"); await esperar_status(pg, "Ficha atualizada")
             await pg.click("#top .eita-voltar"); await pg.wait_for_url("**/index.html"); await pg.wait_for_selector(".prot")
             ok("1 medição" in await pg.text_content(".prots"), "avaliação craniana ligada ao paciente")
 
@@ -99,7 +102,7 @@ async def main():
             await pg.screenshot(path=os.path.join(RAIZ, "dist", "plataforma-teste.png"))
 
             print("base: importar num navegador limpo (base única e base antiga do OLHO)")
-            ctx2 = await b.new_context(viewport={"width": 1440, "height": 900}); pg2 = await ctx2.new_page()
+            ctx2 = await b.new_context(viewport={"width": 1440, "height": 900}); await three_local.ligar(ctx2); pg2 = await ctx2.new_page()
             pg2.on("pageerror", lambda e: erros.append(str(e)))
             await pg2.goto(URL + "index.html")
             ok("Nenhum paciente" in await pg2.text_content("#lista"), "navegador limpo")

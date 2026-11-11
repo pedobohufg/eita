@@ -18,7 +18,7 @@ export const MODULOS = Object.freeze({
   afo: { nome: "EITA! AFO", peca: "órtese tornozelo-pé (AFO)", chave: "eitaAFO.fichas.v1", formatoFicha: "EITA! AFO ficha", formatoBase: "EITA! AFO base", pagina: "afo/index.html", externo: "https://claude.ai/artifact/Kod5SXvjeJGGCfs4jzWwxr" },
   olho: { nome: "EITA! OLHO", peca: "prótese ocular", chave: "eitaOLHO.fichas.v1", formatoFicha: "EITA! OLHO ficha", formatoBase: "EITA! OLHO base", pagina: "olho/index.html" },
   mamilo: { nome: "EITA! MAMILO", peca: "prótese de aréola e papila", chave: "eitaMAMILO.fichas.v1", formatoFicha: "EITA! MAMILO ficha", formatoBase: "EITA! MAMILO base", pagina: "mamilo/index.html" },
-  cranio: { nome: "EITA! CRÂNIO", peca: "avaliação de assimetria craniana", chave: "eitaCRANIO.fichas.v1", formatoFicha: "EITA! CRÂNIO ficha", formatoBase: "EITA! CRÂNIO base", pagina: "cranio/index.html" },
+  cranio: { nome: "EITA! CRÂNIO", peca: "avaliação craniana e órtese", chave: "eitaCRANIO.fichas.v1", formatoFicha: "EITA! CRÂNIO ficha", formatoBase: "EITA! CRÂNIO base", pagina: "cranio/index.html" },
 });
 export const CHAVE_CALIBRACAO_AFO = "eitaAFO.calib.v1";
 export const CAMPOS = ["nome", "codigo", "nascimento", "sexo", "profissional", "alergias", "observacoes"];
@@ -35,9 +35,10 @@ export function dadosDaFicha(f) {
 }
 // lado e arquivo de origem de uma ficha, para a lista de próteses
 export function resumoProtese(modulo, f) {
-  if (modulo === "cranio") {   // avaliação, não peça: em vez de lado e arquivo, o número de medições e a última data
-    const md = (f.medicoes || []).map((x) => x.data).filter(Boolean).sort(), n = md.length;
-    return { modulo, fichaId: f.id, peca: MODULOS.cranio.peca, lado: "", atualizado: f.atualizado || "", arquivo: n ? `${n} medição${n > 1 ? "ões" : ""}, a última em ${md[n - 1].split("-").reverse().join("/")}` : "sem medições", nome: txt(f.nome) };
+  if (modulo === "cranio") {   // avaliação, não peça: em vez de lado e arquivo, o número de medições e a última data (e o scan da órtese, desde a E3c-3)
+    const md = (f.medicoes || []).map((x) => x.data).filter(Boolean).sort(), n = md.length, sc = f.ortese && f.ortese.scan && txt(f.ortese.scan.nome);
+    const med = n ? `${n} medição${n > 1 ? "ões" : ""}, a última em ${md[n - 1].split("-").reverse().join("/")}` : "sem medições";
+    return { modulo, fichaId: f.id, peca: MODULOS.cranio.peca, lado: "", atualizado: f.atualizado || "", arquivo: sc ? `${med} · órtese (${sc})` : med, nome: txt(f.nome) };
   }
   const lado = modulo === "afo" ? f.lado : modulo === "olho" ? f.olho : (f.lados && f.lados.protese) || (f.paciente && f.paciente.pLado);
   const arquivo = modulo === "afo" ? f.scan : modulo === "olho" ? f.foto && f.foto.nome : f.foto && f.foto.arquivo;

@@ -10,7 +10,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="EITA! CRÂNIO — avaliação da assimetria craniana (CVA, CVAI e índice cefálico) com ficha e acompanhamento, do Lab.EITA/UFG.">
+<meta name="description" content="EITA! CRÂNIO — avaliação da assimetria craniana (CVA, CVAI e índice cefálico) por medidas manuais ou pelo scan 3D, com acompanhamento e projeto da órtese craniana, do Lab.EITA/UFG.">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <title>EITA! CRÂNIO</title>
@@ -111,7 +111,7 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
 .uni{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden;margin:4px 0 6px}
 .uni button{border:0;border-radius:0;padding:6px 16px;font:500 12.5px var(--f-mono);background:var(--surface);color:var(--muted)}
 .uni button.on{background:var(--accent);color:#fff}
-.med{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.med{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
 .med label{display:flex;flex-direction:column;gap:4px;font:500 12.5px var(--f-body)}
 .med label .sg{font:400 11px var(--f-mono);color:var(--muted);margin-left:4px}
 .med .inp{display:flex;align-items:center;border:1px solid var(--line-strong);border-radius:7px;background:var(--bg)}
@@ -145,6 +145,29 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
 .crit{max-width:1080px;margin:0 auto;font-size:12.5px;color:var(--muted)}.crit table{width:100%;border-collapse:collapse;margin:8px 0}.crit td,.crit th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.crit th{font:600 10px var(--f-mono);letter-spacing:.06em;text-transform:uppercase}
 .crit summary{cursor:pointer;font-weight:600;color:var(--ink)}
 @media(max-width:900px){.duas{grid-template-columns:1fr}#conteudo{position:static}}
+/* ---- scan 3D e órtese (E3c-3) */
+#conteudo{padding-top:62px}
+#v3d{position:absolute;inset:0}#cena{position:absolute;inset:0}#cena canvas{position:absolute;inset:0}
+#vazio3d{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;pointer-events:none;font-size:13.5px;line-height:1.6;padding:20px}#vazio3d b{display:block;font-size:17px;color:var(--ink);margin-bottom:4px}
+#vistas3d{top:14px}#camadas{top:58px}
+#legend .barraCor{display:block;width:150px;height:9px;border-radius:5px;margin:4px 0 2px;background:linear-gradient(90deg,#2B5FD0,#f2f2f2 50%,#C2281F)}
+#legend .ext{display:flex;width:150px;gap:6px;justify-content:space-between;font-size:10.5px;color:var(--muted)}
+label.ctl.dec{grid-template-columns:1fr 78px}label.ctl:has(input[type=date]){grid-template-columns:1fr 150px}label.ctl.dec input{width:78px!important;text-align:right}
+label.ctl.sel{grid-template-columns:1fr 168px}label.ctl.sel select{width:168px}
+.is-hidden{display:none!important}
+details.av{margin-top:8px;border-top:1px solid var(--line);padding-top:6px}details.av>summary{cursor:pointer;font:600 12.5px var(--f-body);color:var(--accent);padding:4px 0}
+.why{font-size:12px;color:var(--warn);margin:4px 0 0;min-height:0}.why:empty{display:none}
+ul.pts{list-style:none;padding:0;margin:8px 0;display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;font-size:12.5px}ul.pts li{display:flex;gap:6px;align-items:center;color:var(--muted)}ul.pts li i{width:9px;height:9px;border-radius:50%;flex:none}ul.pts li.ok{color:var(--ok);font-weight:600}
+#cro-polar{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:8px}
+.lst-h{font:600 10.5px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.lst-r{display:flex;gap:6px;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid var(--surface-2)}.lst-r.muted{color:var(--muted)}.lst-t{flex:1;min-width:0}
+.chip{font:600 11px var(--f-mono);border-radius:6px;padding:1px 6px;flex:none}.chip-p{background:#fde4e2;color:#B3261E}.chip-a{background:#e2eafd;color:#1D4ED8}.chip-e{background:#fdf0dc;color:#B45309}
+.lst-b{padding:2px 8px!important;font-size:11.5px!important}
+ul.ck{list-style:none;padding:0;margin:8px 0;font-size:12.5px;display:grid;gap:5px}ul.ck li{padding-left:20px;position:relative;line-height:1.4}ul.ck li:before{position:absolute;left:0;top:0;font-weight:700}
+ul.ck li.ck-ok:before{content:"✓";color:var(--ok)}ul.ck li.ck-warn:before{content:"!";color:var(--s2)}ul.ck li.ck-bad:before{content:"✕";color:var(--s3)}ul.ck li.ck-na{color:var(--muted);padding-left:0}ul.ck small{display:block;color:var(--muted);font-size:11.5px}
+pre.tec{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font:400 11.5px/1.5 var(--f-mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.seta{font-size:12px;color:var(--muted);margin:2px 0 0}
+
 </style>
 </head>
 <body>
@@ -152,7 +175,7 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
 <header id="top">
   <div class="brand">
     <span class="logo"><img src="assets/eita-cranio-simbolo.png" alt="EITA! CRÂNIO"></span>
-    <div class="ttl"><h1>EITA! <em>CRÂNIO</em></h1><div class="sub">Assimetria craniana: CVA, CVAI e índice cefálico, com acompanhamento · protótipo v0.2</div></div>
+    <div class="ttl"><h1>EITA! <em>CRÂNIO</em></h1><div class="sub">Assimetria craniana e órteses cranianas · v0.3</div></div>
   </div>
   <nav id="stepper" aria-label="Etapas"></nav>
   <span class="vsep"></span>
@@ -169,53 +192,186 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
       <label class="pf">Nascimento<input type="date" id="pBirth"></label>
       <label class="pf">Sexo<select id="pSex"><option value="">—</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select></label>
       <label class="pf">Idade gestacional (semanas)<input type="number" id="pGest" min="22" max="44" step="1" placeholder="ex.: 38"></label>
+      <label class="pf">Peso (kg)<input type="number" id="pPeso" min="1" max="40" step="0.1" placeholder="—"></label>
+      <label class="pf">Perímetro cefálico (cm)<input type="number" id="pPC" min="25" max="65" step="0.1" placeholder="—"></label>
+      <label class="pf">Lado achatado<select id="pLado"><option value="">—</option><option value="D">Direito</option><option value="E">Esquerdo</option><option value="B">Bilateral / posterior</option></select></label>
       <label class="pf w2">Diagnóstico<input type="text" id="pDiag" placeholder="ex.: plagiocefalia posicional à direita"></label>
+      <label class="pf w2">Objetivo / indicação<input type="text" id="pObj" placeholder="ex.: correção da assimetria posterior"></label>
       <label class="pf w2">Profissional responsável<input type="text" id="pProf" placeholder="nome e registro"></label>
       <label class="pf w2">Observações<textarea id="pNotes" rows="2" placeholder="ex.: torcicolo, posição preferida para dormir, uso de capacete"></textarea></label>
     </div>
     <div class="note" id="pAge"></div>
     <div class="row" style="margin-top:8px"><button class="primary" id="fSave" type="button">Salvar ficha</button><button id="fNew" type="button">Nova</button><button id="fExp" type="button">Exportar</button><button id="fImpB" type="button">Abrir arquivo</button><input type="file" id="fImp" accept=".json" hidden></div>
-    <div class="note">A ficha guarda os dados do paciente e todas as medições com as datas. As fichas ficam neste navegador; exporte o arquivo para levar a outro computador.</div>
+    <div class="note">A ficha guarda os dados do paciente, as medições com as datas e o projeto da órtese (pontos de referência, plano, parâmetros, correções e versões); o scan não fica na ficha. As fichas ficam neste navegador; exporte o arquivo para levar a outro computador. Abre também as fichas da versão antiga do EITA! Crânio.</div>
     <div class="sub-h">Fichas salvas</div><div id="fList"></div>
     <div class="sub-h">Base do laboratório</div>
     <div class="row"><button id="dbExp" type="button">Exportar base</button><button id="dbImpB" type="button">Importar base</button><input type="file" id="dbImp" accept=".json" hidden></div>
-    <div class="note">Um único arquivo com todas as fichas deste navegador. Guarde na pasta do laboratório com acesso restrito à equipe, porque contém dados de pacientes.</div>
+    <div class="note">Um único arquivo com todas as fichas e os protocolos da órtese deste navegador. Guarde na pasta do laboratório com acesso restrito à equipe, porque contém dados de pacientes.</div>
   </div>
 </section>
 
-<section id="s1">
-  <h2><span class="n">1</span>Medidas</h2>
+<section id="s1" class="collapsed">
+  <h2><span class="n">1</span>Scan 3D <span class="pname" style="color:var(--muted)">opcional</span></h2>
+  <div class="bd">
+    <label class="ctl sel">Unidade do STL<select id="stl-scale-unit"><option value="1">Milímetros (mm)</option><option value="10">Centímetros (cm)</option><option value="1000" selected>Metros (m)</option></select></label>
+    <div class="drop" id="stlDrop" tabindex="0" role="button" style="margin-top:8px"><b>Abrir o STL do scan</b>clique ou arraste o arquivo (malha triangulada)</div>
+    <input type="file" id="stl-file" accept=".stl" hidden>
+    <div class="note" id="scanInfo">Com o scan, as medidas saem do plano axial e dá para analisar a pressão e gerar a órtese. Sem ele, informe as medidas à mão (etapa 2).</div>
+    <div class="sub-h">Pontos de referência</div>
+    <label class="ctl sel">Ponto<select id="landmark-select"><option value="anterior">Glabela (anterior)</option><option value="posterior">Opistocrânio (posterior)</option><option value="left">Eúrio esquerdo</option><option value="right">Eúrio direito</option><option value="vertex">Vértice (superior)</option></select></label>
+    <div class="row"><button class="primary" id="btn-arm-mark" type="button" disabled>Marcar na malha</button><button id="btn-clear-marks" type="button" disabled>Limpar pontos</button></div>
+    <ul class="pts" id="landmark-status-list"></ul>
+    <button class="primary" id="btn-align-mesh" type="button" disabled>Alinhar aos eixos anatômicos</button>
+    <p class="why" id="why-align"></p>
+    <div class="note">Escolha o ponto, toque em <b>Marcar na malha</b> e dê <b>duplo clique</b> no modelo. Glabela: o ponto mais anterior da testa, entre as sobrancelhas; opistocrânio: o mais posterior do crânio; eúrios: os mais laterais de cada lado; vértice: o mais alto da cabeça.</div>
+  </div>
+</section>
+
+<section id="s2">
+  <h2><span class="n">2</span>Medidas</h2>
   <div class="bd">
     <label class="ctl">Data da medição<input type="date" id="mData" style="width:150px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:inherit;background:var(--bg)"></label>
+    <div id="doScan" hidden>
+      <div class="sub-h">Do scan (plano axial)</div>
+      <label class="ctl sel">Corte<select id="plane-axis"><option value="axial" selected>Axial (horizontal)</option><option value="coronal">Coronal (frente/trás)</option><option value="sagittal">Sagital (lateral)</option></select></label>
+      <label class="ctl" style="grid-template-columns:1fr 90px">Altura do plano<span id="plane-offset-val" style="font:500 13px var(--f-mono);text-align:right;color:var(--accent)">0,0 mm</span><input type="range" id="plane-offset" min="-100" max="100" step="0.5" value="0"></label>
+      <label class="chk"><input type="checkbox" id="show-intersection" checked> Mostrar o corte e as linhas de medida</label>
+      <div class="row"><button class="primary" id="btn-extract-3d" type="button">Extrair D1, D2, AP e LL do scan</button></div>
+      <p class="why" id="why-extract"></p>
+      <div class="note">Depois do alinhamento, o plano fica na altura glabela–opistocrânio. Em reavaliações, use a mesma altura para comparar.</div>
+      <div class="sub-h">Medidas</div>
+    </div>
     <div class="row" style="margin:8px 0 4px"><span style="font-size:13px">Unidade</span><div class="uni" id="uni"><button type="button" data-u="mm" class="on">mm</button><button type="button" data-u="cm">cm</button></div></div>
     <div class="med" id="med"></div>
+    <div class="note" id="origemMed"></div>
     <div class="row"><button id="exemplo" type="button">Carregar exemplo</button><button id="limpar" type="button">Limpar</button></div>
     <div class="row"><button class="primary" id="registrar" type="button">Registrar medição</button></div>
-    <div class="note">Os valores iniciais são um exemplo. Substitua pelas medidas do paciente e registre: a medição entra no acompanhamento com a data acima.</div>
+    <div class="note">Os valores iniciais são um exemplo. Substitua pelas medidas do paciente (à mão ou do scan) e registre: a medição entra no acompanhamento com a data acima.</div>
   </div>
 </section>
 
-<section id="s2" class="collapsed">
-  <h2><span class="n">2</span>Acompanhamento</h2>
+<section id="s3" class="collapsed">
+  <h2><span class="n">3</span>Acompanhamento</h2>
   <div class="bd">
     <div id="histBox"></div>
     <div class="note" id="evol"></div>
   </div>
 </section>
 
-<section id="s3" class="collapsed">
-  <h2><span class="n">3</span>Relatório</h2>
+<section id="s4" class="collapsed off cro-sec">
+  <h2><span class="n">4</span>Mapa de pressão</h2>
+  <div class="bd">
+    <div class="note" style="margin-top:0">Onde a órtese encosta (<b style="color:#C2281F">vermelho</b>, contato) e onde libera espaço (<b style="color:#2B5FD0">azul</b>, alívio), a partir do plano axial atual.</div>
+    <label class="ctl sel" id="row-cro-indic" title="Plagiocefalia: compara cada lado ao espelho sagital. Braquicefalia: reduz a largura e libera o eixo ântero-posterior até o IC alvo.">Indicação<select id="cro-indic"><option value="auto">Automática (IC e espelho)</option><option value="plagio">Plagiocefalia</option><option value="brachy">Braquicefalia</option><option value="both">Ambas</option></select></label>
+    <label class="ctl dec" id="row-cro-age" title="Usada para sugerir o IC alvo e a reserva de crescimento (curva OMS). Preenchida pela ficha (nascimento e data da medição).">Idade (meses)<input type="text" inputmode="decimal" id="cro-age" value=""></label>
+    <label class="ctl dec" id="row-cro-ic-target" title="Índice cefálico (largura ÷ comprimento) desejado ao fim do tratamento. Só se aplica à braquicefalia.">IC alvo<input type="text" inputmode="decimal" id="cro-ic-target" value="0,85"></label>
+    <label class="ctl sel" id="row-cro-mode" title="Passivo: só direciona o crescimento. Ativo: adiciona compressão leve nas áreas de contato.">Modo<select id="cro-mode"><option value="passive">Passivo (contato + alívio)</option><option value="active">Ativo (com compressão)</option></select></label>
+    <p class="note" id="cro-ic-info"></p>
+    <div class="row" style="margin-top:2px"><button type="button" id="btn-cro-ic-auto">Usar alvo pela idade</button></div>
+    <details class="av"><summary>Avançado: intensidade da correção</summary>
+      <label class="ctl dec" id="row-cro-relief" title="Percentual do desvio que a órtese corrige. 100% = corrige tudo até o alvo.">Fator de correção (%)<input type="text" inputmode="decimal" id="cro-relief" value="100"></label>
+      <label class="ctl dec" id="row-cro-relief-max" title="Limite da folga criada nas áreas de alívio.">Alívio máximo (mm)<input type="text" inputmode="decimal" id="cro-relief-max" value="6"></label>
+      <label class="ctl dec" id="row-cro-comp-max" title="Só no modo Ativo.">Compressão máxima (mm)<input type="text" inputmode="decimal" id="cro-comp-max" value="1,5"></label>
+    </details>
+    <div class="row"><button class="primary" id="btn-cro-analyze" type="button" disabled>Analisar pressão</button></div>
+    <p class="why" id="why-analyze"></p>
+    <canvas id="cro-polar" width="340" height="390" hidden></canvas>
+    <details class="av" open><summary>Correção manual dos pontos</summary>
+      <label class="ctl sel">Ferramenta<select id="cro-tool"><option value="none">Nenhuma (só girar o modelo)</option><option value="contact">＋ Contato (aumentar pressão)</option><option value="relief">－ Alívio (liberar crescimento)</option><option value="zero">○ Anular (tornar neutro)</option><option value="ear-r">◎ Marcar orelha D (clicar no topo)</option><option value="ear-l">◎ Marcar orelha E (clicar no topo)</option></select></label>
+      <label class="ctl dec" id="row-cro-edit-r">Raio da área (mm)<input type="text" inputmode="decimal" id="cro-edit-r" value="25"></label>
+      <label class="ctl dec" id="row-cro-edit-mm">Intensidade (mm)<input type="text" inputmode="decimal" id="cro-edit-mm" value="3"></label>
+      <div class="note">Com uma ferramenta ativa, clique na malha (um clique; arrastar continua girando) ou no mapa em vista superior. Para um falso positivo, use <b>Anular</b> na lista.</div>
+      <div class="row"><button type="button" id="btn-cro-undo">Desfazer última</button><button type="button" id="btn-cro-clear-edits">Limpar correções</button></div>
+      <div id="cro-lists"></div>
+    </details>
+  </div>
+</section>
+
+<section id="s5" class="collapsed off cro-sec">
+  <h2><span class="n">5</span>Órtese</h2>
+  <div class="bd">
+    <label class="ctl sel">Predefinição<select id="cro-preset"><option value="">Selecione…</option></select></label>
+    <div class="row"><input type="text" id="cro-preset-name" placeholder="Nome do protocolo do serviço" maxlength="40" style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--line-strong);border-radius:6px;background:var(--bg);font:inherit"><button type="button" id="btn-cro-preset-save">Salvar protocolo</button></div>
+    <div id="cro-params">
+      <label class="ctl sel" id="row-cro-type">Tipo<select id="cro-type"><option value="closed">Capacete fechado</option><option value="band">Faixa (topo aberto)</option></select></label>
+      <label class="ctl dec" id="row-cro-bandtop" title="Elevação do topo da faixa, em graus acima do plano de referência.">Topo da faixa (°)<input type="text" inputmode="decimal" id="cro-bandtop" value="55"></label>
+      <label class="ctl dec" id="row-cro-c0" title="Espaço entre a cabeça e a casca para o forro.">Folga / forro (mm)<input type="text" inputmode="decimal" id="cro-c0" value="2"></label>
+      <label class="ctl dec" id="row-cro-t">Espessura da casca (mm)<input type="text" inputmode="decimal" id="cro-t" value="3"></label>
+      <label class="ctl dec" id="row-cro-hb" title="Altura da borda atrás, relativa ao plano de referência (negativo = abaixo).">Borda posterior (mm)<input type="text" inputmode="decimal" id="cro-hb" value="-12"></label>
+      <label class="ctl dec" id="row-cro-occ-drop" title="Baixa a borda ao redor do occipício. Não estenda até a nuca: limita a flexão do pescoço.">Descida no occipício (mm)<input type="text" inputmode="decimal" id="cro-occ-drop" value="8"></label>
+      <label class="ctl sel" id="row-cro-cheek">Apoio na bochecha<select id="cro-cheek"><option value="on">Com apoio</option><option value="off">Sem apoio</option></select></label>
+      <label class="ctl dec" id="row-cro-cheek-w">Largura do apoio (mm)<input type="text" inputmode="decimal" id="cro-cheek-w" value="30"></label>
+      <label class="ctl sel" id="row-cro-mast">Aba atrás da orelha<select id="cro-mast"><option value="on">Com aba</option><option value="off">Sem aba</option></select></label>
+      <label class="ctl dec" id="row-cro-mast-w">Largura da aba (mm)<input type="text" inputmode="decimal" id="cro-mast-w" value="24"></label>
+      <label class="ctl sel" id="row-cro-res">Resolução<select id="cro-res"><option value="normal">Normal (~2 s, ~8 MB)</option><option value="high">Alta (~5 s, ~16 MB)</option><option value="fine">Fina (~10 s, ~28 MB)</option></select></label>
+      <label class="ctl sel" id="row-cro-split">Divisão em valvas<select id="cro-split"><option value="coronal">Coronal (frente/trás)</option><option value="sagittal">Sagital (esq./dir.)</option><option value="none">Sem divisão</option></select></label>
+      <div class="sub-h">Orelhas</div>
+      <p class="note" id="cro-ear-info">Analise a pressão para detectar as orelhas.</p>
+      <div class="row"><button type="button" id="btn-cro-mark-ear-r">◎ Marcar D</button><button type="button" id="btn-cro-mark-ear-l">◎ Marcar E</button><button type="button" id="btn-cro-ear-auto">Voltar à detecção automática</button></div>
+      <div class="note">A linha amarela e as bolas verdes no modelo mostram onde o programa achou as orelhas. Se errar, toque em <b>Marcar</b> e clique no topo da orelha na malha.</div>
+      <details class="av"><summary>Avançado: reserva de crescimento</summary>
+        <label class="ctl sel" id="row-cro-grow-src">Origem do crescimento<select id="cro-grow-src"><option value="age">Curva OMS pela idade</option><option value="manual">Manual (mm/mês)</option></select></label>
+        <label class="ctl dec" id="row-cro-grow-m">Meses até o reajuste<input type="text" inputmode="decimal" id="cro-grow-m" value="4"></label>
+        <label class="ctl dec" id="row-cro-grow-rate">Crescimento radial (mm/mês)<input type="text" inputmode="decimal" id="cro-grow-rate" value="0,8"></label>
+        <label class="ctl dec" id="row-cro-grow-contact" title="Nas áreas de alívio vale 100%; nas de contato só esta fração, para o capacete continuar segurando a região.">Reserva nas áreas de contato (%)<input type="text" inputmode="decimal" id="cro-grow-contact" value="30"></label>
+        <label class="ctl dec" id="row-cro-grow-vertex">Reserva extra no vértice (mm)<input type="text" inputmode="decimal" id="cro-grow-vertex" value="2"></label>
+        <p class="note" id="cro-grow-info"></p>
+      </details>
+      <details class="av"><summary>Avançado: orelhas (valores)</summary>
+        <label class="ctl sel" id="row-cro-ear-mode">Modo das orelhas<select id="cro-ear-mode"><option value="auto">Automático (o lado marcado prevalece)</option><option value="manual">Manual nos dois lados</option></select></label>
+        <label class="ctl dec" id="row-cro-ear-clear">Folga ao redor da orelha (mm)<input type="text" inputmode="decimal" id="cro-ear-clear" value="8"></label>
+        <label class="ctl dec" id="row-cro-ear-az-r">Azimute D (°)<input type="text" inputmode="decimal" id="cro-ear-az-r" value="100"></label>
+        <label class="ctl dec" id="row-cro-ear-az-l">Azimute E (°)<input type="text" inputmode="decimal" id="cro-ear-az-l" value="100"></label>
+        <label class="ctl dec" id="row-cro-ear-w-r">Semilargura D (°)<input type="text" inputmode="decimal" id="cro-ear-w-r" value="24"></label>
+        <label class="ctl dec" id="row-cro-ear-w-l">Semilargura E (°)<input type="text" inputmode="decimal" id="cro-ear-w-l" value="24"></label>
+        <label class="ctl dec" id="row-cro-ear-top-r">Altura do arco D (mm)<input type="text" inputmode="decimal" id="cro-ear-top-r" value="14"></label>
+        <label class="ctl dec" id="row-cro-ear-top-l">Altura do arco E (mm)<input type="text" inputmode="decimal" id="cro-ear-top-l" value="14"></label>
+      </details>
+      <details class="av"><summary>Avançado: bordas e abas</summary>
+        <label class="ctl dec" id="row-cro-hf">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="4"></label>
+        <label class="ctl dec" id="row-cro-occ-w">Semilargura do occipício (°)<input type="text" inputmode="decimal" id="cro-occ-w" value="50"></label>
+        <label class="ctl dec" id="row-cro-cheek-depth">Profundidade da bochecha (mm)<input type="text" inputmode="decimal" id="cro-cheek-depth" value="32"></label>
+        <label class="ctl dec" id="row-cro-cheek-gap">Afastamento da orelha (mm)<input type="text" inputmode="decimal" id="cro-cheek-gap" value="6"></label>
+        <label class="ctl dec" id="row-cro-cheek-clear">Folga nos apoios (mm)<input type="text" inputmode="decimal" id="cro-cheek-clear" value="1,5"></label>
+        <label class="ctl dec" id="row-cro-mast-depth">Profundidade da aba (mm)<input type="text" inputmode="decimal" id="cro-mast-depth" value="24"></label>
+        <label class="ctl dec" id="row-cro-mast-gap">Afastamento atrás da orelha (mm)<input type="text" inputmode="decimal" id="cro-mast-gap" value="4"></label>
+      </details>
+      <details class="av"><summary>Avançado: furos e divisão</summary>
+        <label class="ctl dec" id="row-cro-hole-d">Diâmetro dos furos (mm)<input type="text" inputmode="decimal" id="cro-hole-d" value="4"></label>
+        <label class="ctl dec" id="row-cro-pitch">Passo entre furos (mm)<input type="text" inputmode="decimal" id="cro-pitch" value="10"></label>
+        <label class="ctl dec" id="row-cro-margin">Margem sem furos (mm)<input type="text" inputmode="decimal" id="cro-margin" value="8"></label>
+        <label class="ctl dec" id="row-cro-split-pos" title="Corte coronal: negativo = atrás do plano da orelha.">Posição do corte (mm)<input type="text" inputmode="decimal" id="cro-split-pos" value="-35"></label>
+        <label class="ctl dec" id="row-cro-gap">Fenda (mm)<input type="text" inputmode="decimal" id="cro-gap" value="2"></label>
+      </details>
+    </div>
+    <div class="row"><button class="primary" id="btn-cro-generate" type="button" disabled>Gerar órtese</button></div>
+    <p class="why" id="why-generate"></p>
+    <div class="sub-h">Verificação</div>
+    <ul class="ck" id="cro-check"><li class="ck-na">Gere a órtese para ver a verificação.</li></ul>
+    <div class="row"><button class="primary" id="btn-cro-export" type="button" disabled>Exportar órtese (STL, mm)</button></div>
+    <p class="why" id="why-export"></p>
+    <details class="av"><summary>Resumo técnico</summary><pre class="tec" id="cro-summary">Posicione o plano axial na altura glabela–opistocrânio e toque em "Analisar pressão".</pre></details>
+    <div class="sub-h">Versões do projeto</div>
+    <div class="row"><button type="button" id="v-save">Guardar versão atual</button></div><div id="v-list"></div>
+    <div class="note">Cada versão guarda os parâmetros e as correções manuais (para comparar a órtese atual com a anterior de uma criança em crescimento). Salve a ficha para mantê-las.</div>
+    <div class="note">Parâmetros iniciais de projeto, a validar pelo ortesista. O resultado não substitui a avaliação clínica nem o ensaio de fabricação.</div>
+  </div>
+</section>
+
+<section id="s6" class="collapsed">
+  <h2><span class="n">6</span>Relatório</h2>
   <div class="bd">
     <div class="row"><button class="primary" id="expPdf" type="button">Relatório (PDF)</button><button id="copiar" type="button">Copiar resumo</button></div>
-    <div class="note">O relatório traz os dados do paciente, a medição atual com a classificação, o esquema, a evolução e todas as medições registradas.</div>
+    <div class="note">O relatório traz os dados do paciente, a medição atual com a classificação, o esquema, a evolução e todas as medições registradas; com o scan, também as vistas do modelo, o mapa de pressão e o planejamento da órtese.</div>
     <div id="expInfo"></div>
   </div>
 </section>
 
-<div class="credit"><img src="assets/logo-labeita.png" alt="Lab.EITA"><div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Ferramenta de apoio ao cálculo. A interpretação dos valores e a conduta dependem da avaliação clínica do paciente.</div></div>
+<div class="credit"><img src="assets/logo-labeita.png" alt="Lab.EITA"><div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Ferramenta de apoio ao cálculo e ao projeto. A interpretação dos valores, a conduta e a validação da órtese dependem da avaliação clínica do paciente.</div></div>
 </aside>
 
 <main id="view">
+  <div id="tabs" role="tablist"><button type="button" data-v="res" class="cur">Resultados</button><button type="button" data-v="3d">Modelo 3D</button></div>
   <div id="conteudo">
     <div class="grade" id="cartoes"></div>
     <div class="duas">
@@ -235,10 +391,19 @@ section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;heigh
       <p>CVA é a diferença absoluta entre as duas diagonais, em milímetros. CVAI é essa diferença dividida pela maior diagonal, em porcentagem. O índice cefálico é a largura dividida pelo comprimento, vezes 100: descreve a forma do crânio e não mede assimetria. Os limiares variam entre serviços e publicações, e o índice cefálico muda com a idade e a população estudada.</p>
     </details>
   </div>
-  <div id="status">Informe as medidas (etapa 1). O resultado sai na hora.</div>
+  <div id="v3d" hidden>
+    <div id="cena"></div>
+    <div id="vazio3d"><div><b>Nenhum scan aberto</b>Abra o STL na etapa 1 (Scan 3D), marque os 5 pontos e alinhe.<br>Depois: medidas no plano axial, mapa de pressão e órtese.</div></div>
+    <div class="tools" id="vistas3d" aria-label="Vistas"><button type="button" data-view="front">Frente</button><button type="button" data-view="right">Lat. D</button><button type="button" data-view="left">Lat. E</button><button type="button" data-view="back">Posterior</button><button type="button" data-view="top">Cima</button><span class="vs"></span><button type="button" data-view="flip" title="Inverter">⇅</button><button type="button" data-view="fit">Enquadrar</button></div>
+    <div class="tools" id="camadas" aria-label="Camadas do modelo"><label><input type="checkbox" id="cro-show-head" checked> Cabeça</label><label><input type="checkbox" id="cro-show-map" checked> Pressão</label><label><input type="checkbox" id="cro-show-helmet" checked> Órtese</label><label><input type="checkbox" id="cro-show-marks" checked> Pontos</label><label>Opacidade <input type="range" id="cro-opacity" min="15" max="100" step="5" value="75" style="width:70px"></label></div>
+    <div id="legend"></div>
+  </div>
+  <div id="status">Informe as medidas (etapa 2) ou abra o scan 3D (etapa 1). O resultado sai na hora.</div>
   <div id="busy"><div id="busyT">Processando…</div></div>
 </main>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
