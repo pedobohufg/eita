@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<!--
+  EITA! NARIZ·ORELHA
+  © 2026 Laboratório de Estudos Inventivos em Tecnologias Assistivas da Universidade Federal de Goiás (Lab.EITA/UFG).
+  Autor: Pedro Henrique Gonçalves.
+  Todos os direitos reservados. É proibido copiar, modificar, redistribuir ou usar este código, no todo ou em parte,
+  sem autorização por escrito do Lab.EITA/UFG.
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="EITA! NARIZ·ORELHA — projeto de próteses nasais e auriculares a partir do scan 3D do rosto: orelha espelhada do lado sadio ou nariz paramétrico, prótese com borda afinada e molde em partes para silicone, do Lab.EITA/UFG.">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<title>EITA! NARIZ·ORELHA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--bg:#F4F2F9;--surface:#FFFFFF;--surface-2:#ECE8F6;--ink:#1C1730;--muted:#5B5573;--line:#E1DCEC;--line-strong:#A79FBF;--accent:#6B3FD6;--accent-2:#8656F5;--brand:#9560FD;--accent-soft:#EFE8FF;--ufg:#0075BE;--warn:#B04E0C;--ok:#25774F;--areola:#1fae63;--papila:#2f6fdb;--marc:#d99a00;--f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;--r:10px;--shadow:0 1px 2px rgba(40,22,90,.06),0 4px 16px rgba(60,30,130,.07)}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{margin:0;height:100%;font-family:var(--f-body);color:var(--ink);background:var(--bg);font-size:14px}
+#app{display:grid;grid-template-rows:64px 1fr;grid-template-columns:384px 1fr;grid-template-areas:"top top" "panel view";height:100vh}
+#top{grid-area:top;display:flex;align-items:center;gap:18px;padding:0 18px;background:var(--surface);border-bottom:1px solid var(--line);position:relative;min-width:0}
+#top:after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--brand),var(--accent) 45%,transparent 100%)}
+.brand{display:flex;align-items:center;gap:12px;flex:none}
+.logo img{height:44px;width:auto;display:block}
+.ttl h1{font:800 23px/1 var(--f-body);margin:0;letter-spacing:-.02em}.ttl h1 em{font-style:normal;color:var(--brand)}
+.ttl .sub{font:600 11.5px var(--f-body);color:#2a2438;margin-top:4px}
+#stepper{display:flex;gap:4px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+#stepper button{display:flex;align-items:center;gap:7px;border:1px solid transparent;background:transparent;border-radius:999px;padding:6px 11px 6px 6px;font:500 12.5px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap}
+#stepper button .n{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--line-strong);font:600 11px var(--f-mono);color:var(--muted);background:var(--surface)}
+#stepper button.done .n{background:var(--accent);border-color:var(--accent);color:#fff}
+#stepper button.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.vsep{width:1px;height:34px;background:var(--line)}
+.logo.sec img{height:34px}
+#panel{grid-area:panel;background:var(--bg);border-right:1px solid var(--line);overflow-y:auto;padding:14px 14px 28px;display:flex;flex-direction:column;gap:10px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+section>h2{margin:0;display:flex;align-items:center;gap:10px;padding:12px 14px;font:600 13.5px var(--f-body);cursor:pointer;user-select:none}
+section>h2 .n{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 11.5px var(--f-mono);flex:none}
+section>h2 .n.ext{background:var(--surface-2);color:var(--accent)}
+section>h2:after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--line-strong);border-bottom:2px solid var(--line-strong);transform:rotate(45deg);transition:transform .2s}
+section.collapsed>h2:after{transform:rotate(-45deg)}
+section .bd{padding:0 14px 14px}section.collapsed .bd{display:none}
+section.off{opacity:.5}section.off .bd{pointer-events:none}section.off>h2 .n{background:var(--line-strong)}
+.grp{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:8px 4px 0}
+button{font:500 13px var(--f-body);border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:8px 13px;cursor:pointer;color:var(--ink)}
+button:hover{background:var(--surface-2)}button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}button.primary:hover{background:var(--accent-2)}
+button:disabled{opacity:.5;cursor:default}button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.drop{border:1.5px dashed var(--line-strong);border-radius:var(--r);padding:20px 14px;text-align:center;color:var(--muted);cursor:pointer;background:var(--bg)}
+.drop:hover,.drop.hover{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}.drop b{display:block;font-size:14px;color:var(--ink);margin-bottom:4px}
+label.ctl{display:grid;grid-template-columns:1fr 78px;gap:4px 8px;align-items:center;font-size:13px;margin:10px 0 2px}
+label.ctl:has(select){grid-template-columns:1fr 150px}
+label.ctl:has(input[type=text]){grid-template-columns:1fr 150px}
+label.ctl input[type=number]{width:78px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);text-align:right;background:var(--bg);color:var(--ink)}
+label.ctl input[type=text]{width:150px;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:500 13px var(--f-mono);background:var(--bg);color:var(--ink)}
+label.ctl select{width:150px;padding:5px 6px;border:1px solid var(--line-strong);border-radius:6px;font:inherit;background:var(--bg);color:var(--ink)}
+label.ctl input[type=range]{grid-column:1/-1;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
+.avisos{list-style:none;margin:6px 0 0;padding:0;font-size:12px;line-height:1.4}
+.avisos li{padding:5px 8px;border-left:3px solid #D97706;background:#FEF3C7;margin-top:4px;border-radius:0 6px 6px 0}
+.avisos li.alerta{border-color:#DC2626;background:#FEE2E2}
+.avisos li.ok{border-color:#16A34A;background:#DCFCE7}
+.chk{font-size:13px;display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}.chk input{accent-color:var(--accent);width:15px;height:15px}
+.sub-h{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 4px}
+table.m{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}table.m td{padding:5px 2px;border-bottom:1px solid var(--surface-2)}
+table.m td:last-child{text-align:right;font:500 13px var(--f-mono)}
+.warnbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#fbebdd;color:var(--warn);font-size:12px;line-height:1.45}
+.okbox{margin-top:8px;padding:8px 10px;border-radius:8px;background:#e1f1e8;color:var(--ok);font-size:12px;line-height:1.45}
+.seg{display:flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}.seg button{border:0;border-radius:0;flex:1;padding:7px 8px;font-size:12.5px}.seg button+button{border-left:1px solid var(--line-strong)}
+.sw{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}.sw div{font:500 11.5px var(--f-mono);color:var(--muted)}.sw i{display:block;height:30px;border-radius:7px;border:1px solid var(--line);margin-bottom:4px}
+.marc{display:grid;place-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:6px}.marc svg{width:150px;height:auto;background:#fff}
+#cvCorpo{width:100%;aspect-ratio:1;display:block;border-radius:8px;border:1px solid var(--line);margin-top:6px}
+.credit{margin-top:auto;padding:16px 4px 0;font-size:11.5px;color:var(--muted);line-height:1.5;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line)}
+.credit img{height:58px;width:auto;flex:none}.credit b{color:var(--ink)}
+#view{grid-area:view;position:relative;overflow:hidden;background:radial-gradient(120% 90% at 50% 0%,#FBFAFE 0%,var(--bg) 70%)}
+#view canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#pc{cursor:grab}#pc.alca{cursor:pointer}
+#tabs{position:absolute;top:14px;left:14px;display:flex;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2}
+#tabs button{padding:6px 12px;font:500 12.5px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}
+#tabs button.cur{background:var(--accent-soft);color:var(--accent)}
+#tabs button:disabled{opacity:.4}
+.tools{position:absolute;top:14px;right:14px;display:flex;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:3px;z-index:2;flex-wrap:wrap;align-items:center}
+.tools button{padding:6px 10px;font:500 12px var(--f-body);background:transparent;border:0;border-radius:7px;color:var(--muted)}.tools button:hover{background:var(--accent-soft);color:var(--ink)}
+.tools button.cur{background:var(--accent-soft);color:var(--accent)}
+.tools .vs{width:1px;height:20px;background:var(--line);margin:0 3px}
+.tools label{font-size:12px;color:var(--muted);display:flex;gap:4px;align-items:center;padding:0 6px}.tools input{accent-color:var(--accent)}
+#legend{position:absolute;right:14px;bottom:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:8px 11px;font:500 12px var(--f-mono);z-index:2;line-height:1.6}
+#legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+#status{position:absolute;bottom:14px;left:14px;font-size:12.5px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 30px;max-width:min(640px,calc(100% - 28px));box-shadow:var(--shadow);line-height:1.45;z-index:2}
+#status:before{content:"";position:absolute;left:12px;top:14px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+#status.warn:before{background:var(--warn)}
+#empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;pointer-events:none}
+#empty b{display:block;font-size:18px;color:var(--ink);margin-bottom:6px}
+#busy{position:absolute;inset:0;display:none;place-items:center;background:#f4f2f98c;z-index:3}
+#busy>div{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;box-shadow:var(--shadow);font-weight:600}
+#busy>div:before{content:"";width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);animation:sp .8s linear infinite}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px}.pgrid .w2{grid-column:1/-1}
+.pf{display:flex;flex-direction:column;font:500 11.5px var(--f-body);color:var(--muted);gap:3px;min-width:0}
+.pf input,.pf select,.pf textarea{width:100%;min-width:0;padding:5px 7px;border:1px solid var(--line-strong);border-radius:6px;font:13px var(--f-body);color:var(--ink);background:var(--bg);box-sizing:border-box}.pf textarea{resize:vertical}
+section.pac>h2 .n{background:var(--brand)}section.pac>h2 .n svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round}
+.pname{font:500 11px var(--f-mono);color:var(--accent);margin-left:6px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}.frow>div{flex:1;min-width:0}
+.frow small{display:block;color:var(--muted);font:11px var(--f-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.frow button{padding:4px 9px;font-size:12px}.frow button.del{color:var(--warn)}
+.warnbox ul{margin:4px 0 0;padding-left:18px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media(max-width:900px){#app{grid-template-columns:1fr;grid-template-rows:auto 50vh 1fr;grid-template-areas:"top" "view" "panel";height:auto;min-height:100%}#stepper{display:none}#top{padding:10px 14px}}
+
+/* ---- nariz e orelha */
+#v3d{position:absolute;inset:0}#cena{position:absolute;inset:0}#cena canvas{position:absolute;inset:0}
+#vazio3d{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;pointer-events:none;font-size:13.5px;line-height:1.6;padding:20px}#vazio3d b{display:block;font-size:17px;color:var(--ink);margin-bottom:4px}
+#vistas3d{top:14px}#camadas{top:58px}
+label.ctl.sel{grid-template-columns:1fr 168px}label.ctl.sel select{width:168px}
+ul.pts{list-style:none;padding:0;margin:8px 0;display:grid;gap:3px;font-size:12.5px}ul.pts li{display:flex;gap:7px;align-items:center;color:var(--muted);cursor:pointer;padding:3px 5px;border-radius:6px}ul.pts li:hover{background:var(--surface-2)}
+ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px solid var(--line-strong)}ul.pts li.ok{color:var(--ink)}ul.pts li.ok i{border-color:transparent}ul.pts li.cur{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.why{font-size:12px;color:var(--warn);margin:4px 0 0}.why:empty{display:none}
+.pares{font:500 12px var(--f-mono);margin:6px 0}.pares div{padding:2px 0}
+#legend:empty{display:none}
+.dl{display:grid;gap:6px;margin-top:8px}.dl button{text-align:left}
+</style>
+</head>
+<body>
+<div id="app">
+<header id="top">
+  <div class="brand">
+    <span class="logo"><img src="assets/eita-nariz-orelha-simbolo.png" alt="EITA! NARIZ·ORELHA"></span>
+    <div class="ttl"><h1>EITA! <em>NARIZ·ORELHA</em></h1><div class="sub">Próteses nasais e auriculares · v0.1</div></div>
+  </div>
+  <nav id="stepper" aria-label="Etapas"></nav>
+  <span class="vsep"></span>
+  <span class="logo sec" title="Universidade Federal de Goiás"><img src="assets/logo-ufg.png" alt="UFG"></span>
+</header>
+
+<aside id="panel">
+<section id="s0" class="pac collapsed">
+  <h2><span class="n"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.8"/><path d="M4.5 20c.8-3.8 3.9-6 7.5-6s6.7 2.2 7.5 6"/></svg></span>Ficha do paciente<span class="pname" id="pBadge"></span></h2>
+  <div class="bd">
+    <div class="pgrid">
+      <label class="pf w2">Nome<input type="text" id="pName" placeholder="ex.: Maria S." autocomplete="off"></label>
+      <label class="pf">Prontuário / código<input type="text" id="pId" placeholder="ex.: NO-012" autocomplete="off"></label>
+      <label class="pf">Nascimento<input type="date" id="pBirth"></label>
+      <label class="pf">Sexo<select id="pSex"><option value="">—</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select></label>
+      <label class="pf">Etiologia<select id="pEtio"><option value="">—</option><option value="congenita">Congênita (microtia/anotia)</option><option value="oncologica">Oncológica (ressecção)</option><option value="trauma">Trauma</option><option value="queimadura">Queimadura</option><option value="outra">Outra</option></select></label>
+      <label class="pf">Radioterapia na região<select id="pRadio"><option value="">—</option><option value="nao">Não</option><option value="sim">Sim</option></select></label>
+      <label class="pf">Retenção prevista<select id="pRet"><option value="adesivo">Adesivo</option><option value="imas">Ímãs / implantes</option><option value="oculos">Armação de óculos</option><option value="anatomica">Retenção anatômica</option></select></label>
+      <label class="pf w2">Alergias<input type="text" id="pAlerg" placeholder="ex.: adesivo acrílico, látex"></label>
+      <label class="pf w2">Profissional responsável<input type="text" id="pProf" placeholder="nome e registro"></label>
+      <label class="pf w2">Observações<textarea id="pNotes" rows="2" placeholder="ex.: cicatriz, enxerto, implantes já instalados"></textarea></label>
+    </div>
+    <div class="row" style="margin-top:8px"><button class="primary" id="fSave" type="button">Salvar ficha</button><button id="fNew" type="button">Nova</button><button id="fExp" type="button">Exportar</button><button id="fImpB" type="button">Abrir arquivo</button><input type="file" id="fImp" accept=".json" hidden></div>
+    <div class="note">A ficha guarda os dados do paciente e o projeto (tipo, pontos, contorno, plano, forma, parâmetros e medidas); o scan não fica na ficha. As fichas ficam neste navegador; exporte o arquivo para levar a outro computador.</div>
+    <div class="sub-h">Fichas salvas</div><div id="fList"></div>
+    <div class="sub-h">Base do laboratório</div>
+    <div class="row"><button id="dbExp" type="button">Exportar base</button><button id="dbImpB" type="button">Importar base</button><input type="file" id="dbImp" accept=".json" hidden></div>
+    <div class="note">Um único arquivo com todas as fichas deste navegador. Guarde na pasta do laboratório com acesso restrito à equipe, porque contém dados de pacientes.</div>
+  </div>
+</section>
+
+<section id="s1">
+  <h2><span class="n">1</span>Prótese e scan</h2>
+  <div class="bd">
+    <div class="seg" id="tipoSeg" role="group" aria-label="Tipo de prótese"><button type="button" data-tipo="orelha" class="on">Orelha</button><button type="button" data-tipo="nariz">Nariz</button></div>
+    <label class="ctl sel" id="ladoBox">Lado da orelha que falta<select id="lado"><option value="D">Direito do paciente</option><option value="E">Esquerdo do paciente</option></select></label>
+    <label class="ctl sel">Unidade do arquivo<select id="unidade"><option value="auto">Automática</option><option value="1">Milímetros (mm)</option><option value="10">Centímetros (cm)</option><option value="1000">Metros (m)</option></select></label>
+    <div class="drop" id="scanDrop" tabindex="0" role="button" style="margin-top:8px"><b>Abrir o scan do rosto</b>STL, OBJ ou PLY (malha) · clique ou arraste</div>
+    <input type="file" id="scanFile" accept=".stl,.obj,.ply" hidden>
+    <label class="chk"><input type="checkbox" id="furos" checked> Fechar furos pequenos do scan (até 40 mm de contorno)</label>
+    <div class="note" id="scanInfo">Scanner de luz estruturada ou fotogrametria (vários ângulos). Para a orelha, o scan precisa mostrar os dois lados da cabeça e a orelha sadia inteira, inclusive por trás; para o nariz, o rosto de frente com os olhos e o lábio superior.</div>
+  </div>
+</section>
+
+<section id="s2" class="off collapsed">
+  <h2><span class="n">2</span>Pontos e simetria</h2>
+  <div class="bd">
+    <ul class="pts" id="listaPontos"></ul>
+    <div class="row"><button class="primary" id="marcar" type="button">Marcar o ponto escolhido</button><button id="limparPontos" type="button">Limpar</button></div>
+    <div id="contornoBox">
+      <div class="sub-h">Contorno da orelha sadia</div>
+      <div class="row"><button id="marcarContorno" type="button">Marcar contorno</button><button id="desfazerContorno" type="button">Desfazer ponto</button><button id="limparContorno" type="button">Limpar</button></div>
+      <div class="note" id="contornoInfo">Pontos na pele em volta da orelha sadia, rente à raiz e envolvendo toda a orelha vista de lado (8 a 16 pontos, na ordem, em volta).</div>
+    </div>
+    <div class="sub-h">Plano sagital mediano</div>
+    <label class="chk"><input type="checkbox" id="refinar" checked> Refinar pela simetria do rosto</label>
+    <button class="primary" id="calcPlano" type="button" disabled>Calcular o plano</button>
+    <p class="why" id="whyPlano"></p>
+    <div class="note" id="planoInfo">Dê <b>duplo clique</b> no modelo para marcar. O plano passa pelo meio dos cantos dos olhos, pelo násio e pelo subnasal; o refinamento compara o rosto com o seu espelho, sem a região do defeito e sem as orelhas.</div>
+  </div>
+</section>
+
+<section id="s3" class="off collapsed">
+  <h2><span class="n">3</span>Forma</h2>
+  <div class="bd">
+    <label class="ctl sel">Origem da forma<select id="fonte"></select></label>
+    <div id="paramNariz">
+      <div class="sub-h">Nariz paramétrico</div>
+      <label class="ctl">Comprimento n–sn (mm)<input type="number" id="nzComprimento" step="0.5" min="30" max="70"></label>
+      <label class="ctl">Largura alar (mm)<input type="number" id="nzLargura" step="0.5" min="20" max="50"></label>
+      <label class="ctl">Projeção da ponta (mm)<input type="number" id="nzProjecao" step="0.5" min="10" max="35"></label>
+      <label class="ctl">Altura da ponta acima de sn (mm)<input type="number" id="nzAlturaPonta" step="0.5" min="2" max="20"></label>
+      <label class="ctl">Ângulo nasolabial (°)<input type="number" id="nzNasolabial" step="1" min="80" max="125"></label>
+      <label class="ctl">Dorso: côncavo (−) a convexo (+), mm<input type="number" id="nzDorso" step="0.5" min="-4" max="4"></label>
+      <label class="ctl">Largura do lóbulo da ponta (mm)<input type="number" id="nzLarguraPonta" step="0.5" min="8" max="26"></label>
+      <label class="ctl">Tamanho das narinas (%)<input type="number" id="nzNarina" step="5" min="50" max="150"></label>
+      <label class="ctl">Profundidade das narinas (mm)<input type="number" id="nzProfNarina" step="0.5" min="4" max="16"></label>
+      <div class="row"><button id="nzPadrao" type="button">Padrões pelo rosto</button></div>
+      <div class="note">Os padrões saem do próprio rosto: largura alar ≈ distância entre os cantos internos dos olhos; projeção ≈ 0,4 × comprimento. É um ponto de partida: confira com fotos antigas do paciente, se houver.</div>
+    </div>
+    <div id="modeloBox">
+      <div class="sub-h">Modelo importado</div>
+      <div class="drop" id="modeloDrop" tabindex="0" role="button"><b>Abrir o modelo</b>STL, OBJ ou PLY, já recortado (nariz do banco de Leeds, scan antigo, orelha)</div>
+      <input type="file" id="modeloFile" accept=".stl,.obj,.ply" hidden>
+      <div class="note">Marque pelo menos 3 pares de pontos: o mesmo ponto anatômico no modelo e no rosto (ex.: raiz, ponta, base de cada asa). O alinhamento ajusta posição, giro e escala.</div>
+      <div class="row"><button id="parModelo" type="button">Ponto no modelo</button><button id="parRosto" type="button">Ponto no rosto</button><button id="parLimpar" type="button">Limpar pares</button></div>
+      <div class="pares" id="pares"></div>
+      <button class="primary" id="alinharModelo" type="button" disabled>Alinhar o modelo</button>
+    </div>
+    <div class="sub-h">Ajuste fino da posição</div>
+    <label class="ctl">Deslocar para a frente/trás (mm)<input type="number" id="ajU" step="0.5" value="0"></label>
+    <label class="ctl">Deslocar para cima/baixo (mm)<input type="number" id="ajV" step="0.5" value="0"></label>
+    <label class="ctl">Afastar/aproximar da pele (mm)<input type="number" id="ajW" step="0.5" value="0"></label>
+    <label class="ctl">Girar (°)<input type="number" id="ajGiro" step="1" value="0"></label>
+    <label class="ctl">Escala (%)<input type="number" id="ajEscala" step="1" value="100" min="70" max="130"></label>
+    <div class="note" id="ajInfo">Na orelha, "frente/trás" e "cima/baixo" valem no plano do lado da cabeça; no nariz, "frente/trás" é para os lados.</div>
+  </div>
+</section>
+
+<section id="s4" class="off collapsed">
+  <h2><span class="n">4</span>Prótese</h2>
+  <div class="bd">
+    <label class="ctl sel">Resolução<select id="passo"><option value="0.4">Fina (0,4 mm, mais lenta)</option><option value="0.5" selected>Padrão (0,5 mm)</option><option value="0.7">Rápida (0,7 mm, prévia)</option></select></label>
+    <label class="ctl">Largura da aba de assentamento (mm)<input type="number" id="pAba" step="0.5" min="2" max="15"></label>
+    <label class="ctl">Espessura na borda (mm)<input type="number" id="pBorda" step="0.05" min="0.1" max="1.5"></label>
+    <label class="ctl">Espessura na raiz da aba (mm)<input type="number" id="pBase" step="0.1" min="0.5" max="4"></label>
+    <label class="chk"><input type="checkbox" id="pOco"> Prótese oca</label>
+    <label class="ctl" id="paredeBox">Parede (mm)<input type="number" id="pParede" step="0.5" min="1.5" max="6"></label>
+    <div class="sub-h">Retenção por ímãs / cápsulas</div>
+    <div class="row"><button id="marcarIma" type="button">Marcar ímãs</button><button id="limparImas" type="button">Limpar</button></div>
+    <label class="ctl">Diâmetro do nicho (mm)<input type="number" id="imaDiam" step="0.5" value="6" min="2" max="15"></label>
+    <label class="ctl">Profundidade do nicho (mm)<input type="number" id="imaProf" step="0.5" value="3" min="1" max="8"></label>
+    <div class="note" id="imasInfo">Sem ímãs marcados, a prótese sai para adesivo. Cada ímã abre um nicho cilíndrico na face interna, sobre o ponto da pele (ou do pilar) marcado.</div>
+    <button class="primary" id="gerarProtese" type="button">Gerar a prótese</button>
+    <table class="m" id="medidas"></table>
+    <ul class="avisos" id="avisosProtese"></ul>
+  </div>
+</section>
+
+<section id="s5" class="off collapsed">
+  <h2><span class="n">5</span>Molde</h2>
+  <div class="bd">
+    <label class="ctl">Parede lateral (mm)<input type="number" id="mParede" step="0.5" min="4" max="20"></label>
+    <label class="ctl">Base abaixo da pele (mm)<input type="number" id="mBase" step="0.5" min="3" max="20"></label>
+    <label class="ctl">Topo acima da prótese (mm)<input type="number" id="mTopo" step="0.5" min="3" max="20"></label>
+    <label class="chk"><input type="checkbox" id="mDividir"> Dividir a parte externa em duas (molde de 3 partes)</label>
+    <label class="ctl" id="angBox">Ângulo do plano de divisão (°)<input type="number" id="mAngulo" step="5" min="0" max="180"></label>
+    <label class="ctl" id="desBox">Deslocamento do plano (mm)<input type="number" id="mDesloc" step="0.5"></label>
+    <label class="ctl">Raio das chaves (mm)<input type="number" id="mChave" step="0.25" min="1" max="5"></label>
+    <label class="ctl">Folga das chaves (mm)<input type="number" id="mFolga" step="0.05" min="0" max="0.6"></label>
+    <label class="ctl">Canal de injeção (mm)<input type="number" id="mCanal" step="0.5" min="0" max="8"></label>
+    <label class="ctl">Respiros (quantidade)<input type="number" id="mRespiros" step="1" min="0" max="6"></label>
+    <label class="ctl">Diâmetro dos respiros (mm)<input type="number" id="mRespiro" step="0.25" min="0.5" max="4"></label>
+    <div class="note">A base leva a pele do paciente e tudo o que fica abaixo da prótese na direção de retirada (lateral na orelha, para a frente no nariz); a parte externa sai para cima. Nada trava uma peça na outra; nas reentrâncias da hélice e das narinas o silicone flexiona para sair.</div>
+    <button class="primary" id="gerarMolde" type="button">Gerar o molde</button>
+    <table class="m" id="medidasMolde"></table>
+    <ul class="avisos" id="avisosMolde"></ul>
+  </div>
+</section>
+
+<section id="s6" class="off collapsed">
+  <h2><span class="n">6</span>Arquivos e relatório</h2>
+  <div class="bd">
+    <div class="dl">
+      <button class="primary" id="baixarPacote" type="button">Pacote completo (.zip)</button>
+      <button id="baixarProtese" type="button">Só a prótese (STL, no lugar do scan)</button>
+      <button id="baixarPdf" type="button">Relatório (PDF)</button>
+    </div>
+    <div class="note">O pacote traz a prótese (no referencial do scan, para conferir sobreposta a ele), as peças do molde prontas para imprimir (base apoiada em z = 0), o relatório e a ficha. Impressão do molde: resina rígida (SLA) ou FDM com camada fina; o silicone médico entra pelo canal de injeção até sair nos respiros.</div>
+    <ul class="avisos" id="checagens"></ul>
+  </div>
+</section>
+
+<div class="credit"><img src="assets/logo-labeita.png" alt="Lab.EITA"><div><b>Lab.EITA</b> · Laboratório de Estudos Inventivos em Tecnologias Assistivas · Universidade Federal de Goiás<br>Ferramenta de apoio ao projeto. A forma, a adaptação, a cor e a validação da prótese dependem da avaliação clínica e do trabalho do anaplastologista.</div></div>
+</aside>
+
+<main id="view">
+  <div id="v3d">
+    <div id="cena"></div>
+    <div id="vazio3d"><div><b>Nenhum scan aberto</b>Escolha orelha ou nariz e abra o scan do rosto na etapa 1.</div></div>
+    <div class="tools" id="vistas3d" aria-label="Vistas"><button type="button" data-view="frente">Frente</button><button type="button" data-view="D">Lat. D</button><button type="button" data-view="E">Lat. E</button><button type="button" data-view="cima">Cima</button><button type="button" data-view="baixo">Baixo</button><span class="vs"></span><button type="button" data-view="fit">Enquadrar</button></div>
+    <div class="tools" id="camadas" aria-label="Camadas"><label><input type="checkbox" id="vRosto" checked> Rosto</label><label><input type="checkbox" id="vProtese" checked> Prótese</label><label><input type="checkbox" id="vMolde" checked> Molde</label><label><input type="checkbox" id="vModelo" checked> Modelo</label><label><input type="checkbox" id="vPontos" checked> Pontos</label><label><input type="checkbox" id="vExplodir" checked> Separar peças</label><label>Opacidade <input type="range" id="opacidade" min="15" max="100" step="5" value="100" style="width:70px"></label></div>
+    <div id="legend"></div>
+  </div>
+  <div id="status">Escolha orelha ou nariz e abra o scan do rosto (etapa 1).</div>
+  <div id="busy"><div id="busyT">Processando…</div></div>
+</main>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

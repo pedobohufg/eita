@@ -19,6 +19,7 @@ export const MODULOS = Object.freeze({
   olho: { nome: "EITA! OLHO", peca: "prótese ocular", chave: "eitaOLHO.fichas.v1", formatoFicha: "EITA! OLHO ficha", formatoBase: "EITA! OLHO base", pagina: "olho/index.html" },
   mamilo: { nome: "EITA! MAMILO", peca: "prótese de aréola e papila", chave: "eitaMAMILO.fichas.v1", formatoFicha: "EITA! MAMILO ficha", formatoBase: "EITA! MAMILO base", pagina: "mamilo/index.html" },
   cranio: { nome: "EITA! CRÂNIO", peca: "avaliação craniana e órtese", chave: "eitaCRANIO.fichas.v1", formatoFicha: "EITA! CRÂNIO ficha", formatoBase: "EITA! CRÂNIO base", pagina: "cranio/index.html" },
+  "nariz-orelha": { nome: "EITA! NARIZ·ORELHA", peca: "prótese nasal ou auricular", chave: "eitaNARIZORELHA.fichas.v1", formatoFicha: "EITA! NARIZ·ORELHA ficha", formatoBase: "EITA! NARIZ·ORELHA base", pagina: "nariz-orelha/index.html" },
 });
 export const CHAVE_CALIBRACAO_AFO = "eitaAFO.calib.v1";
 export const CAMPOS = ["nome", "codigo", "nascimento", "sexo", "profissional", "alergias", "observacoes"];
@@ -39,6 +40,10 @@ export function resumoProtese(modulo, f) {
     const md = (f.medicoes || []).map((x) => x.data).filter(Boolean).sort(), n = md.length, sc = f.ortese && f.ortese.scan && txt(f.ortese.scan.nome);
     const med = n ? `${n} medição${n > 1 ? "ões" : ""}, a última em ${md[n - 1].split("-").reverse().join("/")}` : "sem medições";
     return { modulo, fichaId: f.id, peca: MODULOS.cranio.peca, lado: "", atualizado: f.atualizado || "", arquivo: sc ? `${med} · órtese (${sc})` : med, nome: txt(f.nome) };
+  }
+  if (modulo === "nariz-orelha") {   // (E5) a peça depende do tipo; o arquivo é o scan
+    const peca = f.tipo === "nariz" ? "prótese nasal" : f.tipo === "orelha" ? "prótese auricular" : MODULOS[modulo].peca;
+    return { modulo, fichaId: f.id, peca, lado: f.tipo === "orelha" && (f.lado === "D" || f.lado === "E") ? f.lado : "", atualizado: f.atualizado || "", arquivo: txt(f.scan && f.scan.nome), nome: txt(f.nome) };
   }
   const lado = modulo === "afo" ? f.lado : modulo === "olho" ? f.olho : (f.lados && f.lados.protese) || (f.paciente && f.paciente.pLado);
   const arquivo = modulo === "afo" ? f.scan : modulo === "olho" ? f.foto && f.foto.nome : f.foto && f.foto.arquivo;

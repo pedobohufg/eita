@@ -7,7 +7,7 @@ const E = window.EITA, UI = E.ui, M = E.MODULOS;
 const $ = (id) => document.getElementById(id);
 const esc = E.escaparHTML;
 const CASCA = UI.criarCasca(), status = CASCA.status, salvar = CASCA.salvar;
-const SIMBOLO = { afo: "assets/eita-afo-simbolo.png", olho: "assets/eita-olho-simbolo.png", mamilo: "assets/eita-mamilo-simbolo.png", cranio: "assets/eita-cranio-simbolo.png" };
+const SIMBOLO = { afo: "assets/eita-afo-simbolo.png", olho: "assets/eita-olho-simbolo.png", mamilo: "assets/eita-mamilo-simbolo.png", cranio: "assets/eita-cranio-simbolo.png", "nariz-orelha": "assets/eita-nariz-orelha-simbolo.png" };
 const CHAVE_PENDENTES = "eita.pendentes.v1", VALIDADE_PENDENTE = 2 * 864e5;   // 2 dias
 // módulos montados junto com o portal (meta "eita-modulos"); os outros abrem pelo artefato publicado à parte
 const PRESENTES = (() => { const m = document.querySelector('meta[name="eita-modulos"]'); return new Set(m ? m.content.split(",").filter(Boolean) : Object.keys(M)); })();
@@ -39,7 +39,7 @@ const iniciais = (p) => E.iniciais(p.dados.nome) || (p.dados.codigo || "?").slic
 const idade = (d) => E.idadeTexto(d, new Date(), { meses: true });
 const dataBR = (iso) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "");
 const LADO = { D: "direito", E: "esquerdo" }, LADO_F = { D: "direita", E: "esquerda" };
-const ladoTexto = (m, l) => (!l ? "" : m === "mamilo" ? "mama " + LADO_F[l] : m === "olho" ? "olho " + LADO[l] + (l === "D" ? " (OD)" : " (OE)") : "lado " + LADO[l]);
+const ladoTexto = (m, l) => (!l ? "" : m === "nariz-orelha" ? "orelha " + LADO_F[l] : m === "mamilo" ? "mama " + LADO_F[l] : m === "olho" ? "olho " + LADO[l] + (l === "D" ? " (OD)" : " (OE)") : "lado " + LADO[l]);
 const SEXO = { F: "feminino", M: "masculino", O: "outro" };
 
 function renderLista() {

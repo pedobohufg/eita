@@ -1,0 +1,71 @@
+# E5 — EITA! NARIZ·ORELHA (revisão de literatura e projeto)
+
+*Plataforma EITA · Lab.EITA/UFG · 11/11/2026. Autor: Pedro Henrique Gonçalves.*
+
+## 1. Revisão de literatura (resumo)
+
+### 1.1 Fluxo digital × convencional
+- O fluxo convencional (moldagem com alginato, gesso, escultura em cera, mufla de 2–3 partes, silicone) depende muito da habilidade do anaplastologista e toma dias. Os fluxos digitais repetem as mesmas etapas — captura do defeito, desenho, molde e silicone — com escaneamento de superfície, CAD e impressão 3D (revisão de escopo, *Appl Sci* 2021, doi:10.3390/app11030973).
+- **Impressão direta × indireta.** Eggbeer, Bibb, Evans e Ji (*Proc IMechE H* 2012;226(9):718-728) compararam prótese nasal impressa diretamente com prótese de silicone feita em **molde impresso**; a via direta não era clinicamente viável (cor, borda, material), e a via indireta deu corpo comparável ao do melhor laboratório. Nuseir et al. (*J Prosthodont* 2019, doi:10.1111/jopr.13001) imprimiram nariz flexível colorido, mas a via indireta (molde impresso + silicone médico pigmentado) continua sendo a mais usada porque mantém o material de prótese já validado.
+- **Revisão sistemática** (Cureus/PMC 2025, PROSPERO CRD42025648290): escaneamento intraoral, fotogrametria e prototipagem têm exatidão comparável à moldagem convencional; o smartphone aparece como alternativa de baixo custo.
+
+### 1.2 Captura 3D
+- **Fotogrametria com smartphone:** orelhas escaneadas por operadores novatos com exatidão de 1,5 ± 0,4 mm e 71 ± 14 % de completude em relação a um scanner de referência (Nightingale et al., *JPRAS* 2021;74(11):3066-3072); com três modelos de celular, 1,1 ± 0,3 mm e 81 ± 10 %. Com 30, 60 ou 90 fotos não houve diferença significativa. **Consequência para o app:** o scan chega com furos (sobretudo atrás da hélice e no sulco retroauricular), então a leitura precisa tolerar malha aberta e furos.
+- A metodologia de fotogrametria monoscópica com celular e software livre (Salazar-Gamarra et al.; "+ID", *F1000Research* 2022) é a referência latino-americana para próteses faciais de baixo custo. Scanners de luz estruturada de baixo custo (Revopoint POP 2) já foram usados em fluxo clínico de orelha (Tarba et al., *Prosthesis* 2025).
+- Formatos de saída usuais: STL, OBJ e PLY — o app lê os três.
+
+### 1.3 Forma da orelha
+- Padrão: **espelhar a orelha sadia** sobre o lado do defeito (Liacouras et al., *J Prosthet Dent* 2011; Turgut 2009; Domingue et al., *Clin Case Rep* 2021; Tarba et al. 2025). O espelhamento pelo plano sagital mediano economiza a escultura em cera.
+- Posição: marcos transferidos do lado sadio (canto externo do olho, trago, ângulo do eixo longo). Em microssomia hemifacial o espelhamento direto pode errar a posição; há estudos com "morphing" por marcos faciais. **Consequência:** o app permite deslocar, girar e escalar a orelha espelhada.
+- Bilateral: biblioteca digital de orelhas e narizes (Ciocca et al., 2010). **Consequência:** além do espelho, aceitar um modelo importado alinhado por pares de pontos.
+- Medidas de referência em adultos jovens (Bozkir et al., *Aesthetic Plast Surg* 2006;30:81-85): altura 59,5–63 mm, largura 31–33 mm, projeção 15–20 mm.
+
+### 1.4 Forma do nariz
+- Órgão ímpar: não há o que espelhar. Alternativas: scan/foto pré-operatória, **biblioteca de narizes** (Ciocca 2010; Sun et al., *Rapid Prototyp J* 2013) ou **modelo estatístico de forma** (morphable face model).
+- Jablonski et al. (*J Prosthet Dent* 2024;131(6):1271-1275) publicaram um banco aberto (CC BY 4.0) de **44 narizes** gerados por modelo estatístico, alinhados e prontos para CAD (doi:10.5518/1228). Bannink et al. (*Int J CARS* 2024;19(11):2279-2285, doi:10.1007/s11548-024-03206-y) automatizaram o desenho: ajuste do modelo estatístico ao rosto, **prótese = nariz − rosto**, molde de 2 partes separando as cascas interna e externa, com **0,3 mm de folga** na borda para o molde fechar bem; impressão em SLA (Rigid 10K) e silicone pigmentado; estética equivalente à convencional. Markel (Cureus, pôster) automatizou o molde em script do Blender: de 2 dias para 6 h de trabalho, com falhas quando a morfologia foge do padrão.
+- **Consequência:** o app traz um **nariz paramétrico** (medidas antropométricas: comprimento n–sn, largura al–al, projeção da ponta, ângulo nasolabial, dorso) com padrões a partir dos marcos do próprio rosto (cânone neoclássico: largura alar ≈ distância intercantal) e aceita um **modelo importado** (banco de Leeds, scan pré-operatório recortado) alinhado por pares de pontos.
+
+### 1.5 Moldes
+- Orelha: **molde de 3 partes** é o recomendado (facilita a retirada, põe a costura num lugar favorável e posiciona a subestrutura de retenção; Liacouras 2011). Desenho típico: base com a pele do paciente + negativo da orelha, este dividido em 2 ao longo da borda da hélice. Em orelha parcial, o pedaço mais alto do molde (que entra na concha) pode quebrar → molde de 4 partes (*J Indian Prosthodont Soc*, PMC8820311). Tarba et al. desenharam moldes de 3 blocos em CATIA e Blender e imprimiram em FDM; 5 próteses por molde.
+- Nariz: 2 partes (interna/externa; Bannink 2024) ou 4 partes por estereolitografia (Qiu).
+- **Consequência:** o app separa automaticamente a **base** (pele + tudo o que fica "abaixo" da prótese na direção de retirada) da **parte externa**, que pode ser dividida em 2 por um plano ajustável (3 partes no total); chaves de encaixe, canal de injeção e respiros; mede o volume das **retenções** (regiões em que só a flexibilidade do silicone permite desmoldar).
+
+### 1.6 Borda, material e retenção
+- Silicone (RTV/HTV médico) é o material padrão: cor intrínseca + pintura extrínseca; ponto fraco é a **resistência ao rasgo da borda fina**, sobretudo nas próteses com adesivo, que são coladas e descoladas todo dia. Próteses faciais costumam ser refeitas em 1–2 anos por rasgo da borda e desbotamento.
+- **Consequência:** a aba de assentamento afina até a borda (padrão 0,3 mm), com espessura e largura configuráveis e aviso abaixo de 0,2 mm.
+- Retenção: adesivo, retenções anatômicas do defeito, armação de óculos (nariz) ou implantes osseointegrados com barra/clipe ou ímãs. **Consequência:** o app abre nichos para ímãs/cápsulas em pontos marcados na pele; barra sobre implantes e armação de óculos ficam para depois.
+
+### 1.7 Regulatório
+- No Brasil, prótese feita sob medida para um paciente é dispositivo médico sob medida; a validação clínica e o enquadramento do módulo devem ser feitos à parte (o plano já previa validar cada módulo separadamente). O relatório deixa claro que o resultado precisa ser conferido por profissional habilitado.
+
+## 2. Decisões de projeto
+
+| Problema | Solução no app |
+|---|---|
+| Nariz e orelha têm reentrâncias (a malha não é um campo de altura) | **Representação volumétrica**: cada forma vira um campo de distância com sinal numa grade regular (`nucleo/volume.js`); as operações booleanas são mín/máx dos campos e a malha sai por *marching cubes* (tabela gerada no próprio código, superfície sempre fechada). |
+| Scan aberto e com furos | Dentro/fora por **raios na direção de retirada** (paridade a partir do lado de fora); colunas inconsistentes (furo) são reparadas pela vizinhança; furos pequenos da malha são fechados antes. |
+| Malhas grandes | Recorte do scan na região de trabalho; simplificação por **erro quadrático** (`nucleo/decimar.js`) nas peças do molde e na prótese, com tolerância de centésimos de milímetro. |
+| Plano sagital mediano | Pares simétricos (cantos externos dos olhos) + pontos da linha média (násio, subnasal); refinamento opcional por simetria (iterações tipo ICP, com a região do defeito e as orelhas excluídas). |
+| Prótese | **prótese = (forma doadora ∩ região) ∪ aba − rosto**; aba com espessura que afina até a borda; nariz oco com parede configurável e narinas abertas para o oco; nichos de ímãs. |
+| Molde | Direção de retirada `w` (orelha: lateral; nariz: anterior). Por coluna da grade: tudo abaixo da primeira cavidade (ou da pele, fora dela) é **base**; o resto é **externa**. Assim as peças são separáveis por translação, sem travar uma na outra. Externa opcionalmente dividida em 2 por plano vertical. Chaves hemisféricas com folga, canal de injeção e respiros nos pontos altos. |
+
+## 3. O que foi feito (v0.1, 12/11/2026)
+
+**Núcleo (reaproveitável pelo módulo FACE):**
+- `nucleo/volume.js` — grade, campo de distância de uma malha (dentro/fora por raios ao longo de z com paridade; colunas incoerentes reparadas pela vizinhança; distância exata perto da superfície propagada em faixa estreita), união suave, elipsoide, distância 2D a polígono e a máscara (Felzenszwalb), e *marching cubes* com a tabela gerada no próprio código (segmentos por face que separam os cantos de dentro em diagonal; ciclos com dois vértices na mesma face triangulados a partir do centro, para não repetir aresta do cubo vizinho). Saída sempre fechada, orientada e variedade, testado também com campo aleatório.
+- `nucleo/decimar.js` — colapso de arestas por erro quadrático com condição de enlace, sem triângulo invertido; peso pequeno pelo comprimento para não formar leques nas faces planas (de 71 s para menos de 1 s num molde).
+- `nucleo/superficie.js` — leitura de STL, OBJ e PLY (texto e binário), unidade provável, fechamento de furos pequenos, referencial local, busca do ponto mais próximo com normal.
+
+**Módulo `modulos/nariz-orelha/`:**
+- Plano sagital: cantos externos (e internos, se marcados) + násio + subnasal; refinamento por ICP ponto-plano (linearização do espelho; o ICP ponto-a-ponto com pontos médios era enviesado nas superfícies curvas). Nos rostos sintéticos, de 6° e 4 mm de erro para menos de 0,01°.
+- Orelha: scan espelhado no referencial local (w = lateral), recortado pelo contorno marcado em volta da orelha sadia. Nariz: superfície de altura paramétrica (corpo de seção parabólica + asas em paraboloide elíptico, máximo suave = sulco alar), virando malha para ter distâncias exatas (o oco furava nos vales com a distância aproximada).
+- Prótese: a doadora só conta acima da pele real (0,6 mm, para a pele espelhada não deixar película) exceto na raiz; **raiz** = colunas em que a doadora encosta na pele pela distância normal (a vertical falha na pele íngreme); a **aba** nasce da raiz para fora e não entra sob a parte solta (atrás da orelha), salvo 3 mm de filete que fecham a ponta do sulco. A borda fina (0,3 mm, menor que o passo da grade) entra no campo com 1,8 × passo e os vértices da camada são trazidos à espessura pedida, coluna a coluna. Nariz oco: só a mais de "parede" da superfície e da borda da base, com o oco estendido em linha reta até a pele (sem cunhas finas); narinas abertas para o oco. Lascas soltas (< 2 % da maior parte) são descartadas.
+- Molde: por coluna, base = tudo abaixo da primeira cavidade (ou da pele); externa = o resto, dividida por plano vertical opcional; chaves hemisféricas com folga, canal no ponto mais alto da cavidade e respiros nas extremidades; volume das retenções.
+- Interface: ficha (com etiologia, radioterapia, retenção), marcação por duplo clique, contorno, plano, forma (paramétrico, espelho ou modelo importado com pares de pontos), ajuste fino, prótese, molde, pacote .zip (prótese no referencial do scan e para impressão, peças do molde com a base em z = 0, PDF e ficha) e relatório.
+- Resultados nos rostos sintéticos (passo 0,5 mm): orelha 11,1 mL, 68 × 41 mm com a aba, projeção 18,6 mm, 2 s para a prótese e 4 s para o molde de 3 partes (retenções 0,25 mL); nariz oco 6,3 mL, gênero 2 (as duas narinas).
+
+## 4. Limites desta versão (E5)
+- O nariz paramétrico é um ponto de partida: precisa da conferência e, se for o caso, de ajuste fino em programa de escultura.
+- Barra sobre implantes, armação de óculos, subestrutura rígida e moldes de 4 partes não estão implementados.
+- Cor: o app não faz a receita de pigmentos da pele (o MAMILO tem a lógica de cor por foto; pode ser trazida depois).
+- Validação: só com dados sintéticos (`ferramentas/rosto_sintetico.mjs`). Falta testar com scans reais de pacientes e imprimir os moldes.

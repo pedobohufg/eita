@@ -17,12 +17,13 @@ export const MODULOS = {
   olho: { titulo: "EITA! OLHO", entrada: "modulos/olho/global.js", interface: ["modulos/olho/ui.js"], estaticos: ["modulos/olho/index.html", "modulos/olho/assets"], escopo: true },
   afo: { titulo: "EITA! AFO", entrada: "modulos/afo/global.js", interface: ["modulos/afo/ui.js"], estaticos: ["modulos/afo/index.html", "modulos/afo/sobre.html", "modulos/afo/assets"], escopo: true },
   cranio: { titulo: "EITA! CRÂNIO", entrada: "modulos/cranio/global.js", interface: ["modulos/cranio/ui.js"], estaticos: ["modulos/cranio/index.html", "modulos/cranio/assets"], escopo: true },
+  "nariz-orelha": { titulo: "EITA! NARIZ·ORELHA", entrada: "modulos/nariz-orelha/global.js", interface: ["modulos/nariz-orelha/ui.js"], estaticos: ["modulos/nariz-orelha/index.html", "modulos/nariz-orelha/assets"], escopo: true },
   portal: { titulo: "Plataforma EITA", entrada: "modulos/portal/global.js", interface: ["modulos/portal/ui.js"], estaticos: ["modulos/portal/index.html", "modulos/portal/assets"], escopo: true, soNaPlataforma: true },
 };
 // Plataforma: um só app (um artefato) com o portal na raiz e cada módulo numa subpasta. Mesma origem, então
 // o portal enxerga as fichas guardadas por todos os módulos. Desde a E4e o AFO entra montado de modulos/afo
 // (antes, como estava publicado, de legado/afo); "legados" fica para algum app que ainda não tenha sido migrado.
-export const PLATAFORMA = { portal: "portal", modulos: ["mamilo", "olho", "cranio", "afo"], legados: {}, ponte: "modulos/portal/ponte.js" };
+export const PLATAFORMA = { portal: "portal", modulos: ["mamilo", "olho", "cranio", "afo", "nariz-orelha"], legados: {}, ponte: "modulos/portal/ponte.js" };
 
 const RE_IMPORT = /^import\s+(.+?)\s+from\s+"(.+?)";?\s*$/gm;
 const RE_EXPORT_ALL = /^export\s+\*\s+from\s+"(.+?)";?\s*$/gm;

@@ -11,7 +11,7 @@
 (function () {
   "use strict";
   const eu = document.currentScript, MOD = eu && eu.dataset.modulo;
-  const CHAVES = { afo: "eitaAFO.fichas.v1", olho: "eitaOLHO.fichas.v1", mamilo: "eitaMAMILO.fichas.v1", cranio: "eitaCRANIO.fichas.v1" };
+  const CHAVES = { afo: "eitaAFO.fichas.v1", olho: "eitaOLHO.fichas.v1", mamilo: "eitaMAMILO.fichas.v1", cranio: "eitaCRANIO.fichas.v1", "nariz-orelha": "eitaNARIZORELHA.fichas.v1" };
   const $ = (id) => document.getElementById(id);
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 

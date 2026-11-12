@@ -10,3 +10,6 @@ export * from "./pdf.js";
 export * from "./ficha.js";
 export * from "./paciente.js";
 export * from "./alinhamento.js";
+export * from "./volume.js";
+export * from "./decimar.js";
+export * from "./superficie.js";
