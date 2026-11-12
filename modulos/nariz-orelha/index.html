@@ -120,6 +120,9 @@ figure.refPts{margin:4px 0 8px;padding:8px;border:1px solid var(--line);border-r
 figure.refPts .traco{fill:none;stroke:var(--muted);stroke-width:1.3;stroke-linejoin:round;stroke-linecap:round}figure.refPts .traco .sep{stroke:var(--line-strong);stroke-dasharray:3 4}
 figure.refPts .pts3 circle{stroke:#fff;stroke-width:1.5}figure.refPts .pts3 circle.ok{opacity:.45}figure.refPts .pts3 circle.cur{stroke:var(--ink);stroke-width:3;opacity:1}
 figure.refPts .rot text{font:600 10px "Instrument Sans",sans-serif;fill:var(--ink)}figure.refPts figcaption{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.4}
+figure.refNz .cota{fill:none;stroke:#b3a8d6;stroke-width:1.2}figure.refNz .cota .tr{stroke-dasharray:3 3}figure.refNz .cota .narina{fill:#e6e0f5}
+figure.refNz svg{max-width:none}figure.refNz .cota text{stroke:none;fill:#6b3fd6;font:700 13px "Instrument Sans",sans-serif}figure.refNz .cota.on{stroke:#6b3fd6;stroke-width:2.2}figure.refNz .cota.on .narina{fill:#cbbcf2}
+figure.refNz .rot text.p{fill:var(--muted);font-weight:500}b.letra{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--accent-soft);color:#6b3fd6;font-size:10.5px;margin-right:3px}
 ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px solid var(--line-strong)}ul.pts li.ok{color:var(--ink)}ul.pts li.ok i{border-color:transparent}ul.pts li.cur{background:var(--accent-soft);color:var(--ink);font-weight:600}
 .why{font-size:12px;color:var(--warn);margin:4px 0 0}.why:empty{display:none}
 .pares{font:500 12px var(--f-mono);margin:6px 0}.pares div{padding:2px 0}
@@ -235,15 +238,38 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
     <label class="ctl sel">Origem da forma<select id="fonte"></select></label>
     <div id="paramNariz">
       <div class="sub-h">Nariz paramétrico</div>
-      <label class="ctl">Comprimento n–sn (mm)<input type="number" id="nzComprimento" step="0.5" min="30" max="70"></label>
-      <label class="ctl">Largura alar (mm)<input type="number" id="nzLargura" step="0.5" min="20" max="50"></label>
-      <label class="ctl">Projeção da ponta (mm)<input type="number" id="nzProjecao" step="0.5" min="10" max="35"></label>
-      <label class="ctl">Altura da ponta acima de sn (mm)<input type="number" id="nzAlturaPonta" step="0.5" min="2" max="20"></label>
-      <label class="ctl">Ângulo nasolabial (°)<input type="number" id="nzNasolabial" step="1" min="80" max="125"></label>
-      <label class="ctl">Dorso: côncavo (−) a convexo (+), mm<input type="number" id="nzDorso" step="0.5" min="-4" max="4"></label>
-      <label class="ctl">Largura do lóbulo da ponta (mm)<input type="number" id="nzLarguraPonta" step="0.5" min="8" max="26"></label>
-      <label class="ctl">Tamanho das narinas (%)<input type="number" id="nzNarina" step="5" min="50" max="150"></label>
-      <label class="ctl">Profundidade das narinas (mm)<input type="number" id="nzProfNarina" step="0.5" min="4" max="16"></label>
+      <figure class="refPts refNz">
+        <svg id="refNariz" viewBox="0 0 490 212" role="img" aria-label="O que cada parâmetro do nariz mede, de perfil, de frente e de baixo">
+          <g class="traco">
+            <path d="M38 4 Q44 14 45 22 Q66 70 92 112 Q100 124 90 131 Q72 137 46 142 Q49 166 47 188 Q44 198 50 206"/>
+            <path d="M30 40 Q36 46 42 44"/>
+            <path d="M232 20 Q228 70 220 104 Q208 116 211 136 Q216 146 228 142 Q238 150 246 149 Q254 150 264 142 Q276 146 281 136 Q284 116 272 104 Q264 70 260 20"/>
+            <path d="M226 136 q6 -4 12 2 M266 136 q-6 -4 -12 2"/>
+            <path d="M362 160 Q352 120 382 88 Q400 70 415 74 Q430 70 448 88 Q478 120 468 160 Q441 172 415 166 Q389 172 362 160 Z"/>
+            <path d="M152 6 V206 M322 6 V206" class="sep"/>
+          </g>
+          <g class="cota" data-p="comprimento"><path d="M24 22 H44 M24 142 H44 M28 22 V142"/><text x="18" y="86">A</text></g>
+          <g class="cota" data-p="projecao"><path d="M46 112 V150 M93 112 V150 M46 146 H93" class="tr"/><path d="M46 146 H93"/><text x="72" y="158">C</text></g>
+          <g class="cota" data-p="alturaPonta"><path d="M46 142 H112 M94 122 H112 M108 122 V142"/><text x="114" y="137">D</text></g>
+          <g class="cota" data-p="nasolabial"><path d="M46 142 L80 136 M46 142 L48 178"/><path d="M60 140 A 16 16 0 0 1 47 158" class="arco"/><text x="55" y="180">E</text></g>
+          <g class="cota" data-p="dorso"><path d="M47 30 Q82 62 89 108" class="tr"/><path d="M47 30 Q60 72 89 108" class="tr"/><text x="78" y="60">F ±</text></g>
+          <g class="cota" data-p="largura"><path d="M211 136 V172 M281 136 V172 M211 168 H281"/><text x="242" y="184">B</text></g>
+          <g class="cota" data-p="larguraPonta"><path d="M228 112 V96 M264 112 V96 M228 100 H264"/><text x="242" y="92">G</text></g>
+          <g class="cota" data-p="narina"><path d="M388 150 Q378 128 396 108 Q406 104 404 122 Q400 142 388 150 Z M442 150 Q452 128 434 108 Q424 104 426 122 Q430 142 442 150 Z" class="narina"/><text x="398" y="186">H</text><path d="M396 176 L393 152 M434 176 L437 152"/></g>
+          <g class="cota" data-p="profNarina"><text x="455" y="104">I</text><path d="M452 108 L438 124"/></g>
+          <g class="rot"><text x="44" y="18">n</text><text x="30" y="150">sn</text><text x="96" y="108">ponta</text><text x="110" y="204" class="p" text-anchor="middle">perfil</text><text x="246" y="204" class="p" text-anchor="middle">frente</text><text x="415" y="204" class="p" text-anchor="middle">de baixo</text><text x="415" y="82" class="p" text-anchor="middle">ponta</text></g>
+        </svg>
+        <figcaption>A comprimento da raiz (n) ao subnasal (sn) · B largura entre as asas · C quanto a ponta sai para a frente · D altura da ponta acima do subnasal · E ângulo entre a columela e o lábio · F dorso côncavo (−) ou convexo (+) · G largura do lóbulo da ponta · H tamanho das narinas · I quanto as narinas sobem para dentro. Toque num campo para ver a medida destacada.</figcaption>
+      </figure>
+      <label class="ctl"><span><b class="letra">A</b> Comprimento n–sn (mm)</span><input type="number" id="nzComprimento" step="0.5" min="30" max="70"></label>
+      <label class="ctl"><span><b class="letra">B</b> Largura alar (mm)</span><input type="number" id="nzLargura" step="0.5" min="20" max="50"></label>
+      <label class="ctl"><span><b class="letra">C</b> Projeção da ponta (mm)</span><input type="number" id="nzProjecao" step="0.5" min="10" max="35"></label>
+      <label class="ctl"><span><b class="letra">D</b> Altura da ponta acima de sn (mm)</span><input type="number" id="nzAlturaPonta" step="0.5" min="2" max="20"></label>
+      <label class="ctl"><span><b class="letra">E</b> Ângulo nasolabial (°)</span><input type="number" id="nzNasolabial" step="1" min="80" max="125"></label>
+      <label class="ctl"><span><b class="letra">F</b> Dorso: côncavo (−) a convexo (+), mm</span><input type="number" id="nzDorso" step="0.5" min="-4" max="4"></label>
+      <label class="ctl"><span><b class="letra">G</b> Largura do lóbulo da ponta (mm)</span><input type="number" id="nzLarguraPonta" step="0.5" min="8" max="26"></label>
+      <label class="ctl"><span><b class="letra">H</b> Tamanho das narinas (%)</span><input type="number" id="nzNarina" step="5" min="50" max="150"></label>
+      <label class="ctl"><span><b class="letra">I</b> Profundidade das narinas (mm)</span><input type="number" id="nzProfNarina" step="0.5" min="4" max="16"></label>
       <div class="row"><button id="nzPadrao" type="button">Padrões pelo rosto</button></div>
       <div class="note">Os padrões saem do próprio rosto: largura alar ≈ distância entre os cantos internos dos olhos; projeção ≈ 0,4 × comprimento. É um ponto de partida: confira com fotos antigas do paciente, se houver.</div>
     </div>

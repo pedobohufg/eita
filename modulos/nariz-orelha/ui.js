@@ -267,6 +267,13 @@ function preencherNarizPadrao(forcar) {
   const p = NO.narizPadrao(S.pontos);
   for (const k of PARAM_NARIZ) { const el = $(idNariz(k)); if (forcar || el.value === "") el.value = k === "narina" ? Math.round(p[k] * 100) : p[k]; }
 }
+// figura dos parâmetros: o campo em foco (ou sob o mouse) destaca a sua medida
+for (const k of PARAM_NARIZ) {
+  const el = $(idNariz(k)), marca = (on) => $("refNariz").querySelectorAll(`.cota[data-p="${k}"]`).forEach((g) => g.classList.toggle("on", on));
+  const lb = el.closest("label") || el;
+  el.addEventListener("focus", () => marca(true)); el.addEventListener("blur", () => marca(false));
+  lb.addEventListener("mouseenter", () => marca(true)); lb.addEventListener("mouseleave", () => marca(document.activeElement === el));
+}
 $("nzPadrao").onclick = () => { preencherNarizPadrao(true); invalidar("forma"); status("Parâmetros do nariz recalculados pelo rosto."); };
 function lerNariz() { const o = {}; for (const k of PARAM_NARIZ) { const v = parseFloat($(idNariz(k)).value); if (Number.isFinite(v)) o[k] = k === "narina" ? v / 100 : v; } return o; }
 const lerAjuste = () => ({ du: +$("ajU").value || 0, dv: +$("ajV").value || 0, dw: +$("ajW").value || 0, giro: +$("ajGiro").value || 0, escala: +$("ajEscala").value || 100 });
