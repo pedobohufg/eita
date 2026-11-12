@@ -189,3 +189,28 @@ test("nariz paramétrico: perfil, largura e ângulo nasolabial seguem os parâme
   const g = P.narizParametrico(Object.assign({}, p, { nasolabial: 115 }));
   assert.ok(g(0, 2, 10) > 0, "ângulo maior: columela sobe mais rápido");
 });
+
+test("campo de malha: scan fechado atrás (tampa) conta como dentro abaixo da pele", () => {
+  // caixa fechada de z = −5 a 0 (a "pele" é a face de cima; a de baixo é a tampa), e a grade vai até z = −8
+  const V = [], F = [], q = (x, y, z) => { V.push(x, y, z); return V.length / 3 - 1; };
+  const c = [[-20, -20, -5], [20, -20, -5], [20, 20, -5], [-20, 20, -5], [-20, -20, 0], [20, -20, 0], [20, 20, 0], [-20, 20, 0]].map((p) => q(...p));
+  for (const [a, b, d, e] of [[0, 3, 2, 1], [4, 5, 6, 7], [0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7]]) F.push(c[a], c[b], c[d], c[a], c[d], c[e]);
+  const malha = { V: new Float64Array(V), F: new Uint32Array(F) };
+  const g = N.criarGrade([-10, -10, -8], [10, 10, 3], 0.5);
+  const r = N.campoDeMalha(g, N.triangulosNaCaixa(malha, [-12, -12, -10], [12, 12, 5]), { banda: 3, final: "dentro" });
+  assert.equal(r.reparadas, 0);
+  const em = (x, y, z) => N.amostrarGrade(g, x, y, z);
+  assert.ok(em(0, 0, -7) < 0 && em(3, -4, -6) < 0, "abaixo da tampa continua dentro");
+  assert.ok(em(0, 0, 1) > 0 && Math.abs(em(0, 0, -1) + 1) < 0.05, "pele em z = 0");
+});
+
+test("modelo do próprio paciente: refinar pelo rosto desfaz um desalinhamento de 4° e 3 mm", () => {
+  const { info, malha } = rosto("rosto_sem_nariz");
+  const a = (4 * Math.PI) / 180, T0 = { R: [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]], s: 1, t: [2, -1.5, 1.8] };
+  const fora = P.transformarModelo(malha, T0);
+  const L = Math.hypot(...info.pontos.n.map((v, i) => v - info.pontos.sn[i]));
+  const r = P.refinarModelo(fora, malha, { centro: info.pontos.n, raio: 90, excluir: [{ c: info.pontos.n.map((v, i) => 0.4 * v + 0.6 * info.pontos.sn[i]), r: 0.75 * L }] });
+  const volta = P.transformarModelo(fora, r.T);
+  let mx = 0; for (let i = 0; i < volta.V.length; i += 3 * 37) mx = Math.max(mx, Math.hypot(volta.V[i] - malha.V[i], volta.V[i + 1] - malha.V[i + 1], volta.V[i + 2] - malha.V[i + 2]));
+  assert.ok(r.rms < 0.1 && mx < 0.3, `rms ${r.rms}, desvio máx ${mx}`);
+});

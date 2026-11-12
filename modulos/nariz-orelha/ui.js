@@ -299,6 +299,7 @@ function mostrarModelo() {
 function listarPares() {
   $("pares").innerHTML = S.paresM.map((p, i) => `<div>Par ${i + 1}: modelo ✓ · rosto ${S.paresR[i] ? "✓" : "…"}</div>`).join("");
   $("alinharModelo").disabled = Math.min(S.paresM.length, S.paresR.length) < 3;
+  $("refinarModelo").disabled = !S.modelo || !S.plano;
 }
 $("parModelo").onclick = () => { if (!mModelo) { status("Abra o modelo primeiro.", true); return; } if (S.paresM.length > S.paresR.length) S.paresM.pop(); S.modo = "parModelo"; status(`Par ${S.paresM.length + 1}: duplo clique no ponto do <b>modelo</b>.`); desenharPontos(); };
 $("parRosto").onclick = () => { if (S.paresR.length >= S.paresM.length) { status("Marque primeiro o ponto no modelo.", true); return; } S.modo = "parRosto"; status("Duplo clique no mesmo ponto no <b>rosto</b>."); };
@@ -314,6 +315,27 @@ $("alinharModelo").onclick = () => {
     status(`Modelo alinhado: erro médio de ${fmt(r.erro, 2)} mm nos ${n} pares, escala ${fmt(r.T.s * 100, 1)} %.${r.erro > 3 ? " Erro alto: confira os pares." : ""}`, r.erro > 3);
   } catch (e) { status("Não foi possível alinhar: " + esc(e.message), true); }
 };
+// ICP pela pele em volta do defeito (scan antigo do mesmo paciente): compõe com a posição atual do modelo
+$("refinarModelo").onclick = async () => {
+  if (!S.modelo || !S.modeloT) return;
+  await ocupado(true, "Refinando o encaixe do modelo pelo rosto…");
+  try {
+    const ex = Math.hypot(...S.pontos.exD.map((v, i) => v - S.pontos.exE[i]));
+    const r = NO.refinarModelo(modeloNaCena(), S.scan, { centro: S.pontos.n, raio: 1.3 * ex, excluir: excluirDefeito() });
+    S.modeloT = E.comporTransformacoes(r.T, S.modeloT);
+    S.paresM = S.paresM.map((p) => E.aplicarTransformacao(r.T, p));
+    mostrarModelo(); desenharPontos(); invalidar("forma");
+    $("refinoInfo").innerHTML = `Encaixe pelo rosto: <b>${fmt(r.rms, 2)} mm</b> de distância média (RMS) em ${r.pares} pontos da pele em volta, ${r.iteracoes} iterações.${r.rms > 1.5 ? " Distância alta: o modelo talvez não seja da mesma pessoa, ou o rosto mudou." : ""}`;
+    status(`Modelo refinado pelo rosto: ${fmt(r.rms, 2)} mm (RMS).`, r.rms > 1.5);
+  } catch (e) { status("Não foi possível refinar: " + esc(e.message), true); }
+  await ocupado(false);
+};
+// região do defeito, fora da conta do encaixe: em volta do nariz (n–sn) ou do contorno da orelha (lado do defeito)
+function excluirDefeito() {
+  if (S.tipo === "nariz") { const L = Math.hypot(...S.pontos.n.map((v, i) => v - S.pontos.sn[i])); return [{ c: S.pontos.n.map((v, i) => 0.4 * v + 0.6 * S.pontos.sn[i]), r: 0.75 * L }]; }
+  const c = regiaoDefeito(), r = S.contorno.length ? Math.max(...S.contorno.map((p) => Math.hypot(...p.map((v, i) => v - (S.contorno.reduce((s, q) => s + q[i], 0) / S.contorno.length))))) + 10 : 40;
+  return [{ c, r }];
+}
 ["ajU", "ajV", "ajW", "ajGiro", "ajEscala"].concat(PARAM_NARIZ.map(idNariz)).forEach((id) => $(id).addEventListener("change", () => invalidar("forma")));
 
 // ------------------------------------------------------------------ etapa 4: prótese

@@ -11,9 +11,10 @@ import * as Vo from "../../nucleo/volume.js";
 import { decimar } from "../../nucleo/decimar.js";
 import { paraLocal, deLocal, transformarVertices, criarBuscaProxima } from "../../nucleo/superficie.js";
 import { volume as volumeMalha, verificarFechada, filtrarComponentes } from "../../nucleo/malha.js";
-import { aplicarTransformacao, ajustarSimilaridade } from "../../nucleo/alinhamento.js";
+import { aplicarTransformacao, ajustarSimilaridade, comporTransformacoes } from "../../nucleo/alinhamento.js";
+import { componenteProxima, preencherBuracos } from "../../nucleo/imagem.js";
 
-export const VERSAO = "0.1";
+export const VERSAO = "0.2";
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], soma = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const esc = (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cruz = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -89,6 +90,19 @@ export function refinarPlano(malha, plano, { centro, raio = 90, excluir = [], am
   }
   return { plano: P, residuo, pares: pts.length, iteracoes: it };
 }
+// sistema linear n × n por eliminação de Gauss com pivô parcial → solução ou null
+function resolverN(A, b) {
+  const n = b.length, M = A.map((l, i) => Array.from(l).concat([b[i]]));
+  for (let c = 0; c < n; c++) {
+    let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (!(Math.abs(M[p][c]) > 1e-12)) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    for (let r = c + 1; r < n; r++) { const f = M[r][c] / M[c][c]; for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k]; }
+  }
+  const x = new Array(n).fill(0);
+  for (let r = n - 1; r >= 0; r--) { let s = M[r][n]; for (let k = r + 1; k < n; k++) s -= M[r][k] * x[k]; x[r] = s / M[r][r]; }
+  return x;
+}
 function resolver3x3(A, b) {
   const det = (M) => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
   const D = det(A); if (!(Math.abs(D) > 1e-18)) return null;
@@ -121,55 +135,84 @@ export function narizPadrao(pontos) {
   return { comprimento: +L.toFixed(1), largura: +W.toFixed(1), projecao: +(0.4 * L).toFixed(1), alturaPonta: +(0.16 * L).toFixed(1), nasolabial: 100, dorso: 0, larguraPonta: +(0.5 * W).toFixed(1), narina: 1, profNarina: 10 };
 }
 // Nariz no referencial do nariz (origem sn, u lateral, v para cima, w anterior), como superfície de altura sobre o
-// rosto: w ≤ topo(u, v), cortada pela base (columela e soleira das narinas, inclinada pelo ângulo nasolabial) e pela
-// raiz. topo = máximo suave entre o corpo (dorso e lóbulo: seção parabólica de meia-largura b(v) e altura D(v), o
-// perfil do dorso) e as asas (lobos laterais); o vale entre os dois é o sulco alar. As narinas ficam à parte
-// (narinasParametricas), para atravessarem até o oco.
+// rosto: w ≤ topo(u, v), cortada pela base (columela e soleira das narinas, inclinada pelo ângulo nasolabial; as bordas
+// das asas um pouco acima da columela) e pela raiz. topo = máximo suave de três partes:
+//   corpo (dorso e paredes laterais): perfil D(v) na linha média, base de meia-largura b(v) que alarga da raiz para baixo
+//     (pirâmide, não tubo), seção arredondada no dorso;
+//   lóbulo da ponta: cúpula elíptica de largura larguraPonta, centrada na altura da ponta;
+//   asas: lobos ovais alongados na vertical, de topo achatado (não bolas), com o sulco alar onde encontram o lóbulo e
+//     queda íngreme para o rosto (sulco alar-facial).
+// Fora da pegada, o topo cai com inclinação forte (≥ 2,5 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
+// pegada é a do nariz, não a da caixa de trabalho. As narinas ficam à parte (narinasParametricas).
+const QUEDA = 3;   // inclinação fora da pegada (mm de descida por mm para fora)
+const cupula = (r, e) => (r < 1 ? Math.pow(1 - r * r, e) : -QUEDA * (r - 1));   // 1 no centro, 0 na borda, cai fora
 export function narizTopo(p) {
   const L = p.comprimento, W = p.largura, P = p.projecao, vt = Math.min(p.alturaPonta, 0.4 * L), r0 = 1.5, Rt = Math.max(4, 0.14 * L);
-  const bR = 0.25 * W, bM = 0.34 * W, bL = Math.max(4, 0.45 * p.larguraPonta), v6 = 0.6 * L;
-  const ra = 0.2 * W, ua = W / 2 - ra, Amax = 0.45 * P, va = 0.12 * L, rv = 0.2 * L;
+  const Wt = Math.min(p.larguraPonta || 0.5 * W, 0.8 * W);
+  // corpo: meia-largura da base da raiz (0,22 W) até o terço inferior (0,40 W)
+  const bR = 0.22 * W, bB = 0.4 * W, vB = 0.35 * L;
   const D = (v) => {
     if (v >= vt) { const s = (L - v) / (L - vt); return r0 + (P - r0) * s + (p.dorso || 0) * 4 * s * (1 - s); }
     return P - ((vt - v) * (vt - v)) / (2 * Rt);
   };
-  const b = (v) => (v >= v6 ? bM + (bR - bM) * sstep((v - v6) / (L - v6)) : v >= vt + 2 ? bL + (bM - bL) * sstep((v - vt - 2) / (v6 - vt - 2)) : bL);
-  const pe = (v) => (v >= v6 ? 2 : v >= vt ? 2 + 0.6 * (1 - (v - vt) / (v6 - vt)) : 2.6);
-  return function (u, v) {
-    const vv = Math.min(L + 3, v), au = Math.abs(u), bv = b(vv), x = au / bv;
-    const corpo = x < 1 ? Math.max(0, D(vv)) * (1 - Math.pow(x, pe(vv))) : -(au - bv);
-    const ya = (v - va) / rv, za = (au - ua) / (au > ua ? ra : 1.4 * ra);
-    const asa = Amax * (1 - ya * ya - za * za);   // paraboloide elíptico: contorno oval de frente
-    return -Vo.uniaoSuave(-corpo, -asa, 4);
+  const b = (v) => (v >= vB ? bB + (bR - bB) * sstep((v - vB) / (L - vB)) : bB);
+  // lóbulo
+  const ru = 0.62 * Wt, rvL = 0.22 * L, rzL = 0.55 * P, vL = vt - 0.5;
+  // asas
+  const rau = 0.2 * W, ua = W / 2 - rau, rav = 0.22 * L, va = 0.13 * L, Ha = 0.42 * P;
+  const forma = (dl) => function (u, v) {
+    const vv = Math.min(L + 3, v), au = Math.abs(u), bv = b(vv), x = au / bv, Dv = Math.max(0, D(vv) - dl * sstep(1 - Math.abs(vv - vt) / (0.4 * L)));
+    // seção do corpo: 1 − x^1,8 (dorso arredondado, paredes quase retas); fora, continua descendo com QUEDA
+    const corpo = x < 1 ? Dv * (1 - Math.pow(x, 1.8)) : -QUEDA * (au - bv);
+    const lob = P - dl - rzL + rzL * cupula(Math.hypot(u / ru, (v - vL) / rvL), 0.6) * (Math.hypot(u / ru, (v - vL) / rvL) < 1 ? 1 : Math.min(ru, rvL) / rzL);
+    const ra = Math.hypot((au - ua) / rau, (v - va) / rav);
+    const asa = Ha * cupula(ra, 0.6) * (ra < 1 ? 1 : Math.min(rau, rav) / Ha);
+    return -Vo.uniaoSuave(Vo.uniaoSuave(-corpo, -lob, 5), -asa, 7);
   };
+  // o máximo suave soma um pouco onde o corpo e o lóbulo se encontram: baixa os dois perto da ponta até a projeção
+  // ficar igual à pedida (duas iterações bastam)
+  const pico = (f) => { let m = -Infinity; for (let v = 0; v <= 0.5 * L; v += 0.25) m = Math.max(m, f(0, v)); return m; };
+  let dl = 0; for (let i = 0; i < 3; i++) dl += pico(forma(dl)) - P;
+  return forma(dl);
+}
+// base: columela pelo ângulo nasolabial; as bordas das asas sobem até 2,5 mm (columela aparente de perfil)
+function alturaBase(p, u, w) {
+  const W = p.largura, P = p.projecao, tg = Math.tan(((p.nasolabial - 90) * Math.PI) / 180);
+  return tg * w + 2.5 * sstep((Math.abs(u) - 0.17 * W) / (0.12 * W)) * sstep((w - 0.15 * P) / (0.3 * P));
 }
 // campo do nariz (distância aproximada: altura normalizada pela inclinação, base e raiz)
 export function narizParametrico(p) {
-  const topo = narizTopo(p), L = p.comprimento, alfa = ((p.nasolabial - 90) * Math.PI) / 180, tg = Math.tan(alfa), ca = Math.cos(alfa), e = 0.25;
+  const topo = narizTopo(p), L = p.comprimento, ca = Math.cos(((p.nasolabial - 90) * Math.PI) / 180), e = 0.25;
   return function (u, v, w) {
     const t = topo(u, v), gu = (topo(u + e, v) - topo(u - e, v)) / (2 * e), gv = (topo(u, v + e) - topo(u, v - e)) / (2 * e);
-    return Math.max((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (tg * w - v) * ca, v - (L + 3));
+    return Math.max((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca, v - (L + 3));
   };
 }
-// malha fechada do nariz paramétrico no referencial do nariz, cortada a 40 mm atrás do subnasal (dentro do rosto)
+// malha fechada do nariz paramétrico no referencial do nariz, cortada a 40 mm atrás do subnasal (dentro do rosto);
+// a grade vai até onde o topo já desceu abaixo do corte (sem paredes da caixa)
 export function malhaNariz(p, passo = 0.4) {
-  const f = narizParametrico(p), W = p.largura, L = p.comprimento, P = p.projecao;
-  const g = Vo.criarGrade([-W / 2 - 4, -8, -40], [W / 2 + 4, L + 6, P + 4], passo);
-  Vo.preencherGrade(g, (u, v, w) => Math.max(f(u, v, w), -40 + passo - w));
+  const f = narizParametrico(p), W = p.largura, L = p.comprimento, P = p.projecao, m = 40 / QUEDA + 2;
+  const g = Vo.criarGrade([-W / 2 - m, -8, -40], [W / 2 + m, L + 6, P + 4], passo);
+  Vo.preencherGrade(g, (u, v, w) => Math.max(f(u, v, w), -40 + passo - w, Math.abs(u) - (W / 2 + m - passo)));
   return decimar(Vo.extrairSuperficie(g), { tolerancia: 0.01 });
 }
+// narinas: ovais na base, inclinadas para a ponta (o eixo maior vai da asa para a frente e para dentro), afastadas
+// da columela; sobem profNarina para dentro do nariz e ficam a pelo menos 1,5 mm da superfície de fora
 export function narinasParametricas(p) {
-  const L = p.comprimento, W = p.largura, P = p.projecao, alfa = ((p.nasolabial - 90) * Math.PI) / 180, k = p.narina || 1;
-  const ca = Math.cos(alfa), sa = Math.sin(alfa), du = 0.12 * W, wc = 0.45 * P, vc = Math.tan(alfa) * wc;
+  const W = p.largura, P = p.projecao, alfa = ((p.nasolabial - 90) * Math.PI) / 180, k = p.narina || 1, topo = narizTopo(p);
+  const u0 = 0.2 * W, w0 = 0.4 * P, beta = (25 * Math.PI) / 180, cb = Math.cos(beta), sb = Math.sin(beta);
+  const ca = Math.cos(alfa), sa = Math.sin(alfa), prof = p.profNarina || 10;
+  const a = 0.35 * P * k, c = 0.1 * W * k, h = prof / 2;
   return function (u, v, w) {
     let f = Infinity;
     for (const s of [-1, 1]) {
-      // eixos da narina: ao longo da columela (no plano v-w), lateral, e normal à base (para dentro do nariz)
-      const x = u - s * du, y = v - vc, z = w - wc;
-      const al = y * sa + z * ca, no = y * ca - z * sa;
-      f = Math.min(f, Vo.elipsoide(x, no - p.profNarina * 0.25, al, 0.07 * W * k, p.profNarina * 0.45, 0.25 * P * k));
+      // no plano da base: eixo maior d (para a frente e para a linha média), eixo menor e; n sobe para dentro do nariz
+      const du = u - s * u0, dw = w - w0, vb = alturaBase(p, s * u0, w0);
+      const y = v - vb, al = dw * ca + y * sa, no = y * ca - dw * sa;   // al: ao longo da base (frente); no: normal
+      const ad = al * cb - s * du * sb, ae = s * du * cb + al * sb;
+      f = Math.min(f, Vo.elipsoide(ae, ad, no - h + 1, c, a, h + 1));
     }
-    return f;
+    return Math.max(f, 1.5 - (topo(u, v) - w));
   };
 }
 
@@ -178,7 +221,7 @@ export const PARAMETROS_PADRAO = {
   // filete: sob a parte solta da doadora, a aba entra até esta distância da raiz (fecha a ponta do sulco atrás da orelha,
   // sem cunha fina de ar); no nariz fica 0 (taparia o fundo das narinas)
   orelha: { passo: 0.5, aba: 8, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 1.5, oco: false, parede: 3, filete: 3 },
-  nariz: { passo: 0.5, aba: 6, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 1.5, oco: true, parede: 3, filete: 0 },
+  nariz: { passo: 0.5, aba: 6, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 3, oco: true, parede: 3, filete: 0 },
 };
 export const MOLDE_PADRAO = { parede: 8, base: 6, topo: 6, dividir: true, anguloDivisao: 90, deslocDivisao: 0, chaveRaio: 2.5, folga: 0.2, canal: 4, respiro: 1.5, respiros: 2, tolerancia: 0.03 };
 
@@ -236,6 +279,10 @@ export async function gerarProtese(e) {
   // extensão da região em (u, v)
   if (!regiaoUV) {
     if (nz) regiaoUV = { lo: [-nz.largura / 2 - 4, -5, 0], hi: [nz.largura / 2 + 4, nz.comprimento + 4, 0] };
+    else if (e.tipo === "nariz") {   // modelo de nariz (pode ser um scan inteiro com o nariz): a região vem das proporções do rosto
+      const pd = narizPadrao(e.pontos);
+      regiaoUV = { lo: [-pd.largura / 2 - 6, -8, 0], hi: [pd.largura / 2 + 6, pd.comprimento + 6, 0] };
+    }
     else { const pts = []; for (let i = 0; i < doadoraL.V.length; i += 3) pts.push([doadoraL.V[i], doadoraL.V[i + 1], 0]); regiaoUV = caixaDe(pts); }
   }
   const mold = Object.assign({}, MOLDE_PADRAO, e.molde || {});
@@ -251,7 +298,7 @@ export async function gerarProtese(e) {
   if (!cheias.length) throw new Error("o scan não cobre a região da prótese");
   const mediana = cheias[cheias.length >> 1];
   for (const x of cheias) if (x > mediana - 40) { wmin = Math.min(wmin, x); wmax = Math.max(wmax, x); }
-  { const D = doadoraL.V; for (let i = 0; i < D.length; i += 3) { const u = D[i], v = D[i + 1]; if (poligono ? Vo.distanciaPoligono(u, v, poligono) < 2 : true) dmax = Math.max(dmax, D[i + 2]); } }
+  { const D = doadoraL.V; for (let i = 0; i < D.length; i += 3) { const u = D[i], v = D[i + 1]; if (u >= lo[0] && u <= hi[0] && v >= lo[1] && v <= hi[1] && (poligono ? Vo.distanciaPoligono(u, v, poligono) < 2 : true)) dmax = Math.max(dmax, D[i + 2]); } }
   // o fundo da grade fica abaixo da pele mais funda da região (a base do molde precisa caber)
   const zLo = wmin - mold.base - 3 * h - 2, zHi = Math.max(dmax, wmax) + mold.topo + 3 * h + 2;
   if (zHi - zLo > 160) avisos.push({ n: "atenção", t: `A região de trabalho tem ${fmt(zHi - zLo, 0)} mm de profundidade: confira os pontos e o contorno.` });
@@ -283,9 +330,16 @@ export async function gerarProtese(e) {
   const regiao = new Float32Array(NC);
   if (poligono) { for (let j = 0; j < g.ny; j++) for (let i = 0; i < g.nx; i++) regiao[i + g.nx * j] = Vo.distanciaPoligono(g.o[0] + i * h, g.o[1] + j * h, poligono); }
   else {
-    const mask = new Uint8Array(NC);
-    for (let c = 0; c < NC; c++) for (let k = 0; k < g.nz; k++) { const q = c + NC * k; if (sD[q] < 0 && sH[q] > 0.3) { mask[c] = 1; break; } }
+    // modelo importado (um scan com o nariz, p.ex.): fora do nariz ele coincide com a pele a menos do ruído dos dois
+    // scans; só conta o que fica claramente acima (0,8 mm) e só a parte ligada ao nariz, sem buracos
+    const lim = doa.tipo === "modelo" ? 0.8 : 0.3;
+    let mask = new Uint8Array(NC);
+    for (let c = 0; c < NC; c++) for (let k = 0; k < g.nz; k++) { const q = c + NC * k; if (sD[q] < 0 && sH[q] > lim) { mask[c] = 1; break; } }
     if (!mask.some((x) => x)) throw new Error("a forma doadora não aparece acima da pele: confira o alinhamento e os pontos");
+    if (e.tipo === "nariz") {
+      const cn = paraLocal(R, soma(esc(e.pontos.n, 0.3), esc(e.pontos.sn, 0.7)));
+      mask = preencherBuracos(componenteProxima(mask, g.nx, g.ny, (cn[0] - g.o[0]) / h, (cn[1] - g.o[1]) / h), g.nx, g.ny);
+    }
     regiao.set(Vo.distanciaMascara2D(mask, g.nx, g.ny, h));
   }
   // raiz: colunas em que a doadora encosta na pele (a aba nasce dali, para fora); onde a doadora passa acima da pele sem
@@ -340,7 +394,7 @@ export async function gerarProtese(e) {
         // rasgada); na raiz ela assenta direto na pele (sem a folga ficaria uma lâmina de ar fina sob a prótese)
         let f = Vo.uniaoSuave(Math.max(sD[q], d2, (raiz[c] ? 0 : FOLGA_PELE) - sh), fAba, par.raioUniao);
         if (ocoFundo) { const hb = ocoFundo[c]; if (hb < Infinity) f = Math.max(f, -Math.min(sD[q] + par.parede, w - hb)); }
-        if (narinas) f = Math.max(f, -narinas(u, v, w));
+        if (narinas) f = Math.max(f, -Math.max(narinas(u, v, w), 1.2 - sh));   // a narina não fura a pele por baixo (no nariz maciço fica cega)
         for (const m of imas) f = Math.max(f, -Math.max(Math.hypot(u - m.u, v - m.v) - rI, m.w0 - 1 - w, w - (m.w0 + pI)));
         fP[q] = Math.max(f, -sh);
       }
@@ -531,6 +585,46 @@ export function alinharModelo(origem, destino, comEscala = true) {
   return { T, erro };
 }
 export const transformarModelo = (m, T) => ({ V: transformarVertices(m.V, (x, y, z) => aplicarTransformacao(T, [x, y, z])), F: m.F });
+
+// Refina um modelo já perto do lugar pelo próprio rosto (ICP rígido, ponto-plano): serve quando o modelo é um scan da
+// mesma pessoa com o nariz (ou com a orelha), feito antes. Só conta a pele em volta (até raio de centro), fora da região
+// do defeito (excluir: [{ c, r }]), onde os dois scans devem coincidir. modelo: { V, F } já na posição atual (cena).
+// → { T (a compor depois da transformação atual), rms (mm), pares, iteracoes }
+export function refinarModelo(modelo, scan, { centro, raio = 80, excluir = [], amostras = 4000, iteracoes = 40, busca } = {}) {
+  const B = busca || criarBuscaProxima(scan, 4), V = modelo.V, cand = [];
+  for (let i = 0; i < V.length; i += 3) {
+    const p = [V[i], V[i + 1], V[i + 2]];
+    if (centro && dist(p, centro) > raio) continue;
+    if (excluir.some((e) => dist(p, e.c) < e.r)) continue;
+    cand.push(p);
+  }
+  if (cand.length < 50) throw new Error("o modelo não tem pele em volta da região do defeito para comparar com o rosto");
+  const passo = Math.max(1, Math.floor(cand.length / amostras)), pts = cand.filter((_, i) => i % passo === 0);
+  // ponto-plano (Chen–Medioni), linearizado em rotações pequenas: min Σ ((R p + t − q)·N)², 6 incógnitas
+  let T = { R: [[1, 0, 0], [0, 1, 0], [0, 0, 1]], s: 1, t: [0, 0, 0] }, rms = null, n = 0, it = 0;
+  for (; it < iteracoes; it++) {
+    const lim = Math.max(2, 12 - 1.5 * it), A = Array.from({ length: 6 }, () => new Float64Array(6)), b = new Float64Array(6), res = [];
+    for (const p0 of pts) {
+      const p = aplicarTransformacao(T, p0), r = B.pontoMaisProximo(p, lim); if (!r) continue;
+      const N = r.n, e = dot(sub(p, r.p), N); res.push({ p, N, e });
+    }
+    if (res.length < 30) break;
+    res.sort((x, y) => Math.abs(x.e) - Math.abs(y.e));
+    const usa = res.slice(0, Math.ceil(res.length * 0.9));   // 10 % piores fora (bordas, cabelo, diferenças reais)
+    rms = Math.sqrt(usa.reduce((s2, x) => s2 + x.e * x.e, 0) / usa.length); n = usa.length;
+    for (const { p, N, e } of usa) {
+      const J = cruz(p, N).concat(N);
+      for (let i = 0; i < 6; i++) { b[i] -= J[i] * e; for (let j = 0; j < 6; j++) A[i][j] += J[i] * J[j]; }
+    }
+    const x = resolverN(A, b); if (!x) break;
+    const ang = Math.hypot(x[0], x[1], x[2]), k = ang > 1e-12 ? [x[0] / ang, x[1] / ang, x[2] / ang] : [1, 0, 0], c = Math.cos(ang), s1 = Math.sin(ang), v1 = 1 - c;
+    const R = [[c + k[0] * k[0] * v1, k[0] * k[1] * v1 - k[2] * s1, k[0] * k[2] * v1 + k[1] * s1], [k[1] * k[0] * v1 + k[2] * s1, c + k[1] * k[1] * v1, k[1] * k[2] * v1 - k[0] * s1], [k[2] * k[0] * v1 - k[1] * s1, k[2] * k[1] * v1 + k[0] * s1, c + k[2] * k[2] * v1]];
+    T = comporTransformacoes({ R, s: 1, t: [x[3], x[4], x[5]] }, T);
+    if (it > 3 && ang < 1e-6 && Math.hypot(x[3], x[4], x[5]) < 1e-4) { it++; break; }
+  }
+  if (rms == null) throw new Error("o modelo está longe demais do rosto: alinhe antes pelos pares de pontos");
+  return { T, rms, pares: n, iteracoes: it };
+}
 
 // ------------------------------------------------------------------ malha local → coordenadas do scan (para mostrar e exportar)
 export function malhaParaScan(malha, R) {

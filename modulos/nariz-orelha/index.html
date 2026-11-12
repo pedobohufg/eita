@@ -249,12 +249,13 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
     </div>
     <div id="modeloBox">
       <div class="sub-h">Modelo importado</div>
-      <div class="drop" id="modeloDrop" tabindex="0" role="button"><b>Abrir o modelo</b>STL, OBJ ou PLY, já recortado (nariz do banco de Leeds, scan antigo, orelha)</div>
+      <div class="drop" id="modeloDrop" tabindex="0" role="button"><b>Abrir o modelo</b>STL, OBJ ou PLY: um scan antigo do paciente com o nariz (ou a orelha), inteiro ou recortado, ou um nariz de banco</div>
       <input type="file" id="modeloFile" accept=".stl,.obj,.ply" hidden>
-      <div class="note">Marque pelo menos 3 pares de pontos: o mesmo ponto anatômico no modelo e no rosto (ex.: raiz, ponta, base de cada asa). O alinhamento ajusta posição, giro e escala.</div>
+      <div class="note">Marque pelo menos 3 pares de pontos: o mesmo ponto anatômico no modelo e no rosto. Num scan antigo do próprio paciente, use pontos fora do defeito (cantos dos olhos, násio). O alinhamento ajusta posição, giro e escala.</div>
       <div class="row"><button id="parModelo" type="button">Ponto no modelo</button><button id="parRosto" type="button">Ponto no rosto</button><button id="parLimpar" type="button">Limpar pares</button></div>
       <div class="pares" id="pares"></div>
-      <button class="primary" id="alinharModelo" type="button" disabled>Alinhar o modelo</button>
+      <div class="row"><button class="primary" id="alinharModelo" type="button" disabled>Alinhar o modelo</button><button id="refinarModelo" type="button" disabled>Refinar pelo rosto</button></div>
+      <div class="note" id="refinoInfo">Depois de alinhar pelos pares: se o modelo é um scan do mesmo paciente, <b>Refinar pelo rosto</b> encaixa a pele em volta (testa, olhos, bochechas, lábio), sem contar a região do defeito.</div>
     </div>
     <div class="sub-h">Ajuste fino da posição</div>
     <label class="ctl">Deslocar para a frente/trás (mm)<input type="number" id="ajU" step="0.5" value="0"></label>

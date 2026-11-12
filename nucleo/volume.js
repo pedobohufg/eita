@@ -143,9 +143,17 @@ export function campoDeMalha(g, T, { banda = 3, final = "dentro" } = {}) {
   for (let c = 0; c < NC; c++) {
     const a = cont[c], b = cont[c + 1];
     if (a === b) { estado[c] = 0; continue; }
-    const lista = Array.from(zs.subarray(a, b)).sort((p, q) => q - p);
+    // "dentro": travessias abaixo da grade não contam (scan fechado atrás, como uma máscara com tampa: a coluna sai de
+    // novo pela tampa, mas isso fica fora da grade e não muda nenhuma célula)
+    let lista = Array.from(zs.subarray(a, b));
+    if (final === "dentro") lista = lista.filter((z) => z >= o[2] - h);
+    lista.sort((p, q) => q - p);
+    if (!lista.length) { estado[c] = 0; continue; }
     const z = [];
     for (const v of lista) if (!z.length || z[z.length - 1] - v > h * 1e-5) z.push(v); else z.pop();   // duas travessias no mesmo ponto se anulam
+    // número par de travessias com a coluna terminando fora: a última é o fundo do scan (tampa de um scan fechado) e
+    // é ignorada — tudo abaixo da pele conta como dentro. Uma travessia só e nenhuma ficam como antes.
+    if (final === "dentro" && z.length >= 2 && z.length % 2 === 0) z.pop();
     if (final === "dentro" && z.length % 2 === 0) { estado[c] = z.length ? 2 : 0; continue; }
     estado[c] = 1;
     let q = 0, den = false;
