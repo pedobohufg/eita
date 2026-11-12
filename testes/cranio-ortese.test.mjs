@@ -193,3 +193,10 @@ test("contorno editável (E3c-4): desenho na altura certa e os dois lados iguais
   assert.ok(Math.abs(a.D - b.E) < 0.3 && Math.abs(a.E - b.D) < 0.3, JSON.stringify({ a, b }));
   assert.ok(Math.abs(r1.stats.volume_cm3 - r2.stats.volume_cm3) < 0.02 * r1.stats.volume_cm3);
 });
+
+test("contorno editável (E3c-4): borda de baixo assentada (sem alívio nem reserva junto da borda)", () => {
+  const an = O.analisar(pos, meta.zRef), P = Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 40, bandTopBack: 70, hf: 0, frontArc: 40, hb: -30, cheek: "on", cheekDepth: 40, mast: "off", split: "none", holeD: 0, cheekWall: "on", cheekFoam: 3, earBack: 35, reliefMax: 6, growMonths: 4, growRate: 0.8 });
+  const r = O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: O.contornoPadrao(an, P) }), pos), T = r.tris, lo = {};
+  for (let k = 0; k < T.length; k += 3) { const x = T[k], y = T[k + 1], z = T[k + 2] - meta.zRef, th = Math.round(((Math.atan2(x, y) / O.GRAU) + 360) % 360 / 5) * 5 % 360; if (!lo[th] || z < lo[th].z) lo[th] = { z, rr: Math.hypot(x, y, z), ph: Math.asin(z / Math.hypot(x, y, z)) / O.GRAU }; }
+  for (let th = 130; th <= 230; th += 10) { const q = lo[th], g = q.rr - P.t - O.amostrarGrade(an.rho, th, q.ph); assert.ok(g < P.c0 + 1, `azimute ${th}°: folga na borda ${g.toFixed(1)} mm`); }
+});

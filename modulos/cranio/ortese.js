@@ -542,12 +542,28 @@ export function reservaDeCrescimento(d, ph, P) {
 }
 
 export function raioInterno(an, th, ph, P) {
-  const r = amostrarGrade(an.rho, th, ph);
-  const d = amostrarGrade(an.dev, th, ph);
+  let r = amostrarGrade(an.rho, th, ph);
+  let d = amostrarGrade(an.dev, th, ph);
+  // com contorno editado (E3c-4): a casca acompanha o crânio sem as orelhas (a orelha inclinada para trás fazia a
+  // casca atrás dela se afastar da cabeça) e, onde há orelha deste lado ou do espelho, o mapa de desvio (que compara
+  // os dois lados) não vale — a orelha de um lado contra a pele do outro virava alívio ou contato falso
+  if (P.contorno && an.rsNoEar && P.zonasOrelha) {
+    // só perto das orelhas (o "sem orelha" também achata outras saliências estreitas, como a bochecha)
+    let perto = 0;
+    for (const z of P.zonasOrelha) { const dz = diferencaAzimute(th, z.az); if (dz < z.w + 30 && ph < z.phTop) perto = Math.max(perto, degrauSuave((z.w + 30 - dz) / 10)); }
+    if (perto > 0) {
+      const re = amostrarGrade(an.rsNoEar, th, ph), m = 360 - th, orelha = Math.max(r - re, amostrarGrade(an.rho, m, ph) - amostrarGrade(an.rsNoEar, m, ph));
+      r = r + (re - r) * perto; if (orelha > 0.5) d *= 1 - perto * Math.min(1, (orelha - 0.5) / 1.5);
+    }
+  }
   let add = 0;
   if (d < 0) add = Math.min(P.reliefMax, P.relief * (-d));              // alívio (vazio) na área achatada
   else if (P.mode === 'active') add = -Math.min(P.compMax, P.relief * d); // compressão opcional na área proeminente
-  let gap = P.c0 + add + reservaDeCrescimento(d, ph, P);
+  // borda assentada (com contorno editado, E3c-4): o alívio e a reserva de crescimento somem nos 15 mm junto da borda
+  // de baixo, que encosta na cabeça (só o forro); sem isso a borda atrás da orelha e no occipício abria para fora
+  let assento = 1;
+  if (P.bordaInferior) assento = degrauSuave((ph - P.bordaInferior(th)) * GRAU * r / 15);
+  let gap = P.c0 + (add + reservaDeCrescimento(d, ph, P)) * assento;
   if (P.cheekClear != null) { const low = limitar((-ph - 6) / 10, 0, 1); gap = gap * (1 - low) + P.cheekClear * low; }
   if (P.parede) { const w = P.parede(th, ph); if (w) return (r + gap) * (1 - w.peso) + w.r * w.peso; }
   return r + gap;
@@ -560,18 +576,23 @@ export function raioInterno(an, th, ph, P) {
    órtese machucar. → função (θ, φ) → { peso 0–1, r } ou null fora das abas. */
 export function paredeDosApoios(an, P, ears) {
   const PH0 = -6, zonas = [];
-  // com contorno editado, os apoios podem estar em qualquer lugar à frente das orelhas: setores de 15° a 115° de cada
-  // lado (a borda de trás, abaixo do occipício, continua acompanhando a cabeça); sem contorno, as abas dos parâmetros
-  if (P.contorno && P.contorno.length >= 4) zonas.push({ az: 65, larg: 50 }, { az: 295, larg: 50 });
+  // com contorno editado, os apoios podem estar em qualquer lugar à frente das orelhas: setor de 15° até a frente da
+  // janela da orelha de cada lado (atrás da orelha e no occipício a casca acompanha a cabeça); sem contorno, as abas
+  // dos parâmetros
+  if (P.contorno && P.contorno.length >= 4) ['R', 'L'].forEach((s) => {   // de 15° até a frente da orelha daquele lado
+    const e = ears[s], fim = Math.max(30, e.az - e.w), az = (15 + fim) / 2, larg = (fim - 15) / 2;
+    zonas.push({ az: s === 'R' ? az : 360 - az, larg });
+  });
   else ['R', 'L'].forEach((s) => [ears['leg' + s], ears['mast' + s]].forEach((lg) => { if (lg) zonas.push({ az: s === 'R' ? lg.az : 360 - lg.az, larg: lg.w + 4 }); }));
   if (!zonas.length) return null;
   // por azimute (graus inteiros): raio horizontal na altura φ0 e quanto a pele passa dele de φ0 para baixo (máximo
   // acumulado), suavizado em ±6° de azimute para a parede não copiar o relevo do rosto
   const norm = (t) => ((Math.round(t) % 360) + 360) % 360, base = new Float64Array(360), bruto = [];
+  const R = an.rho;   // o setor dos apoios acaba antes da orelha; a pele do rosto conta inteira
   for (let t = 0; t < 360; t++) {
-    base[t] = amostrarGrade(an.rho, t, PH0) * Math.cos(PH0 * GRAU);
+    base[t] = amostrarGrade(R, t, PH0) * Math.cos(PH0 * GRAU);
     const col = []; let m = 0;
-    for (let ph = PH0; ph >= GRADE.PMIN; ph -= 1) { m = Math.max(m, amostrarGrade(an.rho, t, ph) * Math.cos(ph * GRAU) - base[t]); col.push(m); }
+    for (let ph = PH0; ph >= GRADE.PMIN; ph -= 1) { m = Math.max(m, amostrarGrade(R, t, ph) * Math.cos(ph * GRAU) - base[t]); col.push(m); }
     bruto.push(col);
   }
   const NPH = bruto[0].length, salto = [];
@@ -721,6 +742,7 @@ export function gerarOrtese(an, zRef, P, pos) {
   const wrap = th => ((th % 360) + 360) % 360;
 
   const ears = resolverOrelhas(an, P), tf = campoDeCorte(an, P, ears);
+  if (P.contorno) P = Object.assign({}, P, { zonasOrelha: ['R', 'L'].map((s) => ({ az: s === 'R' ? ears[s].az : 360 - ears[s].az, w: ears[s].w, phTop: Math.atan2(ears[s].top + 15, amostrarGrade(an.rho, ears[s].az, 0)) / GRAU })) });
   if (P.cheekWall === 'on') P = Object.assign({}, P, { parede: paredeDosApoios(an, P, ears) });
   const phT = new Float32Array(Nc);
   let Rm = 0, phMin = 90;
@@ -730,6 +752,7 @@ export function gerarOrtese(an, zRef, P, pos) {
     phT[j] = tf.lowest(th);
     phMin = Math.min(phMin, phT[j]);
   }
+  if (P.contorno) P = Object.assign({}, P, { bordaInferior: (th) => { const f = (((th % 360) + 360) % 360) / dTh, j0 = Math.floor(f) % Nc, w = f - Math.floor(f); return phT[j0] * (1 - w) + phT[(j0 + 1) % Nc] * w; } });
   let maxJump = 0;
   for (let j = 0; j < Nc; j++) maxJump = Math.max(maxJump, Math.abs(phT[(j + 1) % Nc] - phT[j]));
   const phLo = Math.max(GRADE.PMIN + 1, phMin - 1.5);
