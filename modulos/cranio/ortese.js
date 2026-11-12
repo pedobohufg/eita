@@ -187,8 +187,10 @@ export function detectarOrelhas(rs, plausivel) {
   // superfície sem a orelha: só onde o raio excede a abertura em ≥ 2 mm (preserva o crânio liso)
   const rsE = Float32Array.from(rs);
   for (let i = 0; i < N; i++) if (rs[i] - op[i] > 1.2) rsE[i] = op[i];
-  const thr = 3.5, out = { rsNoEar: rsE };
-  ['R', 'L'].forEach(function (side) {
+  const out = { rsNoEar: rsE };
+  ['R', 'L'].forEach(function (side) { out[side] = orelhaDoLado(side, 3.5); });
+  return out;
+  function orelhaDoLado(side, thr) {
     const mask = new Uint8Array(N), bump = new Float32Array(N);
     for (let ip = 0; ip < NP; ip++) {
       const ph = GRADE.PMIN + ip * GRADE.dP;
@@ -224,21 +226,23 @@ export function detectarOrelhas(rs, plausivel) {
         topH = Math.max(topH, rs[i] * Math.sin(ph * GRAU));
       });
       const az = (tmin + tmax) / 2, w = (tmax - tmin) / 2 + GRADE.dT / 2;
-      const plaus = az >= 60 && az <= 140 && w <= 32 && topH >= -20 && topH <= 35;      // orelha plausível: perto do plano de referência
+      const plaus = az >= 60 && az <= 140 && w <= 32 && topH >= (plausivel ? -40 : -20) && topH <= 35 && (!plausivel || pmax - pmin <= 40);      // orelha plausível: perto do plano de referência (E3c-4: até 40 mm abaixo, no occipital plano o plano G–O sobe; e no máximo 40° de altura, a dobra da touca é comprida)
       return { ok: plaus, az: az, w: w, top: topH, phiTop: pmax, phiBot: pmin, cells: g.cells.length, doubtful: !plaus };
     };
     let best = null;
     for (const g of grupos) if (!best || g.sum > best.sum) best = g;
-    if (!best || best.cells.length < 40) { out[side] = { ok: false }; return; }
+    if (!best || best.cells.length < 40) return thr > 3.5 ? null : { ok: false };
     let r = medir(best);
     if (!r.ok && plausivel) {
       let alt = null;
       for (const g of grupos) { if (g.cells.length < 40 || g === best) continue; const m = medir(g); if (m.ok && (!alt || g.sum > alt.sum)) alt = { sum: g.sum, m: m }; }
       if (alt) r = alt.m;
+      // nenhum plausível: a orelha pode estar emendada a um dedo ou à dobra da touca; com limiar mais alto, o
+      // calombo se divide e ela aparece sozinha (orelha salta 10–18 mm; a dobra, menos)
+      else if (thr < 9) { const r2 = orelhaDoLado(side, thr + 2.5); if (r2 && r2.ok) r = r2; }
     }
-    out[side] = r;
-  });
-  return out;
+    return r;
+  }
 }
 
 export function maiorDesvio(dev) {
@@ -484,7 +488,10 @@ export function funcaoDaBorda(P, ears, noLegs) {
       const ts = s === 'R' ? th : 360 - th;
       const e = ears[s], rd = P.legRound == null ? 0.3 : limitar(P.legRound, 0.1, 1);
       const d = diferencaAzimute(ts, e.az);
-      if (d < e.w) { const t = degrauSuave((e.w - d) / (0.45 * e.w)); h = Math.max(h, h + (e.top - h) * t); }   // janela da orelha (arco)
+      // janela da orelha (arco); earBack (E3c-4, graus): atrás da orelha a borda desce até a de trás numa curva longa
+      // (a página antiga descia em 0,45·w, quase em ângulo reto até o occipício)
+      const B = ts > e.az && P.earBack > 0 ? P.earBack : 0;
+      if (d < e.w + B) { const t = degrauSuave((e.w + B - d) / (0.45 * e.w + B)); h = Math.max(h, h + (e.top - h) * t); }
       (noLegs ? [] : [ears['leg' + s], ears['mast' + s]]).forEach(function (lg) {
         if (!lg) return;
         const d2 = diferencaAzimute(ts, lg.az);
@@ -532,7 +539,47 @@ export function raioInterno(an, th, ph, P) {
   else if (P.mode === 'active') add = -Math.min(P.compMax, P.relief * d); // compressão opcional na área proeminente
   let gap = P.c0 + add + reservaDeCrescimento(d, ph, P);
   if (P.cheekClear != null) { const low = limitar((-ph - 6) / 10, 0, 1); gap = gap * (1 - low) + P.cheekClear * low; }
+  if (P.parede) { const w = P.parede(th, ph); if (w) return (r + gap) * (1 - w.peso) + w.r * w.peso; }
   return r + gap;
+}
+
+/* Apoios lisos (E3c-4, cheekWall 'on'): abaixo da orelha, nas abas da bochecha (e atrás da orelha, se houver), a face
+   interna não copia o rosto: é uma parede que desce do contorno da cabeça na altura φ0 (−6°) e só se abre para fora
+   onde a bochecha passa desse contorno (máximo acumulado de cima para baixo, em toda a largura da aba). Entre a
+   parede e a pele fica a folga dos apoios mais o espaço da espuma (cheekFoam, mm), que faz o ajuste fino sem a
+   órtese machucar. → função (θ, φ) → { peso 0–1, r } ou null fora das abas. */
+export function paredeDosApoios(an, P, ears) {
+  const PH0 = -6, abas = [];
+  ['R', 'L'].forEach(function (s) {
+    [ears['leg' + s], ears['mast' + s]].forEach(function (lg) {
+      if (!lg) return;
+      const az = s === 'R' ? lg.az : 360 - lg.az, larg = lg.w + 4, borda = 8;
+      // contorno horizontal na altura φ0 e saliência máxima acumulada (mm) para baixo, em toda a largura da aba
+      const ths = []; for (let d = -larg; d <= larg; d += 1) ths.push(az + d);
+      const base = (th) => amostrarGrade(an.rho, ((th % 360) + 360) % 360, PH0) * Math.cos(PH0 * GRAU);
+      const salto = []; let m = 0;
+      for (let ph = PH0; ph >= GRADE.PMIN; ph -= 1) {
+        for (const th of ths) { const t = ((th % 360) + 360) % 360; m = Math.max(m, amostrarGrade(an.rho, t, ph) * Math.cos(ph * GRAU) - base(th)); }
+        salto.push(m);
+      }
+      abas.push({ az: az, larg: larg, borda: borda, base: base, salto: salto });
+    });
+  });
+  if (!abas.length) return null;
+  const folga = (P.cheekClear == null ? 1.5 : P.cheekClear) + (P.cheekFoam || 0);
+  return function (th, ph) {
+    if (ph >= PH0) return null;
+    let melhor = null;
+    for (const a of abas) {
+      const d = diferencaAzimute(th, a.az);
+      if (d >= a.larg + a.borda) continue;
+      const pt = degrauSuave((a.larg + a.borda - d) / a.borda) * degrauSuave((PH0 - ph) / 6);
+      const k = limitar(Math.round(PH0 - ph), 0, a.salto.length - 1), rh = a.base(th) + a.salto[k];
+      const r = rh / Math.cos(ph * GRAU) + folga;
+      if (!melhor || pt > melhor.peso) melhor = { peso: pt, r: r };
+    }
+    return melhor;
+  };
 }
 
 /* Campo de corte (mm, >0 = material). Une a borda-base (com janela da orelha) às abas
@@ -582,6 +629,7 @@ export function gerarOrtese(an, zRef, P, pos) {
   const wrap = th => ((th % 360) + 360) % 360;
 
   const ears = resolverOrelhas(an, P), tf = campoDeCorte(an, P, ears);
+  if (P.cheekWall === 'on') P = Object.assign({}, P, { parede: paredeDosApoios(an, P, ears) });
   const phT = new Float32Array(Nc);
   let Rm = 0, phMin = 90;
   for (let j = 0; j < Nc; j++) {

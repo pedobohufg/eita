@@ -76,7 +76,7 @@ test("fichas antigas: ficha e base da versão completa → ficha unificada", () 
   assert.deepEqual(FX.mesclarProtocolos({ A: { x: 1 } }, { A: { x: 2 }, B: { y: 1 } }), { A: { x: 1 }, B: { y: 1 } }, "os protocolos deste navegador prevalecem");
   assert.throws(() => FX.converterFichaAntiga({ formato: "EITA! CRÂNIO ficha" }));
   // campos criados na E3c-4: numa ficha antiga completa, valem os equivalentes ao comportamento antigo
-  assert.deepEqual(FX.completarEntradas({ "cro-type": "band", "cro-bandtop": "60" }), { "cro-type": "band", "cro-bandtop": "60", "cro-bandtop-back": "60", "cro-hole-zone": "all", "cro-front-arc": "0" });
+  assert.deepEqual(FX.completarEntradas({ "cro-type": "band", "cro-bandtop": "60" }), { "cro-type": "band", "cro-bandtop": "60", "cro-bandtop-back": "60", "cro-hole-zone": "all", "cro-front-arc": "0", "cro-cheek-wall": "off", "cro-cheek-foam": "0", "cro-ear-back": "0" });
   assert.deepEqual(FX.completarEntradas({ "cro-indic": "brachy" }), { "cro-indic": "brachy" }, "sem os campos da casca: fica o padrão da página");
   assert.equal(f.ortese.entradas["cro-bandtop-back"], undefined, "a ficha de teste não tem cro-type");
 });
@@ -141,4 +141,28 @@ test("correção do pescoço (E3c-4): tira o corte plano e as abas soltas", asyn
   const sa = P.semAbas(comAba, al.zRef, { analise: an });
   assert.equal(sa.removidos, 20); assert.equal(sa.pos.length, al.pos.length);
   assert.equal(P.semCortePlano(new Float32Array(9 * 0)), null);
+});
+
+test("conferência do scan (E3c-4): dedo encostado na cabeça vira saliência marcada e pode sair da análise", async () => {
+  const P = await import("../modulos/cranio/pontos.js");
+  const cab = JSON.parse(fs.readFileSync(new URL("./fixtures/cabeca_sintetica.json", import.meta.url)));
+  const bruto = lerSTL(zlib.gunzipSync(fs.readFileSync(new URL("./fixtures/cabeca_sintetica.stl.gz", import.meta.url))).buffer.slice(0));
+  const { pos, centro } = O.prepararScan(bruto, 1), pts = {}; for (const [k, p] of Object.entries(cab.pontos_mm)) pts[k] = p.map((v, q) => v - centro[q]);
+  const al = O.alinharPorPontos(pos, pts), an0 = O.analisar(al.pos, al.zRef);
+  assert.equal(P.detectarSaliencias(an0).filter((q) => !q.talvezOrelha).length, 0, "cabeça limpa: nada fora das orelhas");
+  // "dedo": cilindro de 8 mm de raio, 14 mm para fora da calota, no parieto-occipital E (θ 220°, φ 25°)
+  const th = 220 * O.GRAU, ph = 25 * O.GRAU, r0 = O.amostrarGrade(an0.rho, 220, 25), d = [Math.cos(ph) * Math.sin(th), Math.cos(ph) * Math.cos(th), Math.sin(ph)];
+  const u = [Math.cos(th), -Math.sin(th), 0], v = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]], dedo = [];
+  const pt = (s, a) => [0, 1, 2].map((q) => (q === 2 ? al.zRef : 0) + d[q] * (r0 - 3 + s) + 8 * (Math.cos(a) * u[q] + Math.sin(a) * v[q]));
+  for (let i = 0; i < 24; i++) { const a = i / 24 * 2 * Math.PI, b = (i + 1) / 24 * 2 * Math.PI; for (let s = 0; s < 17; s += 1) dedo.push(...pt(s, a), ...pt(s, b), ...pt(s + 1, a), ...pt(s, b), ...pt(s + 1, b), ...pt(s + 1, a)); const c = pt(17, 0).map((x, q) => x - 8 * u[q]); dedo.push(...pt(17, a), ...pt(17, b), ...c); }
+  // como num scan de verdade, a pele debaixo do dedo não aparece: tira da cabeça os triângulos sob ele
+  const cabeca = []; for (let k = 0; k < al.pos.length; k += 9) { const c = [0, 1, 2].map((q) => (al.pos[k + q] + al.pos[k + 3 + q] + al.pos[k + 6 + q]) / 3 - (q === 2 ? al.zRef : 0)), ax = c[0] * d[0] + c[1] * d[1] + c[2] * d[2]; if (ax > 0 && Math.hypot(c[0] - ax * d[0], c[1] - ax * d[1], c[2] - ax * d[2]) < 8) continue; for (let q = 0; q < 9; q++) cabeca.push(al.pos[k + q]); }
+  const com = new Float32Array(cabeca.length + dedo.length); com.set(cabeca); com.set(dedo, cabeca.length);
+  const an = O.analisar(com, al.zRef), sal = P.detectarSaliencias(an).filter((q) => !q.talvezOrelha);
+  assert.equal(sal.length, 1); assert.ok(O.diferencaAzimute(sal[0].th, 220) < 10 && Math.abs(sal[0].ph - 25) < 10 && sal[0].altura > 8, JSON.stringify({ th: sal[0].th, ph: sal[0].ph, h: sal[0].altura }));
+  const av = P.conferirScan({ analise: an, saliencias: sal });
+  assert.ok(av.some((a) => a.codigo === "saliencia" && a.nivel === "alerta"));
+  const limpo = P.semSaliencias(com, al.zRef, sal, an), an2 = O.analisar(limpo.pos, al.zRef);
+  assert.ok(limpo.removidos > 0); assert.equal(P.detectarSaliencias(an2).filter((q) => !q.talvezOrelha).length, 0, "sem o dedo, nada marcado");
+  assert.ok(Math.abs(O.amostrarGrade(an2.rho, 220, 25) - r0) < 1.5, "a calota volta ao lugar");
 });

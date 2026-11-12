@@ -6,18 +6,21 @@
    2) plano sagital: busca de simetria por espelhamento entre normais quase perpendiculares ao "para cima";
       entre os dois melhores planos (a calota de bebê é quase simétrica também de frente para trás) fica aquele em
       que os detalhes da face (onde a superfície é mais irregular) ficam centrados;
-   3) frente = lado oposto ao pescoço (ou, sem pescoço, o dos detalhes da face); no contorno sagital: opistocrânio
+   3) frente = lado do nariz (reentrância do násio seguida do nariz no contorno sagital); se ele não decidir, lado
+   oposto ao pescoço (ou, sem pescoço, o dos detalhes da face); no contorno sagital: opistocrânio
       (o ponto mais posterior da metade de cima, fora do corte), násio (a primeira reentrância do perfil da frente
       entre 45 e 5 mm abaixo do opistocrânio, com o nariz logo abaixo), glabela (12 mm acima do násio; sem násio,
-      8 mm abaixo da altura do opistocrânio) e vértice (o mais alto); eúrios = extremos laterais acima da glabela + 10 mm (sem as orelhas);
-   4) repete 3) uma vez com o "para cima" dado pelos próprios pontos (vértice − meio dos eúrios), se ele ficar a
+      8 mm abaixo da altura do opistocrânio), eúrios = extremos laterais acima da glabela + 10 mm (sem as orelhas) e
+      vértice = o ponto do contorno logo acima do meio dos eúrios, na perpendicular à linha glabela–opistocrânio (o
+      alinhamento usa vértice − meio dos eúrios como "para cima"; assim a linha glabela–opistocrânio fica horizontal);
+   4) repete 3) uma vez com o "para cima" dado pelos próprios pontos (mais alto − meio dos eúrios), se ele ficar a
       menos de 20° do primeiro.
    Entre os dois planos de simetria, o sagital é aquele cuja perpendicular (no plano horizontal) é a direção mais
    curta da metade de cima da cabeça (a cabeça é mais comprida que larga); empate: o pescoço no plano; depois, a face.
    É uma sugestão: a página mostra os pontos para conferência, e qualquer um pode ser marcado de novo.
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados. */
 
-import { amostrarGrade, analisar } from "./ortese.js";
+import { amostrarGrade, analisar, GRADE, nomeDaRegiao, diferencaAzimute } from "./ortese.js";
 
 const GRAU = Math.PI / 180;
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -127,7 +130,13 @@ function pontosNoQuadro(pos, Vtx, n, a, s, d, corte) {
   let dir = null, esq = null;
   for (let i = 0; i < Vtx.length; i += 3) { const v = [Vtx[i], Vtx[i + 1], Vtx[i + 2]]; if (dot(v, s) < sG + 10) continue; const x = dot(v, n); if (!dir || x > dir.x) dir = { v, x }; if (!esq || x < esq.x) esq = { v, x }; }
   if (!post || !vert || !dir || !esq) return null;
-  return { anterior: glab.p, posterior: post.p, right: dir.v, left: esq.v, vertex: vert.p, nasio: hNasio != null };
+  // vértice para o alinhamento (z = vértice − meio dos eúrios): o ponto do contorno logo acima do meio dos eúrios na
+  // direção perpendicular à linha glabela–opistocrânio, para que essa linha fique horizontal. O ponto mais alto do
+  // quadro provisório não serve: os eúrios costumam ficar atrás do meio da cabeça e o "para cima" inclinava a face
+  // para cima (no scan dos gêmeos, 33°)
+  const meioLat = escala([0, 1, 2].map((q) => dir.v[q] + esq.v[q]), 0.5), u = norm(sub(glab.p, post.p)), sup = norm(semComp(s, u));
+  const topo = S.filter((q) => dot(sub(q.p, meioLat), sup) > 20).reduce((m, q) => { const e = Math.abs(dot(sub(q.p, meioLat), u)); return !m || e < m.e ? { q, e } : m; }, null);
+  return { anterior: glab.p, posterior: post.p, right: dir.v, left: esq.v, vertex: topo ? topo.q.p : vert.p, maisAlto: vert.p, nasio: hNasio != null };
 }
 
 // Pontos sugeridos → { pontos: { anterior, posterior, left, right, vertex } (no referencial de pos), plano: { n, d },
@@ -183,18 +192,26 @@ export function detectarPontos(pos, o) {
   else { let sf = 0; P.forEach((p, i) => { if (!noCorte[i] && rug[i] >= lim) sf += rug[i] * dot(p, a); }); if (sf < 0) a = escala(a, -1); }
   let n = norm(cruz(a, s));   // direita do paciente = frente × cima
   if (o.depurar) o.depurar({ distBaixo: ref.map(distBaixo), cima, corte: ct, candidatos: ref.map((c) => ({ n: c.n, c: c.c, d: c.d, desc: c.desc })), sag: sag.n, a, s, n });
-  let r = pontosNoQuadro(pos, pos, n, a, s, sag.d, ct.fracao > 0.025 ? ct : null);
+  // o plano sagital é n·p = d com o n do sagital; quando a frente inverte, n troca de sinal e d também
+  const dDe = (m) => sag.d * Math.sign(dot(m, sag.n));
+  let r = pontosNoQuadro(pos, pos, n, a, s, dDe(n), ct.fracao > 0.025 ? ct : null);
+  // a pista mais forte da frente é o nariz: se só o lado oposto tem a reentrância do násio seguida do nariz, a frente
+  // é ele (mãos e dedos debaixo do queixo deixam bordas abertas na frente e enganam a pista do pescoço)
+  if (!(r && r.nasio)) {
+    const a2 = escala(a, -1), n2 = norm(cruz(a2, s)), r2 = pontosNoQuadro(pos, pos, n2, a2, s, dDe(n2), ct.fracao > 0.025 ? ct : null);
+    if (r2 && r2.nasio) { a = a2; n = n2; r = r2; }
+  }
   if (o.depurar) o.depurar({ primeira: r });
   // 4) uma vez de novo, com o "para cima" dos próprios pontos, se ele não se afastar mais de 20° do primeiro
   if (r) {
-    const meioLat = escala([0, 1, 2].map((q) => r.left[q] + r.right[q]), 0.5), cimaP = semComp(sub(r.vertex, meioLat), n);
-    if (dot(cimaP, s) > Math.cos(20 * GRAU)) { const s2 = cimaP, a2 = norm(cruz(s2, n)), r2 = pontosNoQuadro(pos, pos, norm(cruz(a2, s2)), a2, s2, sag.d, ct.fracao > 0.025 ? ct : null); if (r2) r = r2; }
+    const meioLat = escala([0, 1, 2].map((q) => r.left[q] + r.right[q]), 0.5), cimaP = semComp(sub(r.maisAlto, meioLat), n);
+    if (dot(cimaP, s) > Math.cos(20 * GRAU)) { const s2 = cimaP, a2 = norm(cruz(s2, n)), n3 = norm(cruz(a2, s2)), r2 = pontosNoQuadro(pos, pos, n3, a2, s2, dDe(n3), ct.fracao > 0.025 ? ct : null); if (r2) r = r2; }
   }
   if (o.depurar) o.depurar({ final: r });
   if (!r) return null;
   const arred = (p) => p.map((v) => +v.toFixed(4));
   return { pontos: { anterior: arred(r.anterior), posterior: arred(r.posterior), left: arred(r.left), right: arred(r.right), vertex: arred(r.vertex) },
-    plano: { n: n.map((v) => +v.toFixed(5)), d: +sag.d.toFixed(3) }, erroEspelho: +sag.c.toFixed(2), corte: +ct.fracao.toFixed(3), nasio: r.nasio };
+    plano: { n: n.map((v) => +v.toFixed(5)), d: +dDe(n).toFixed(3) }, erroEspelho: +sag.c.toFixed(2), corte: +ct.fracao.toFixed(3), nasio: r.nasio };
 }
 
 // Correção do pescoço (E3c-4): tira da malha os triângulos do corte plano (a maior área com a mesma normal, quando
@@ -241,6 +258,95 @@ export function semAbas(pos, zRef, o) {
     return !orelha && r - amostrarGrade(an.rho, th, ph) > folga;
   };
   let rem = 0;
+  for (let t = 0; t < pos.length / 9; t++) { if (fora(t * 9) && fora(t * 9 + 3) && fora(t * 9 + 6)) { rem++; continue; } fica.push(t); }
+  const out = new Float32Array(fica.length * 9); fica.forEach((t, i) => out.set(pos.subarray(t * 9, t * 9 + 9), i * 9));
+  return { pos: out, removidos: rem };
+}
+
+// Saliências estranhas (E3c-4): o que sobra acima do "crânio liso" (abertura morfológica da grade de raios com janela
+// de ±20°) em ≥ `altura` mm (padrão 4), em grupos de ≥ `area` cm² (padrão 1,5), na zona onde a órtese encosta
+// (elevação −40° a 75°), fora da face (azimute ±70° abaixo de +5°) e fora das orelhas detectadas. Em geral é dedo, mão,
+// dobra ou costura da touca, ou cabelo. → [{ th, ph (centro, graus), altura (mm), area (cm²), regiao, celulas }]
+function abertura(src, graus) {
+  const NT = GRADE.NT, NP = GRADE.NP, N = NT * NP, wT = Math.round(graus / GRADE.dT), wP = Math.round(graus / GRADE.dP);
+  const t = new Float32Array(N), mn = new Float32Array(N), op = new Float32Array(N);
+  const filtro = (a, d, min) => {
+    for (let ip = 0; ip < NP; ip++) for (let it = 0; it < NT; it++) { let v = min ? 1e9 : -1e9; for (let k = -wT; k <= wT; k++) { const x = a[ip * NT + (it + k + NT) % NT]; v = min ? Math.min(v, x) : Math.max(v, x); } t[ip * NT + it] = v; }
+    for (let ip = 0; ip < NP; ip++) for (let it = 0; it < NT; it++) { let v = min ? 1e9 : -1e9; for (let k = -wP; k <= wP; k++) { const x = t[Math.min(NP - 1, Math.max(0, ip + k)) * NT + it]; v = min ? Math.min(v, x) : Math.max(v, x); } d[ip * NT + it] = v; }
+  };
+  filtro(src, mn, true); filtro(mn, op, false);
+  return op;
+}
+export function detectarSaliencias(an, o) {
+  o = o || {};
+  const NT = GRADE.NT, NP = GRADE.NP, N = NT * NP, rs = an.rho, op = abertura(rs, 20), alt = o.altura || 4, amin = o.area || 1.5;
+  const naOrelha = (th, ph) => ["R", "L"].some((s) => { const e = an.ears && an.ears[s]; if (!e || !e.ok) return false; const az = s === "R" ? e.az : 360 - e.az; return diferencaAzimute(th, az) <= e.w + 6 && ph <= e.phiTop + 6 && ph >= e.phiBot - 6; });
+  const marca = new Uint8Array(N);
+  for (let ip = 0; ip < NP; ip++) {
+    const ph = GRADE.PMIN + ip * GRADE.dP; if (ph < -40 || ph > 75) continue;
+    for (let it = 0; it < NT; it++) {
+      const th = it * GRADE.dT, i = ip * NT + it;
+      if (ph < 5 && diferencaAzimute(th, 0) < 70) continue;
+      if (rs[i] - op[i] >= alt && !naOrelha(th, ph)) marca[i] = 1;
+    }
+  }
+  const visto = new Uint8Array(N), out = [];
+  for (let i0 = 0; i0 < N; i0++) {
+    if (!marca[i0] || visto[i0]) continue;
+    const fila = [i0], cel = []; visto[i0] = 1;
+    while (fila.length) { const i = fila.pop(); cel.push(i); const ip = (i / NT) | 0, it = i % NT; for (const [a, b] of [[ip - 1, it], [ip + 1, it], [ip, (it + 1) % NT], [ip, (it + NT - 1) % NT]]) { if (a < 0 || a >= NP) continue; const j = a * NT + b; if (marca[j] && !visto[j]) { visto[j] = 1; fila.push(j); } } }
+    let area = 0, sx = 0, cx = 0, sp = 0, h = 0, w = 0;
+    for (const i of cel) { const ip = (i / NT) | 0, th = (i % NT) * GRADE.dT * GRAU, ph = GRADE.PMIN + ip * GRADE.dP, r = rs[i], d = rs[i] - op[i]; area += r * GRADE.dT * GRAU * Math.cos(ph * GRAU) * r * GRADE.dP * GRAU; sx += Math.sin(th) * d; cx += Math.cos(th) * d; sp += ph * d; w += d; h = Math.max(h, d); }
+    // o crânio também tem calombos (a proeminência da plagiocefalia), mas largos e baixos; dedo, mão e orelha são
+    // estreitos e altos: altura ≥ 0,3 × √área
+    if (area / 100 < amin || h < 0.3 * Math.sqrt(area)) continue;
+    let th = Math.atan2(sx, cx) / GRAU; if (th < 0) th += 360;
+    const ph = sp / w;
+    const lado = diferencaAzimute(th, 90) <= 50 ? "R" : diferencaAzimute(th, 270) <= 50 ? "L" : null;
+    const talvezOrelha = !!lado && ph >= -50 && ph <= 10;
+    out.push({ th: +th.toFixed(0), ph: +ph.toFixed(0), altura: +h.toFixed(1), area: +(area / 100).toFixed(1), regiao: nomeDaRegiao(th, ph), talvezOrelha, celulas: cel });
+  }
+  return out.sort((a, b) => b.area * b.altura - a.area * a.altura);
+}
+
+// Conferência do scan (E3c-4): avisos para a pessoa olhar antes de gerar a órtese. d = { pontos (detectarPontos),
+// analise, corte (semCortePlano), abas (removidos por semAbas), saliencias (detectarSaliencias) }; tudo opcional.
+// → [{ nivel: "alerta" | "atencao", codigo, texto }]
+export function conferirScan(d) {
+  const av = [], A = (nivel, codigo, texto) => av.push({ nivel, codigo, texto }), an = d.analise, mm = (v) => String(Math.round(v));
+  if (d.pontos && !d.pontos.nasio) A("atencao", "frente", "O nariz não foi achado no contorno do meio do rosto: confira se a glabela (G) ficou na testa e não na nuca.");
+  if (d.pontos && d.pontos.erroEspelho > 7) A("atencao", "simetria", `Simetria fraca (${String(d.pontos.erroEspelho).replace(".", ",")} mm): confira o plano do meio (G, O e V) antes de medir.`);
+  if (an && an.ears) {
+    const R = an.ears.R, L = an.ears.L, nome = { R: "direita", L: "esquerda" };
+    for (const s of ["R", "L"]) { const e = an.ears[s]; if (!e || !e.ok) A("alerta", "orelha" + s, `Orelha ${nome[s]} não encontrada${e && e.cells ? " (o que parece orelha está fora do lugar — dedo, mão ou touca?)" : ""}: marque-a no modelo ou ajuste a janela à mão.`); }
+    // na plagiocefalia a orelha do lado achatado vai para a frente; além de ~30° ou 15 mm de altura, desconfiar
+    if (R && L && R.ok && L.ok && (Math.abs(R.az - L.az) > 30 || Math.abs(R.top - L.top) > 15)) A("atencao", "orelhas", `Orelhas bem assimétricas (azimute ${mm(R.az)}° × ${mm(L.az)}°, topo ${mm(R.top)} × ${mm(L.top)} mm): pode ser a plagiocefalia, mas confira se uma delas não é dedo, mão ou dobra da touca.`);
+    const tops = [R, L].filter((e) => e && e.ok).map((e) => e.top);
+    if (tops.length && Math.max(...tops) < -30) A("atencao", "plano", `As orelhas ficaram ${mm(-Math.max(...tops))} mm abaixo do plano glabela–opistocrânio (comum no occipital plano): confira a altura da borda e das janelas.`);
+  }
+  if (an && an.cheekCoverage != null && an.cheekCoverage < 0.5) A("atencao", "bochecha", `O scan cobre pouco a região da bochecha (${mm(an.cheekCoverage * 100)}%): o apoio fica estimado.`);
+  for (const q of d.saliencias || []) A("alerta", "saliencia", `Saliência de ${String(q.altura).replace(".", ",")} mm em ${q.area.toString().replace(".", ",")} cm² (${q.regiao}, ${q.th}°/${q.ph}°): ${q.talvezOrelha ? "é a orelha (não reconhecida) ou dedo/mão junto dela? Confira qual é a orelha e, se preciso, marque-a no modelo." : "dedo, mão, dobra ou costura da touca? Ela entra no molde se não for tirada."}`);
+  if (d.corte && d.corte.removidos) A("atencao", "pescoco", `Corte plano do pescoço tirado (${mm(d.corte.area / 100)} cm²): a região é completada pela análise.`);
+  if (d.abas > 40) A("atencao", "abas", `${d.abas} triângulos soltos (mão ou dedos colados à nuca) tirados da malha.`);
+  return av;
+}
+
+// Tira da malha alinhada as saliências marcadas: triângulos com os três vértices nas células delas e acima do "crânio
+// liso" (abertura) + 1 mm. A análise completa o buraco como completa qualquer falta de malha. → { pos, removidos }
+export function semSaliencias(pos, zRef, saliencias, an) {
+  if (!saliencias || !saliencias.length) return { pos, removidos: 0 };
+  const NT = GRADE.NT, NP = GRADE.NP, marca = new Uint8Array(NT * NP), op = abertura(an.rho, 20);
+  for (const q of saliencias) for (const i of q.celulas) {   // a célula e as vizinhas (borda do dedo)
+    const ip = (i / NT) | 0, it = i % NT;
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const p = ip + a; if (p >= 0 && p < NP) marca[p * NT + (it + b + NT) % NT] = 1; }
+  }
+  const fora = (k) => {
+    const x = pos[k], y = pos[k + 1], z = pos[k + 2] - zRef, r = Math.hypot(x, y, z) || 1, ph = Math.asin(Math.max(-1, Math.min(1, z / r))) / GRAU;
+    let th = Math.atan2(x, y) / GRAU; if (th < 0) th += 360;
+    const it = Math.round(th / GRADE.dT) % NT, ip = Math.round((ph - GRADE.PMIN) / GRADE.dP);
+    return ip >= 0 && ip < NP && marca[ip * NT + it] && r > amostrarGrade(op, th, ph) + 1;
+  };
+  const fica = []; let rem = 0;
   for (let t = 0; t < pos.length / 9; t++) { if (fora(t * 9) && fora(t * 9 + 3) && fora(t * 9 + 6)) { rem++; continue; } fica.push(t); }
   const out = new Float32Array(fica.length * 9); fica.forEach((t, i) => out.set(pos.subarray(t * 9, t * 9 + 9), i * 9));
   return { pos: out, removidos: rem };

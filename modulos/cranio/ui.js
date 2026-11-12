@@ -183,7 +183,7 @@ const T = window.THREE, TEM3D = !!(T && T.OrbitControls);
 const S3 = { arquivo: "", unidade: "", pos: null, alinhado: false, pontos: {}, alinhamento: null, armado: false, pendente: null, eixo: "axial", z: 0, caixa: null, maxDim: 100, versoes: [], medidas: null };
 const PONTOS = { anterior: { nome: "Glabela", cor: 0x34D399 }, posterior: { nome: "Opistocrânio", cor: 0x38BDF8 }, left: { nome: "Eúrio E", cor: 0xFBBF24 }, right: { nome: "Eúrio D", cor: 0xFB923C }, vertex: { nome: "Vértice", cor: 0xE879F9 } };
 const COR_MED = { AP: "#38BDF8", LL: "#FBBF24", D1: "#34D399", D2: "#FB923C" };
-let cena = null, camera, desenhista, controles, malha = null, planoMesh = null, linhasCorte = null, grupoMedidas, marcadores = {};
+let cena = null, camera, desenhista, controles, malha = null, planoMesh = null, linhasCorte = null, grupoMedidas, grupoAvisos, marcadores = {};
 function iniciar3D() {
   if (cena || !TEM3D) return !!cena;
   const caixa = $("cena");
@@ -195,7 +195,7 @@ function iniciar3D() {
   cena.add(new T.AmbientLight(0xffffff, 0.7));
   const l1 = new T.DirectionalLight(0xffffff, 0.9); l1.position.set(150, 200, 250); cena.add(l1);
   const l2 = new T.DirectionalLight(0xffffff, 0.4); l2.position.set(-150, -100, -200); cena.add(l2);
-  grupoMedidas = new T.Group(); cena.add(grupoMedidas); CRO.grupo = new T.Group(); cena.add(CRO.grupo);
+  grupoMedidas = new T.Group(); cena.add(grupoMedidas); grupoAvisos = new T.Group(); cena.add(grupoAvisos); CRO.grupo = new T.Group(); cena.add(CRO.grupo);
   if (window.ResizeObserver) new ResizeObserver(ajustarTamanho).observe($("v3d"));
   window.addEventListener("resize", ajustarTamanho);
   ligarCliques();
@@ -240,8 +240,8 @@ async function abrirSTL(arq) {
     else if (provavel && provavel !== sel.value) avisoU = ` <b>Atenção:</b> pelo tamanho, o arquivo parece estar em ${NOMES_U[provavel]}, não em ${NOMES_U[sel.value]}. Confira a unidade.`;
     const u = sel.value, { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
     mostrarVista("3d"); iniciar3D();
-    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; S3.posPrep = pos; S3.al = null; S3.correcao = null; limparPerfil();
-    trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano(); $("correcaoInfo").textContent = "";
+    S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; S3.posPrep = pos; S3.al = null; S3.correcao = null; S3.detec = null; S3.conferencia = null; limparPerfil();
+    trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano(); $("correcaoInfo").textContent = ""; esvaziar(grupoAvisos); $("conferencia").hidden = true;
     ["btn-arm-mark", "btn-clear-marks", "btn-auto-pontos"].forEach((id) => ($(id).disabled = false));
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
     $("scanInfo").innerHTML = `<b>${esc(arq.name)}</b>: ${(pos.length / 9).toLocaleString("pt-BR")} triângulos, ${[0, 1, 2].map((q) => fmt(S3.caixa.max[q] - S3.caixa.min[q], 0)).join(" × ")} mm. Marque os 5 pontos e alinhe.`;
@@ -287,9 +287,9 @@ async function pontosAutomaticos(prefixo) {
   let r = null; try { r = C.pontos.detectarPontos(S3.posPrep); } catch (e) { console.error(e); }
   CASCA.ocupado(false);
   if (!r) { status(`Não consegui sugerir os pontos neste scan: marque os 5 pontos na malha e toque em <b>Alinhar aos eixos anatômicos</b>.${prefixo || ""}`, true); return false; }
-  definirPontosBrutos(r.pontos); S3.pontosAuto = Object.assign({}, r.pontos); listarPontos();
+  definirPontosBrutos(r.pontos); S3.pontosAuto = Object.assign({}, r.pontos); S3.detec = r; listarPontos();
   alinhar(); extrairMedidas(true);
-  status(`Pontos de referência sugeridos automaticamente (simetria do espelho: erro médio ${fmt(r.erroEspelho, 1)} mm${r.nasio ? "" : "; násio não achado, glabela estimada"}) e modelo alinhado; medidas extraídas no plano glabela–opistocrânio.${S3.correcao ? ` Pescoço corrigido: ${fmt(S3.correcao.area / 100, 1)} cm² de corte e abas soltas fora da análise.` : ""} <b>Confira os pontos</b> no modelo: para corrigir um, escolha-o na etapa 1, marque de novo e alinhe.${prefixo || ""}`);
+  status(`Pontos de referência sugeridos automaticamente (simetria do espelho: erro médio ${fmt(r.erroEspelho, 1)} mm${r.nasio ? "" : "; násio não achado, glabela estimada"}) e modelo alinhado; medidas extraídas no plano glabela–opistocrânio.${S3.correcao ? ` Pescoço corrigido: ${fmt(S3.correcao.area / 100, 1)} cm² de corte e abas soltas fora da análise.` : ""} <b>Confira os pontos</b> no modelo: para corrigir um, escolha-o na etapa 1, marque de novo e alinhe.${S3.conferencia && S3.conferencia.avisos.length ? ` <b>Veja a conferência do scan</b> na etapa 1 (${S3.conferencia.avisos.length} aviso(s)).` : ""}${prefixo || ""}`);
   return true;
 }
 $("btn-auto-pontos").onclick = () => { if (!doisCliquesSeAlinhado()) return; pontosAutomaticos(); };
@@ -304,25 +304,56 @@ $("btn-arm-mark").onclick = () => {
 $("btn-clear-marks").onclick = () => { limparPontos(); status("Pontos de referência apagados."); };
 // correção do pescoço (pontos.js): sem o corte plano e as abas soltas; a análise completa a calota ali
 function corrigirPescoco(pos, zRef) {
-  S3.correcao = null;
+  S3.correcao = null; S3.corteSc = null;
   if (!$("correcao").checked) { $("correcaoInfo").textContent = "Correção desligada: a análise usa o scan inteiro."; return pos; }
   const sc = C.pontos.semCortePlano(pos), base = sc ? sc.pos : pos, sa = C.pontos.semAbas(base, zRef, { corte: sc });
   const nt = pos.length / 9, fica = sa.pos.length / 9, area = (sc ? sc.area : 0);
   if (fica === nt) { $("correcaoInfo").textContent = "Nada a corrigir: sem corte plano nem abas soltas."; return pos; }
-  S3.correcao = { corte: sc ? sc.removidos : 0, abas: sa.removidos, area: area, triangulos: nt - fica };
+  S3.correcao = { corte: sc ? sc.removidos : 0, abas: sa.removidos, area: area, triangulos: nt - fica }; S3.corteSc = sc ? { removidos: sc.removidos, area: sc.area } : null;
   $("correcaoInfo").textContent = `${sc ? `Corte plano: ${fmt(sc.area / 100, 1)} cm² (${sc.removidos.toLocaleString("pt-BR")} triângulos)` : "Sem corte plano"}; abas soltas: ${sa.removidos.toLocaleString("pt-BR")} triângulos. Fora da análise; a calota é completada por interpolação.`;
   return sa.pos;
 }
+// conferência do scan (pontos.js, E3c-4): orelhas, saliências estranhas (dedo, mão, touca), simetria, pescoço.
+// As saliências fora das orelhas podem sair da análise (caixa "Tirar as saliências marcadas").
+function conferirScan(pos, zRef) {
+  S3.conferencia = null; esvaziar(grupoAvisos);
+  let an = null; try { an = O.analisar(pos, zRef); } catch (e) { console.error(e); }
+  if (!an || an.error) { mostrarConferencia([]); return pos; }
+  const sal = C.pontos.detectarSaliencias(an), cr = S3.correcao;
+  const avisos = C.pontos.conferirScan({ pontos: S3.detec, analise: an, corte: cr && S3.corteSc, abas: cr ? cr.abas : 0, saliencias: sal });
+  let out = pos, tirados = 0;
+  const tiraveis = sal.filter((q) => !q.talvezOrelha);
+  if ($("semSaliencias").checked && tiraveis.length) { const r = C.pontos.semSaliencias(pos, zRef, tiraveis, an); out = r.pos; tirados = r.removidos; }
+  S3.conferencia = { avisos, saliencias: sal.map(({ celulas, ...q }) => q), tirados };
+  sal.forEach((q, i) => {   // marcador vermelho no centro de cada saliência
+    const dir = dirOf(q.th, q.ph), r = O.amostrarGrade(an.rho, q.th, q.ph), pt = new T.Vector3(0, 0, zRef).addScaledVector(dir, r);
+    const b = new T.Mesh(new T.SphereGeometry(S3.maxDim * 0.02, 16, 16), new T.MeshBasicMaterial({ color: 0xDC2626, transparent: true, opacity: 0.55, depthTest: false })); b.position.copy(pt); b.renderOrder = 1001; grupoAvisos.add(b);
+    const sp = rotulo3D("! " + (i + 1) + (q.talvezOrelha ? " orelha?" : ""), "#DC2626"); sp.position.copy(pt).addScaledVector(dir, S3.maxDim * 0.07); grupoAvisos.add(sp);
+  });
+  mostrarConferencia(avisos, tirados);
+  return out;
+}
+function mostrarConferencia(avisos, tirados) {
+  const ul = $("conferencia"); ul.hidden = false;
+  let k = 0;
+  ul.innerHTML = (avisos.length ? avisos.map((a) => `<li class="${a.nivel}">${a.codigo === "saliencia" ? "<b>! " + (++k) + "</b> " : ""}${esc(a.texto)}</li>`).join("") : `<li class="ok">Conferência do scan: nada estranho achado (orelhas, saliências, simetria).</li>`)
+    + (tirados ? `<li class="ok">${tirados.toLocaleString("pt-BR")} triângulos das saliências marcadas tirados da análise.</li>` : "");
+}
+$("semSaliencias").addEventListener("change", () => {
+  if (!S3.alinhado || !S3.posAlinhado) return;
+  trocarMalha(conferirScan(corrigirPescoco(S3.posAlinhado, S3.zRef0), S3.zRef0), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO(); mostrarPlano(); atualizarEstado();
+  status($("semSaliencias").checked ? "Saliências marcadas fora da análise: extraia as medidas e analise a pressão de novo." : "Saliências de volta na análise: extraia as medidas e analise a pressão de novo.");
+});
 $("correcao").addEventListener("change", () => {
   if (!S3.alinhado || !S3.posAlinhado) return;
-  trocarMalha(corrigirPescoco(S3.posAlinhado, S3.zRef0), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO(); mostrarPlano(); atualizarEstado();
+  trocarMalha(conferirScan(corrigirPescoco(S3.posAlinhado, S3.zRef0), S3.zRef0), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO(); mostrarPlano(); atualizarEstado();
   status($("correcao").checked ? "Correção do pescoço ligada: analise a pressão de novo." : "Correção do pescoço desligada: a análise usa o scan inteiro. Analise a pressão de novo.");
 });
 function alinhar() {
   const r = O.alinharPorPontos(S3.posPrep || S3.pos, S3.pontos); if (!r) return false;
   S3.alinhamento = {}; O.PONTOS_DE_REFERENCIA.forEach((k) => (S3.alinhamento[k] = S3.pontos[k].map((v) => +v.toFixed(4))));
   S3.al = r; S3.posAlinhado = r.pos; S3.alinhado = true; S3.zRef0 = r.zRef;
-  trocarMalha(corrigirPescoco(r.pos, r.zRef), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO();
+  trocarMalha(conferirScan(corrigirPescoco(r.pos, r.zRef), r.zRef), false); O.PONTOS_DE_REFERENCIA.forEach(desenharPonto); limparPerfil(); resetCRO();
   ajustarFaixaPlano();
   if (S3.eixo === "axial") { const sl = $("plane-offset"); sl.value = Math.min(parseFloat(sl.max), Math.max(parseFloat(sl.min), r.zRef)); lerPlano(); }
   ETP.feito("s1"); atualizarEstado();
@@ -487,7 +518,7 @@ function readParams() {
     earWR: g("cro-ear-w-r", 24, 10, 45), earWL: g("cro-ear-w-l", 24, 10, 45), earTopR: g("cro-ear-top-r", 14, -30, 50), earTopL: g("cro-ear-top-l", 14, -30, 50),
     earAzR: g("cro-ear-az-r", 100, 60, 140), earAzL: g("cro-ear-az-l", 100, 60, 140), earManR: CRO.earMan.r, earManL: CRO.earMan.l,
     cheek: $("cro-cheek").value, cheekWidth: g("cro-cheek-w", 30, 10, 50), cheekDepth: g("cro-cheek-depth", 32, 10, 60),
-    cheekGap: g("cro-cheek-gap", 6, 0, 20), cheekClear: g("cro-cheek-clear", 1.5, 0, 6),
+    cheekGap: g("cro-cheek-gap", 6, 0, 20), cheekClear: g("cro-cheek-clear", 1.5, 0, 6), cheekWall: $("cro-cheek-wall").value, cheekFoam: g("cro-cheek-foam", 0, 0, 10), earBack: g("cro-ear-back", 0, 0, 60),
     holeD: g("cro-hole-d", 4, 0, 8), pitch: g("cro-pitch", 10, 5, 25), margin: g("cro-margin", 8, 2, 20), holeZone: $("cro-hole-zone").value, holeArc: 50,
     split: $("cro-split").value, splitPos: g("cro-split-pos", -35, -80, 80), gap: g("cro-gap", 2, 1.5, 6),
     occDrop: g("cro-occ-drop", 8, 0, 30), occWidth: g("cro-occ-w", 50, 20, 90), occSoft: 0.6, frontArc: g("cro-front-arc", 0, 0, 90),
@@ -528,7 +559,7 @@ function croTrimLines(an, P) {
   if (P.cheek === "off") L.push("Apoio na bochecha: desativado");
   else {
     if (P.mast === "on") L.push("Aba atrás da orelha: " + fN(P.mastWidth, 0) + " mm de largura, até " + fN(P.mastDepth, 0) + " mm abaixo do plano");
-    L.push("Apoio na bochecha: " + fN(P.cheekWidth, 0) + " mm de largura, até " + fN(P.cheekDepth, 0) + " mm abaixo do plano");
+    L.push("Apoio na bochecha: " + fN(P.cheekWidth, 0) + " mm de largura, até " + fN(P.cheekDepth, 0) + " mm abaixo do plano" + (P.cheekWall === "on" ? "; face interna lisa, " + fN(P.cheekFoam, 1) + " mm para espuma" : "; face interna copiando o rosto"));
     if (an.cheekCoverage < 0.7) L.push("⚠ A malha cobre só " + fN(an.cheekCoverage * 100, 0) + "% da região da bochecha: o apoio usa dados extrapolados. Verifique se o escaneamento inclui face e orelhas.");
   }
   return L;
@@ -771,7 +802,8 @@ function conditionals() {
   const an = CRO.an, noBr = v("cro-indic") === "plagio" || (v("cro-indic") === "auto" && an && !an.useBr);
   hide("cro-ic-target", !!noBr); $("btn-cro-ic-auto").parentElement.classList.toggle("is-hidden", !!noBr); $("cro-ic-info").classList.toggle("is-hidden", !!noBr);
   const ck = v("cro-cheek") === "off", ms = v("cro-mast") === "off", sp = v("cro-split") === "none";
-  ["cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap"].forEach((id) => hide(id, ck));
+  ["cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-wall"].forEach((id) => hide(id, ck));
+  hide("cro-cheek-foam", ck || v("cro-cheek-wall") === "off");
   ["cro-mast-w", "cro-mast-depth", "cro-mast-gap"].forEach((id) => hide(id, ms));
   ["cro-split-pos", "cro-gap"].forEach((id) => hide(id, sp)); hide("cro-split-pos", sp || /^lateral/.test(v("cro-split")));
 }
@@ -826,7 +858,7 @@ $("vistas3d").addEventListener("click", (e) => {
 });
 
 // ------------------------------------------------------------------ predefinições (protocolos do serviço)
-const WL = ["cro-type", "cro-bandtop", "cro-bandtop-back", "cro-hole-zone", "cro-front-arc", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
+const WL = ["cro-type", "cro-bandtop", "cro-bandtop-back", "cro-hole-zone", "cro-front-arc", "cro-mode", "cro-relief", "cro-relief-max", "cro-comp-max", "cro-grow-src", "cro-grow-m", "cro-grow-rate", "cro-grow-contact", "cro-grow-vertex", "cro-cheek", "cro-cheek-w", "cro-cheek-wall", "cro-cheek-foam", "cro-ear-back", "cro-cheek-depth", "cro-cheek-gap", "cro-cheek-clear", "cro-mast", "cro-mast-w", "cro-mast-depth", "cro-mast-gap", "cro-c0", "cro-t", "cro-hf", "cro-hb", "cro-occ-drop", "cro-occ-w", "cro-hole-d", "cro-pitch", "cro-margin", "cro-res", "cro-split", "cro-split-pos", "cro-gap", "cro-ear-clear"];
 const DEF = {}; WL.forEach((id) => { DEF[id] = $(id).value; });
 const BUILT = {   // valores que não aparecem aqui voltam ao padrão da página (protocolo Lab.EITA)
   b0: { n: "Lab.EITA (faixa inclinada, peça inteira)", v: FX.PROTOCOLO_LABEITA },
@@ -896,7 +928,7 @@ function coletarOrtese() {
     if (S3.pendente) return Object.assign({}, S3.pendente, { entradas: lerEntradas(), versoes: S3.versoes });
     return S3.versoes.length ? { scan: null, alinhamento: null, planoZ: null, entradas: lerEntradas(), edicoes: [], earMan: null, analisado: false, gerada: false, resultado: null, versoes: S3.versoes } : null;
   }
-  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked }, retrato(), { versoes: S3.versoes });
+  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked, semSaliencias: $("semSaliencias").checked }, retrato(), { versoes: S3.versoes });
 }
 function coletar() {
   if (!S.fichaId) S.fichaId = E.novoIdFicha("c");
@@ -951,9 +983,10 @@ function aplicarOrtese(o) {
   S3.pendente = null;
   try {
     if (o.correcao != null) $("correcao").checked = !!o.correcao;
+    $("semSaliencias").checked = !!o.semSaliencias;
     if (o.alinhamento) {   // os pontos da ficha prevalecem sobre os automáticos
       if (o.scan && o.scan.unidade && S3.unidade && o.scan.unidade !== S3.unidade) status("Atenção: a unidade do STL é diferente da usada na ficha; confira antes de alinhar.", true);
-      S3.pontosAuto = null; definirPontosBrutos(o.alinhamento); alinhar();
+      S3.pontosAuto = null; S3.detec = null; definirPontosBrutos(o.alinhamento); alinhar();
     }
     escreverEntradas(o.entradas);
     if (o.planoZ != null) { if ($("plane-axis").value !== "axial") { $("plane-axis").value = "axial"; ajustarFaixaPlano(); } $("plane-offset").value = o.planoZ; lerPlano(); }
@@ -979,7 +1012,7 @@ function restaurarVersao(v) {
   else status("Parâmetros da versão " + esc(v.rotulo) + " restaurados. Faça a análise para reaplicar as correções manuais.");
   atualizarEstado();
 }
-function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); CRO.icTouched = false; $("correcao").checked = true; escreverEntradas(Object.fromEntries(Object.entries(PADRAO_PAGINA).filter(([k]) => k !== "cro-preset-name"))); $("mData").value = hoje(); preencher(null); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
+function novaFicha() { S.fichaId = null; S.fichaOrigem = null; S.medicoes = []; S.origem = null; mostrarOrigem(); escreverPaciente({}); CRO.icTouched = false; $("correcao").checked = true; $("semSaliencias").checked = false; escreverEntradas(Object.fromEntries(Object.entries(PADRAO_PAGINA).filter(([k]) => k !== "cro-preset-name"))); $("mData").value = hoje(); preencher(null); S3.versoes = []; S3.pendente = null; renderVersoes(); renderFichas(); status("Ficha em branco. Preencha os dados do paciente, as medidas e registre."); $("pName").focus(); }
 async function exportarFicha() { const f = coletar(); if (!f.nome) { status("Dê um nome ou código à ficha antes de exportar.", true); return; } if (await salvar(`${E.nomeArquivo(f.paciente.pId || E.iniciais(f.paciente.pName) || "paciente")}_ficha_CRANIO.json`, new Blob([JSON.stringify(f, null, 1)], { type: "application/json" }))) status("Ficha exportada."); }
 function importarBase(b) {
   const antiga = FX.ehBaseAntiga(b); if (antiga) b = FX.converterBaseAntiga(b);
@@ -1130,7 +1163,7 @@ async function secoesDoScan(R, imgs) {
     if (q && s) {
       const gp = s.gap || {}, ear = (x) => esc(x.src) + " (az " + fN(x.az, 0) + "°, arco " + (x.top < 0 ? "-" : "+") + fN(Math.abs(x.top), 0) + " mm)";
       R.pg.text(36, R.y, 9, "Parâmetros de projeto", true, E.CORES_PDF.roxo); R.y -= 13;
-      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto (borda superior a " + fN(q.bandTop, 0) + "° na frente" + (q.bandTopBack != null && q.bandTopBack !== q.bandTop ? " e " + fN(q.bandTopBack, 0) + "° atrás" : "") + ")" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano"}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm${q.holeZone === "ap" ? ", só na frente e atrás" : ""}; ${q.split === "none" ? "peça inteira, sem fenda" : /^lateral/.test(q.split) ? "peça inteira com fenda lateral " + (q.split === "lateralR" ? "D" : "E") + " de " + fN(q.gap, 1) + " mm" : "duas valvas, corte " + (q.split === "coronal" ? "coronal" : "sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
+      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto (borda superior a " + fN(q.bandTop, 0) + "° na frente" + (q.bandTopBack != null && q.bandTopBack !== q.bandTop ? " e " + fN(q.bandTopBack, 0) + "° atrás" : "") + ")" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano" + (q.cheekWall === "on" ? ", face interna lisa com " + fN(q.cheekFoam, 1) + " mm para espuma" : "")}${q.earBack > 0 ? "; curva de " + fN(q.earBack, 0) + "° atrás da orelha" : ""}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm${q.holeZone === "ap" ? ", só na frente e atrás" : ""}; ${q.split === "none" ? "peça inteira, sem fenda" : /^lateral/.test(q.split) ? "peça inteira com fenda lateral " + (q.split === "lateralR" ? "D" : "E") + " de " + fN(q.gap, 1) + " mm" : "duas valvas, corte " + (q.split === "coronal" ? "coronal" : "sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
       R.pg.text(36, R.y, 9, "Modelo gerado", true, E.CORES_PDF.roxo); R.y -= 13;
       paragrafo(R, `Volume ${fN(s.volume_cm3, 1)} cm³ · massa estimada ${fN(s.mass_g, 0)} g (PA12, sem forro) · dimensões ${s.size.map((v) => fN(v, 0)).join(" × ")} mm · folga média à cabeça: contato ${fN(gp.contact, 1)} mm, neutra ${fN(gp.neutral, 1)} mm, alívio ${fN(gp.relief, 1)} mm · interferência máxima com a malha: ${s.interference ? fN(s.interference.mm, 1) + " mm" : "—"} · ${s.triangles.toLocaleString("pt-BR")} triângulos · malha ${s.mesh && s.mesh.pinch === 0 && s.mesh.dropped === 0 ? "fechada" : "com defeitos (gerar em resolução maior)"}.`);
       if (casco.length) { R.pg.text(36, R.y, 9, "Órtese gerada", true, E.CORES_PDF.roxo); R.y -= 13; gradeImagens(R, casco); }

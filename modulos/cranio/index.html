@@ -60,6 +60,10 @@ label.ctl select{width:150px;padding:5px 6px;border:1px solid var(--line-strong)
 label.ctl input[type=range]{grid-column:1/-1;margin:0}
 input[type=range]{width:100%;accent-color:var(--accent)}
 .note{font-size:12px;color:var(--muted);line-height:1.45;margin-top:4px}
+.avisos{list-style:none;margin:6px 0 0;padding:0;font-size:12px;line-height:1.4}
+.avisos li{padding:5px 8px;border-left:3px solid #D97706;background:#FEF3C7;margin-top:4px;border-radius:0 6px 6px 0}
+.avisos li.alerta{border-color:#DC2626;background:#FEE2E2}
+.avisos li.ok{border-color:#16A34A;background:#DCFCE7}
 .chk{font-size:13px;display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer}.chk input{accent-color:var(--accent);width:15px;height:15px}
 .sub-h{font:600 10.5px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:14px 0 4px}
 table.m{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}table.m td{padding:5px 2px;border-bottom:1px solid var(--surface-2)}
@@ -223,6 +227,8 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
     <div class="note" id="scanInfo">Com o scan, as medidas saem do plano axial e dá para analisar a pressão e gerar a órtese. Sem ele, informe as medidas à mão (etapa 2).</div>
     <label class="chk" title="Tira o corte plano do pescoço (onde o bebê foi segurado) e as abas soltas que o scanner cria; a análise completa a calota ali por interpolação."><input type="checkbox" id="correcao" checked> Corrigir o pescoço (corte plano e abas soltas)</label>
     <div class="note" id="correcaoInfo"></div>
+    <label class="chk" title="Tira da análise as saliências estreitas e altas fora das orelhas e da face (dedo, mão, dobra ou costura da touca); a calota é completada ali por interpolação."><input type="checkbox" id="semSaliencias"> Tirar as saliências marcadas (dedo, mão, touca)</label>
+    <ul class="avisos" id="conferencia" hidden></ul>
     <div class="sub-h">Pontos de referência</div>
     <div class="row"><button type="button" id="btn-auto-pontos" disabled>Detectar pontos automaticamente</button></div>
     <label class="ctl sel">Ponto<select id="landmark-select"><option value="anterior">Glabela (anterior)</option><option value="posterior">Opistocrânio (posterior)</option><option value="left">Eúrio esquerdo</option><option value="right">Eúrio direito</option><option value="vertex">Vértice (superior)</option></select></label>
@@ -314,6 +320,8 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
       <label class="ctl dec" id="row-cro-occ-drop" title="Baixa a borda ao redor do occipício. Não estenda até a nuca: limita a flexão do pescoço.">Descida no occipício (mm)<input type="text" inputmode="decimal" id="cro-occ-drop" value="10"></label>
       <label class="ctl sel" id="row-cro-cheek" title="Aba à frente da orelha, apoiada na bochecha.">Apoio na bochecha<select id="cro-cheek"><option value="on">Com apoio</option><option value="off">Sem apoio</option></select></label>
       <label class="ctl dec" id="row-cro-cheek-w">Largura do apoio (mm)<input type="text" inputmode="decimal" id="cro-cheek-w" value="30"></label>
+      <label class="ctl sel" id="row-cro-cheek-wall" title="Liso: a face interna do apoio desce reta do contorno da cabeça e só se abre onde a bochecha passa dele; o ajuste fino fica com a espuma. Copiar o rosto: segue a pele (versão antiga).">Face interna do apoio<select id="cro-cheek-wall"><option value="on" selected>Lisa, ajuste com espuma</option><option value="off">Copiar o rosto</option></select></label>
+      <label class="ctl dec" id="row-cro-cheek-foam" title="Espaço a mais entre o apoio liso e a bochecha, para a espuma.">Espuma no apoio (mm)<input type="text" inputmode="decimal" id="cro-cheek-foam" value="3"></label>
       <label class="ctl sel" id="row-cro-mast">Aba atrás da orelha<select id="cro-mast"><option value="on">Com aba</option><option value="off" selected>Sem aba</option></select></label>
       <label class="ctl dec" id="row-cro-mast-w">Largura da aba (mm)<input type="text" inputmode="decimal" id="cro-mast-w" value="24"></label>
       <label class="ctl sel" id="row-cro-res">Resolução<select id="cro-res"><option value="normal">Normal (~2 s, ~8 MB)</option><option value="high">Alta (~5 s, ~16 MB)</option><option value="fine">Fina (~10 s, ~28 MB)</option></select></label>
@@ -343,6 +351,7 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
       <details class="av"><summary>Avançado: bordas e abas</summary>
         <label class="ctl dec" id="row-cro-hf" title="Altura da borda na frente em relação ao plano glabela–opistocrânio (0 = na glabela, acima dos olhos).">Borda frontal (mm)<input type="text" inputmode="decimal" id="cro-hf" value="0"></label>
         <label class="ctl dec" id="row-cro-front-arc" title="Até quantos graus para cada lado da frente a borda fica na altura da borda frontal antes de descer (0 = transição contínua, como na versão antiga). 40° deixa os olhos livres.">Frente reta até (°)<input type="text" inputmode="decimal" id="cro-front-arc" value="40"></label>
+        <label class="ctl dec" id="row-cro-ear-back" title="Atrás da orelha, a borda desce do arco da orelha até a borda de trás ao longo destes graus a mais (0 = descida curta, quase em ângulo reto, como na versão antiga).">Curva atrás da orelha (°)<input type="text" inputmode="decimal" id="cro-ear-back" value="35"></label>
         <label class="ctl dec" id="row-cro-occ-w">Semilargura do occipício (°)<input type="text" inputmode="decimal" id="cro-occ-w" value="50"></label>
         <label class="ctl dec" id="row-cro-cheek-depth">Profundidade da bochecha (mm)<input type="text" inputmode="decimal" id="cro-cheek-depth" value="45"></label>
         <label class="ctl dec" id="row-cro-cheek-gap">Afastamento da orelha (mm)<input type="text" inputmode="decimal" id="cro-cheek-gap" value="6"></label>

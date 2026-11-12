@@ -126,3 +126,26 @@ test("estilo do laboratório (E3c-4): topo inclinado, fenda lateral única e fur
   const igual = (P2) => O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, P2, pos).tris);
   assert.deepEqual(igual(Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 55, bandTopBack: 55 })), igual(Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 55 })));
 });
+
+test("apoio liso e curva atrás da orelha (E3c-4): a face interna do apoio não copia o rosto; a borda desce suave", () => {
+  const an = O.analisar(pos, meta.zRef), P = Object.assign({}, CENARIOS.A.P, { cheek: "on", cheekDepth: 45, mast: "off", cheekClear: 1.5 });
+  const ears = O.resolverOrelhas(an, P), lg = ears.legR, parede = O.paredeDosApoios(an, Object.assign({}, P, { cheekFoam: 3 }), ears);
+  assert.ok(lg && parede);
+  // no meio da aba, de φ0 para baixo: raio horizontal da parede nunca diminui e a parede fica fora da pele + folga + espuma
+  let rhAnt = 0;
+  for (let ph = -8; ph >= -50; ph -= 2) {
+    const w = parede(lg.az, ph), rh = (w.r - 4.5) * Math.cos(ph * O.GRAU);
+    assert.ok(rh >= rhAnt - 1e-6, `parede volta para dentro em φ ${ph}`); rhAnt = rh;
+    assert.ok(w.r >= O.amostrarGrade(an.rho, lg.az, ph) + 4.5 - 1e-6, `parede encosta na pele em φ ${ph}`);
+  }
+  assert.equal(parede(lg.az, 10), null); assert.equal(parede(200, -20), null);
+  // sem as opções novas, a casca é a mesma de antes
+  const stl = (P2) => O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, P2, pos).tris);
+  assert.deepEqual(stl(Object.assign({}, P, { cheekWall: "off", cheekFoam: 0, earBack: 0 })), stl(P));
+  // curva atrás da orelha: a borda nunca fica abaixo da antiga e a maior descida por grau atrás da orelha diminui
+  const b0 = O.funcaoDaBorda(P, ears, true), b1 = O.funcaoDaBorda(Object.assign({}, P, { earBack: 35 }), ears, true), e = ears.R;
+  let d0 = 0, d1 = 0;
+  for (let th = e.az; th < e.az + e.w + 45; th += 0.5) { assert.ok(b1(th) >= b0(th) - 1e-9); d0 = Math.max(d0, b0(th) - b0(th + 0.5)); d1 = Math.max(d1, b1(th) - b1(th + 0.5)); }
+  assert.ok(d1 < 0.6 * d0, `descida máx. por meio grau: ${d0.toFixed(2)} → ${d1.toFixed(2)} mm`);
+  for (let th = 0; th < e.az; th += 1) assert.equal(b1(th), b0(th));   // à frente da orelha nada muda
+});

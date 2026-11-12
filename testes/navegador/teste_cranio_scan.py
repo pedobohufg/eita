@@ -6,7 +6,7 @@
       o plano, analisam e reaplicam as correções sozinhas. Depois: gerar a órtese e exportar o STL.
       Confere: STL da órtese idêntico (bytes), resumo técnico idêntico, mapa em vista superior idêntico (pixels) e
       D1/D2/AP/LL extraídos do plano iguais (a página antiga usa raios do three.js; a nova, o corte da malha).
-   2) Na página nova: pontos automáticos, alinhamento e correção do pescoço ao abrir um scan sem ficha; ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
+   2) Na página nova: pontos automáticos, alinhamento, correção do pescoço e conferência do scan ao abrir um scan sem ficha; ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
       correções" em dois cliques, marcação de ponto por duplo clique e importação de uma base antiga com protocolo.
    Uso: python3 testes/navegador/teste_cranio_scan.py
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
@@ -25,7 +25,7 @@ STL = gzip.decompress(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sint
 CABECA = json.load(open(os.path.join(RAIZ, "testes", "fixtures", "cabeca_sintetica.json")))
 NOME_STL = "cabeca_sintetica.stl"
 # campos da página antiga sem os criados na E3c-4 (topo atrás, zona dos furos), que a ficha antiga não tem
-PADRAO_ANTIGO = {k: v for k, v in json.loads(subprocess.run(["node", "-e", "import('./modulos/cranio/fichas.js').then((m) => console.log(JSON.stringify(m.PADRAO_ANTIGO)))"], cwd=RAIZ, capture_output=True, text=True, check=True).stdout).items() if k not in ("cro-bandtop-back", "cro-hole-zone")}
+PADRAO_ANTIGO = {k: v for k, v in json.loads(subprocess.run(["node", "-e", "import('./modulos/cranio/fichas.js').then((m) => console.log(JSON.stringify(m.PADRAO_ANTIGO)))"], cwd=RAIZ, capture_output=True, text=True, check=True).stdout).items() if k not in ("cro-bandtop-back", "cro-hole-zone", "cro-front-arc", "cro-cheek-wall", "cro-cheek-foam", "cro-ear-back")}
 # os pontos da ficha ficam no referencial do scan já centrado (prepararScan: centro da caixa em float32)
 def _centro():
     import numpy as np
@@ -138,6 +138,8 @@ async def main():
             ok(await pn.input_value("#stl-scale-unit") == "1" and "ajustada para" in await pn.text_content("#status"), "unidade deduzida do tamanho (mm)")
             st = await pn.evaluate("({ al: window.__eitaCranio.S3.alinhado, n: Object.keys(window.__eitaCranio.S3.pontos).length, dA: document.getElementById('dA').value, corr: window.__eitaCranio.S3.correcao })")
             ok(st["al"] and st["n"] == 5 and st["dA"] != "" and st["corr"] and st["corr"]["corte"] > 0, f"scan sem ficha: pontos automáticos, alinhamento, medidas e correção do pescoço ({st['corr']})")
+            cf = await pn.evaluate("({ vis: !document.getElementById('conferencia').hidden, n: document.querySelectorAll('#conferencia li').length, c: window.__eitaCranio.S3.conferencia, P: window.__eitaCranio.readParams() })")
+            ok(cf["vis"] and cf["n"] >= 1 and cf["c"] is not None and cf["P"]["cheekWall"] == "on" and cf["P"]["earBack"] == 35, f"conferência do scan mostrada ({cf['n']} item(ns)); apoio liso e curva atrás da orelha no protocolo")
             await pn.evaluate("document.getElementById('landmark-select').value = 'vertex'"); await clicar(pn, "btn-arm-mark")
             cx = await pn.evaluate("(() => { const r = document.querySelector('#cena canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
             await pn.mouse.dblclick(cx[0], cx[1]); await pn.wait_for_timeout(200)
