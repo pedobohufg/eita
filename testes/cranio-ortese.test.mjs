@@ -175,3 +175,21 @@ test("contorno editável (E3c-4): a borda segue a curva, inclusive com parte que
   // sem contorno, a casca é a mesma de antes
   assert.deepEqual(O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: null }), pos).tris), O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, P, pos).tris));
 });
+
+test("contorno editável (E3c-4): desenho na altura certa e os dois lados iguais com a cabeça espelhada", () => {
+  const an = O.analisar(pos, meta.zRef);
+  // a elevação exata devolve a altura pedida (a iteração antiga erra nas laterais baixas)
+  let pior = 0;
+  for (let th = 0; th < 360; th += 5) for (let h = -50; h <= 10; h += 5) { const ph = O.elevacaoExata(an, th, h); if (ph > O.GRADE.PMIN + 0.01) pior = Math.max(pior, Math.abs(O.amostrarGrade(an.rho, th, ph) * Math.sin(ph * O.GRAU) - h)); }
+  assert.ok(pior < 0.05, `erro de altura ${pior.toFixed(3)} mm`);
+  // cabeça espelhada (x → −x) + orelhas e contorno espelhados → a mesma órtese espelhada
+  const esp = Float32Array.from(pos); for (let i = 0; i < esp.length; i += 3) esp[i] = -esp[i];
+  const P = Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 40, bandTopBack: 70, hf: 0, frontArc: 40, hb: -30, cheek: "on", cheekDepth: 40, mast: "off", split: "none", holeD: 0, cheekWall: "on", cheekFoam: 3, earBack: 35, earMode: "manual", earAzR: 110, earTopR: -10, earAzL: 95, earTopL: 2 });
+  const Pe = Object.assign({}, P, { earAzR: 95, earTopR: 2, earAzL: 110, earTopL: -10 });
+  const an2 = O.analisar(esp, meta.zRef), ct = O.contornoPadrao(an, P), ct2 = O.contornoPadrao(an2, Pe);
+  const lado = (T) => { const o = { D: 1e9, E: 1e9 }; for (let k = 0; k < T.length; k += 3) { const s = T[k] > 0 ? "D" : "E"; o[s] = Math.min(o[s], T[k + 2]); } return o; };
+  const r1 = O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: ct }), pos), r2 = O.gerarOrtese(an2, meta.zRef, Object.assign({}, Pe, { contorno: ct2 }), esp);
+  const a = lado(r1.tris), b = lado(r2.tris);
+  assert.ok(Math.abs(a.D - b.E) < 0.3 && Math.abs(a.E - b.D) < 0.3, JSON.stringify({ a, b }));
+  assert.ok(Math.abs(r1.stats.volume_cm3 - r2.stats.volume_cm3) < 0.02 * r1.stats.volume_cm3);
+});

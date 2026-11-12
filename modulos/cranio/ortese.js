@@ -512,6 +512,16 @@ export function elevacaoNaAltura(an, th, h) {
   return ph;
 }
 
+// A mesma coisa, exata (bisseção): a iteração acima não converge onde o raio muda depressa com a elevação (laterais
+// baixas, bochecha) e erra a altura em até 10–15 mm. Usada para desenhar o contorno editável onde a borda vai ficar.
+export function elevacaoExata(an, th, h) {
+  const g = (p) => amostrarGrade(an.rho, th, p) * Math.sin(p * GRAU) - h;
+  let lo = GRADE.PMIN, hi = 89;
+  if (g(lo) >= 0) return lo; if (g(hi) <= 0) return hi;
+  for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (g(m) > 0) hi = m; else lo = m; }
+  return (lo + hi) / 2;
+}
+
 // Linha de corte da borda (azimute → elevação) e orelhas/pernas resolvidas, para pré-visualização
 export function linhaDeCorte(an, P, Nc) {
   const ears = resolverOrelhas(an, P), tf = campoDeCorte(an, P, ears), line = [];
@@ -545,40 +555,36 @@ export function raioInterno(an, th, ph, P) {
 
 /* Apoios lisos (E3c-4, cheekWall 'on'): abaixo da orelha, nas abas da bochecha (e atrás da orelha, se houver), a face
    interna não copia o rosto: é uma parede que desce do contorno da cabeça na altura φ0 (−6°) e só se abre para fora
-   onde a bochecha passa desse contorno (máximo acumulado de cima para baixo, em toda a largura da aba). Entre a
+   onde a bochecha passa desse contorno (máximo acumulado de cima para baixo, por azimute, e o maior em ±6°). Entre a
    parede e a pele fica a folga dos apoios mais o espaço da espuma (cheekFoam, mm), que faz o ajuste fino sem a
    órtese machucar. → função (θ, φ) → { peso 0–1, r } ou null fora das abas. */
 export function paredeDosApoios(an, P, ears) {
-  const PH0 = -6, abas = [];
-  ['R', 'L'].forEach(function (s) {
-    [ears['leg' + s], ears['mast' + s]].forEach(function (lg) {
-      if (!lg) return;
-      const az = s === 'R' ? lg.az : 360 - lg.az, larg = lg.w + 4, borda = 8;
-      // contorno horizontal na altura φ0 e saliência máxima acumulada (mm) para baixo, em toda a largura da aba
-      const ths = []; for (let d = -larg; d <= larg; d += 1) ths.push(az + d);
-      const base = (th) => amostrarGrade(an.rho, ((th % 360) + 360) % 360, PH0) * Math.cos(PH0 * GRAU);
-      const salto = []; let m = 0;
-      for (let ph = PH0; ph >= GRADE.PMIN; ph -= 1) {
-        for (const th of ths) { const t = ((th % 360) + 360) % 360; m = Math.max(m, amostrarGrade(an.rho, t, ph) * Math.cos(ph * GRAU) - base(th)); }
-        salto.push(m);
-      }
-      abas.push({ az: az, larg: larg, borda: borda, base: base, salto: salto });
-    });
-  });
-  if (!abas.length) return null;
-  const folga = (P.cheekClear == null ? 1.5 : P.cheekClear) + (P.cheekFoam || 0);
+  const PH0 = -6, zonas = [];
+  // com contorno editado, os apoios podem estar em qualquer lugar à frente das orelhas: setores de 15° a 115° de cada
+  // lado (a borda de trás, abaixo do occipício, continua acompanhando a cabeça); sem contorno, as abas dos parâmetros
+  if (P.contorno && P.contorno.length >= 4) zonas.push({ az: 65, larg: 50 }, { az: 295, larg: 50 });
+  else ['R', 'L'].forEach((s) => [ears['leg' + s], ears['mast' + s]].forEach((lg) => { if (lg) zonas.push({ az: s === 'R' ? lg.az : 360 - lg.az, larg: lg.w + 4 }); }));
+  if (!zonas.length) return null;
+  // por azimute (graus inteiros): raio horizontal na altura φ0 e quanto a pele passa dele de φ0 para baixo (máximo
+  // acumulado), suavizado em ±6° de azimute para a parede não copiar o relevo do rosto
+  const norm = (t) => ((Math.round(t) % 360) + 360) % 360, base = new Float64Array(360), bruto = [];
+  for (let t = 0; t < 360; t++) {
+    base[t] = amostrarGrade(an.rho, t, PH0) * Math.cos(PH0 * GRAU);
+    const col = []; let m = 0;
+    for (let ph = PH0; ph >= GRADE.PMIN; ph -= 1) { m = Math.max(m, amostrarGrade(an.rho, t, ph) * Math.cos(ph * GRAU) - base[t]); col.push(m); }
+    bruto.push(col);
+  }
+  const NPH = bruto[0].length, salto = [];
+  for (let t = 0; t < 360; t++) { const col = new Float64Array(NPH); for (let k = 0; k < NPH; k++) { let v = 0; for (let d = -6; d <= 6; d++) v = Math.max(v, bruto[norm(t + d)][k]); col[k] = v; } salto.push(col); }
+  const folga = (P.cheekClear == null ? 1.5 : P.cheekClear) + (P.cheekFoam || 0), borda = 8;
   return function (th, ph) {
     if (ph >= PH0) return null;
-    let melhor = null;
-    for (const a of abas) {
-      const d = diferencaAzimute(th, a.az);
-      if (d >= a.larg + a.borda) continue;
-      const pt = degrauSuave((a.larg + a.borda - d) / a.borda) * degrauSuave((PH0 - ph) / 6);
-      const k = limitar(Math.round(PH0 - ph), 0, a.salto.length - 1), rh = a.base(th) + a.salto[k];
-      const r = rh / Math.cos(ph * GRAU) + folga;
-      if (!melhor || pt > melhor.peso) melhor = { peso: pt, r: r };
-    }
-    return melhor;
+    let peso = 0;
+    for (const z of zonas) { const d = diferencaAzimute(th, z.az); if (d < z.larg + borda) peso = Math.max(peso, degrauSuave((z.larg + borda - d) / borda)); }
+    if (!peso) return null;
+    const t0 = Math.floor(th), w = th - t0, k = limitar(Math.round(PH0 - ph), 0, NPH - 1);
+    const rh = (base[norm(t0)] + salto[norm(t0)][k]) * (1 - w) + (base[norm(t0 + 1)] + salto[norm(t0 + 1)][k]) * w;
+    return { peso: peso * degrauSuave((PH0 - ph) / 6), r: rh / Math.cos(ph * GRAU) + folga };
   };
 }
 

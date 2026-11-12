@@ -151,7 +151,8 @@ async def main():
             x, y = await pn.evaluate(f"window.__eitaCranio.contornoNaTela({i})")
             await pn.mouse.move(x, y); await pn.mouse.down(); await pn.mouse.move(x, y + 25, steps=5); await pn.mouse.up(); await pn.wait_for_timeout(200)
             C1 = await pn.evaluate("window.__eitaCranio.CRO.contorno.pts.map((q) => Object.assign({}, q))")
-            ok(C1[i]["h"] < C0[i]["h"] - 2 and abs(C1[par]["h"] - C1[i]["h"]) < 0.05 and abs(C1[par]["th"] - (360 - C1[i]["th"])) < 0.2, f"contorno: ponto arrastado para baixo ({C0[i]['h']} → {C1[i]['h']} mm) e o par do outro lado acompanhou")
+            dh, dth = C1[i]["h"] - C0[i]["h"], C1[i]["th"] - C0[i]["th"]
+            ok(dh < -2 and abs((C1[par]["h"] - C0[par]["h"]) - dh) < 0.15 and abs((C1[par]["th"] - C0[par]["th"]) + dth) < 0.2, f"contorno: ponto arrastado para baixo ({C0[i]['h']} → {C1[i]['h']} mm) e o par do outro lado andou o mesmo tanto")
             await clicar(pn, "btn-cro-generate"); await esperar_texto(pn, "cro-summary", "Órtese (", 120000)
             g = await pn.evaluate("({ n: (window.__eitaCranio.CRO.lastParams.contorno || []).length, m: window.__eitaCranio.CRO.lastStats.mesh, b: document.getElementById('cro-summary').textContent.includes('contorno editado') })")
             ok(g["n"] == len(C1) and g["m"]["pinch"] == 0 and g["b"], f"órtese gerada pelo contorno ({g['n']} pontos, malha fechada)")

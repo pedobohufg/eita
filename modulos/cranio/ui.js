@@ -716,7 +716,7 @@ function addManualEdit(th, ph) {
 // ------------------------------------------------------------------ contorno editável da borda (E3c-4)
 // pontos { th (azimute, graus), h (mm em relação ao plano), k (chave do par D/E; 0 = frente, −1 = trás) }, em ordem de azimute
 function pontoDoContorno3D(th, h, extra) {
-  const an = CRO.an, ph = Math.max(O.GRADE.PMIN + 1, Math.min(88, O.elevacaoNaAltura(an, th, h))), dir = dirOf(th, ph), r = O.amostrarGrade(an.rho, th, ph) + (extra == null ? 2.5 : extra);
+  const an = CRO.an, ph = Math.max(O.GRADE.PMIN, Math.min(88, O.elevacaoExata(an, th, h))), dir = dirOf(th, ph), r = O.amostrarGrade(an.rho, th, ph) + (extra == null ? 2.5 : extra);
   return new T.Vector3(0, 0, CRO.zRef).addScaledVector(dir, r);
 }
 function desenharContorno() {
@@ -739,7 +739,8 @@ function atualizarInfoContorno() {
   $("btn-contorno-editar").textContent = C && C.editando ? "Parar de editar" : "Editar no modelo";
   $("btn-contorno-editar").disabled = !C; $("btn-contorno-apagar").disabled = !C || C.sel == null;
 }
-function thHDoPonto(p) { const q = malha.worldToLocal(p.clone()); let th = Math.atan2(q.x, q.y) / D2R; if (th < 0) th += 360; return { th, h: q.z - CRO.zRef }; }
+// azimute e altura de um ponto da malha na mesma conta do gerador (raio da grade da análise × sen φ)
+function thHDoPonto(p) { const q = malha.worldToLocal(p.clone()), zz = q.z - CRO.zRef, r = Math.hypot(q.x, q.y, zz) || 1, ph = Math.asin(Math.max(-1, Math.min(1, zz / r))) / D2R; let th = Math.atan2(q.x, q.y) / D2R; if (th < 0) th += 360; return { th, h: O.amostrarGrade(CRO.an.rho, th, ph) * Math.sin(ph * D2R) }; }
 const parDoPonto = (C, i) => { const k = C.pts[i].k; if (!(k > 0) || !$("contornoEspelho").checked) return -1; return C.pts.findIndex((q, j) => j !== i && q.k === k); };
 function limitarAzimute(C, i, th) {
   const q = C.pts[i]; if (q.k === 0) return 0; if (q.k === -1) return 180;
@@ -748,9 +749,11 @@ function limitarAzimute(C, i, th) {
 }
 let quadroContorno = 0;
 function moverPontoDoContorno(i, p) {
-  const C = CRO.contorno, { th, h } = thHDoPonto(p);
+  const C = CRO.contorno, { th, h } = thHDoPonto(p), th0 = C.pts[i].th, h0 = C.pts[i].h;
   C.pts[i].th = +limitarAzimute(C, i, th).toFixed(1); C.pts[i].h = +h.toFixed(1);
-  const j = parDoPonto(C, i); if (j >= 0) { C.pts[j].th = +limitarAzimute(C, j, 360 - C.pts[i].th).toFixed(1); C.pts[j].h = C.pts[i].h; }
+  // espelho: o par do outro lado anda o mesmo tanto (azimute ao contrário), sem perder a posição própria daquele lado
+  // (as orelhas e a cabeça não são simétricas)
+  const j = parDoPonto(C, i); if (j >= 0) { C.pts[j].th = +limitarAzimute(C, j, C.pts[j].th - (C.pts[i].th - th0)).toFixed(1); C.pts[j].h = +(C.pts[j].h + (C.pts[i].h - h0)).toFixed(1); }
   if (!quadroContorno) quadroContorno = requestAnimationFrame(() => { quadroContorno = 0; desenharContorno(); });
 }
 function inserirPontoDoContorno(p) {
