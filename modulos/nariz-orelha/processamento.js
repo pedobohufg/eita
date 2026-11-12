@@ -140,33 +140,46 @@ export function narizPadrao(pontos) {
 //   corpo (dorso e paredes laterais): perfil D(v) na linha média, base de meia-largura b(v) que alarga da raiz para baixo
 //     (pirâmide, não tubo), seção arredondada no dorso;
 //   lóbulo da ponta: cúpula elíptica de largura larguraPonta, centrada na altura da ponta;
-//   asas: lobos ovais alongados na vertical, de topo achatado (não bolas), com o sulco alar onde encontram o lóbulo e
+//   asas: lobos ovais alongados na vertical, com o sulco alar onde encontram o lóbulo e
 //     queda íngreme para o rosto (sulco alar-facial).
-// Fora da pegada, o topo cai com inclinação forte (≥ 2,5 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
+// Todas as partes têm inclinação contínua na borda (sem quinas, que apareciam como vincos na luz); fora da pegada a
+// descida vai ficando forte (até 3 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
 // pegada é a do nariz, não a da caixa de trabalho. As narinas ficam à parte (narinasParametricas).
 const QUEDA = 3;   // inclinação fora da pegada (mm de descida por mm para fora)
-const cupula = (r, e) => (r < 1 ? Math.pow(1 - r * r, e) : -QUEDA * (r - 1));   // 1 no centro, 0 na borda, cai fora
+// Descida fora da borda de uma parte, a d mm da borda, partindo da inclinação s1 que a parte tem na borda: a inclinação
+// cresce aos poucos (3 mm) até QUEDA. Sem quina na borda: a quina aparecia como um vinco ao longo da parede do nariz.
+function descida(d, s1) {
+  if (s1 >= QUEDA) return -s1 * d;
+  const c = (QUEDA - s1) / 6;
+  return d < 3 ? -(s1 * d + c * d * d) : -(s1 * 3 + c * 9) - QUEDA * (d - 3);
+}
+// cúpula elíptica de altura H e semieixos a, b (mm), perfil parabólico: H·(1 − r²) dentro e descida() fora, com a
+// mesma inclinação na borda (2·H·|∇r|)
+function cupula(x, y, a, b, H) {
+  const r = Math.hypot(x / a, y / b);
+  if (r < 1) return H * (1 - r * r);
+  const g = Math.hypot(x / (a * a), y / (b * b)) / r || 1 / Math.max(a, b);
+  return descida((r - 1) / g, 2 * H * g);
+}
 export function narizTopo(p) {
   const L = p.comprimento, W = p.largura, P = p.projecao, vt = Math.min(p.alturaPonta, 0.4 * L), r0 = 1.5, Rt = Math.max(4, 0.14 * L);
   const Wt = Math.min(p.larguraPonta || 0.5 * W, 0.8 * W);
-  // corpo: meia-largura da base da raiz (0,22 W) até o terço inferior (0,40 W)
-  const bR = 0.22 * W, bB = 0.4 * W, vB = 0.35 * L;
+  // corpo: meia-largura da base da raiz (0,22 W) até o terço inferior (0,33 W)
+  const bR = 0.22 * W, bB = 0.33 * W, vB = 0.35 * L;
   const D = (v) => {
     if (v >= vt) { const s = (L - v) / (L - vt); return r0 + (P - r0) * s + (p.dorso || 0) * 4 * s * (1 - s); }
     return P - ((vt - v) * (vt - v)) / (2 * Rt);
   };
   const b = (v) => (v >= vB ? bB + (bR - bB) * sstep((v - vB) / (L - vB)) : bB);
-  // lóbulo
+  // lóbulo e asas (cúpulas)
   const ru = 0.62 * Wt, rvL = 0.22 * L, rzL = 0.55 * P, vL = vt - 0.5;
-  // asas
-  const rau = 0.2 * W, ua = W / 2 - rau, rav = 0.22 * L, va = 0.13 * L, Ha = 0.42 * P;
+  const rau = 0.2 * W, ua = W / 2 - rau, rav = 0.22 * L, va = 0.13 * L, Ha = 0.46 * P;
   const forma = (dl) => function (u, v) {
     const vv = Math.min(L + 3, v), au = Math.abs(u), bv = b(vv), x = au / bv, Dv = Math.max(0, D(vv) - dl * sstep(1 - Math.abs(vv - vt) / (0.4 * L)));
-    // seção do corpo: 1 − x^1,8 (dorso arredondado, paredes quase retas); fora, continua descendo com QUEDA
-    const corpo = x < 1 ? Dv * (1 - Math.pow(x, 1.8)) : -QUEDA * (au - bv);
-    const lob = P - dl - rzL + rzL * cupula(Math.hypot(u / ru, (v - vL) / rvL), 0.6) * (Math.hypot(u / ru, (v - vL) / rvL) < 1 ? 1 : Math.min(ru, rvL) / rzL);
-    const ra = Math.hypot((au - ua) / rau, (v - va) / rav);
-    const asa = Ha * cupula(ra, 0.6) * (ra < 1 ? 1 : Math.min(rau, rav) / Ha);
+    // seção do corpo: 1 − x^1,8 (dorso arredondado, paredes quase retas); fora, descida() a partir da mesma inclinação
+    const corpo = x < 1 ? Dv * (1 - Math.pow(x, 1.8)) : descida(au - bv, (1.8 * Dv) / bv);
+    const lob = P - dl - rzL + cupula(u, v - vL, ru, rvL, rzL);
+    const asa = cupula(au - ua, v - va, rau, rav, Ha);
     return -Vo.uniaoSuave(Vo.uniaoSuave(-corpo, -lob, 5), -asa, 7);
   };
   // o máximo suave soma um pouco onde o corpo e o lóbulo se encontram: baixa os dois perto da ponta até a projeção
