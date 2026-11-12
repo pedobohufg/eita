@@ -214,3 +214,34 @@ test("modelo do próprio paciente: refinar pelo rosto desfaz um desalinhamento d
   let mx = 0; for (let i = 0; i < volta.V.length; i += 3 * 37) mx = Math.max(mx, Math.hypot(volta.V[i] - malha.V[i], volta.V[i + 1] - malha.V[i + 1], volta.V[i + 2] - malha.V[i + 2]));
   assert.ok(r.rms < 0.1 && mx < 0.3, `rms ${r.rms}, desvio máx ${mx}`);
 });
+
+test("escultura: elevar a ponta aumenta a projeção, a prótese continua fechada e com as narinas; desfazer volta", async () => {
+  const { info, malha } = rosto("rosto_sem_nariz");
+  const plano = P.planoSagital(info.pontos), base = { tipo: "nariz", malha, pontos: info.pontos, plano };
+  const a = await P.gerarProtese(base);
+  const pad = P.narizPadrao(info.pontos), gesto = [];
+  for (let i = 0; i < 4; i++) gesto.push({ t: "+", u: 0, v: pad.alturaPonta, r: 7, f: 0.5 });
+  const esc = { o: [a.g.o[0], a.g.o[1]], h: 0.5, nx: Math.round((a.g.nx * a.g.h) / 0.5), ny: Math.round((a.g.ny * a.g.h) / 0.5), tracos: [gesto] };
+  const b = await P.gerarProtese(Object.assign({}, base, { escultura: esc }));
+  assert.ok(b.medidas.projecao > a.medidas.projecao + 1.2, `projeção ${a.medidas.projecao} → ${b.medidas.projecao}`);
+  assert.ok(b.medidas.fechada); assert.equal(variedade(b.malha), 0);
+  assert.deepEqual(topologia(b.malha), { componentes: 1, genero: 2 });
+  const c = P.campoEscultura(esc); assert.ok(Math.abs(P.valorEscultura(c, 0, pad.alturaPonta) - 2) < 0.05, "4 toques de 0,5 mm no centro");
+  P.aplicarToque(c, { t: "s", u: 0, v: pad.alturaPonta, r: 7, f: 1 }); assert.ok(P.valorEscultura(c, 0, pad.alturaPonta) < 2, "suavizar baixa o pico");
+  const vazio = await P.gerarProtese(Object.assign({}, base, { escultura: Object.assign({}, esc, { tracos: [] }) }));
+  assert.ok(Math.abs(vazio.medidas.volume - a.medidas.volume) < 1e-9, "sem traços, igual à original");
+});
+
+test("modelo de nariz importado: narinas abertas pela base do próprio modelo", async () => {
+  const { info, malha } = rosto("rosto_sem_nariz");
+  const plano = P.planoSagital(info.pontos), pad = P.narizPadrao(info.pontos);
+  // o "scan antigo com o nariz": o nariz paramétrico, sem narinas, levado para o referencial do scan
+  const R = P.referencial({ tipo: "nariz", pontos: info.pontos, plano });
+  const modelo = P.malhaParaScan(P.malhaNariz(pad, 0.5), R);
+  const base = { tipo: "nariz", malha, pontos: info.pontos, plano };
+  const com = await P.gerarProtese(Object.assign({}, base, { doadora: { tipo: "modelo", modelo } }));
+  const sem = await P.gerarProtese(Object.assign({}, base, { doadora: { tipo: "modelo", modelo, narinas: false } }));
+  assert.ok(com.medidas.fechada && sem.medidas.fechada);
+  assert.deepEqual(topologia(com.malha), { componentes: 1, genero: 2 }, "duas narinas até o oco");
+  assert.equal(topologia(sem.malha).genero, 0, "sem a opção, a base fica fechada");
+});

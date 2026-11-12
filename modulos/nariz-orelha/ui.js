@@ -13,6 +13,7 @@ const S = {
   tipo: "orelha", lado: "D", scan: null, scanNome: "", fator: 1, pontos: {}, ponto: "exD", contorno: [], plano: null, residuo: null,
   modo: null, imas: [], modelo: null, modeloNome: "", paresM: [], paresR: [], modeloT: null,
   protese: null, molde: null, fichaId: null, pendente: null,
+  escultura: null, ferr: null, campoAtual: null, campoBase: null,
 };
 const CORES = { exD: "#2B5FD0", exE: "#C2281F", n: "#6B3FD6", sn: "#25774F", enD: "#5d86e6", enE: "#e2635a" };
 const PARAM_NARIZ = ["comprimento", "largura", "projecao", "alturaPonta", "nasolabial", "dorso", "larguraPonta", "narina", "profNarina"];
@@ -46,7 +47,7 @@ function iniciar3D() {
   grpPontos = new T.Group(); grpPares = new T.Group(); grpImas = new T.Group(); grpMolde = new T.Group();
   cena.add(grpPontos, grpPares, grpImas, grpMolde);
   new ResizeObserver(redimensionar).observe(cena3d);
-  redimensionar(); ligarCliques();
+  redimensionar(); ligarCliques(); ligarEscultura();
   (function loop() { requestAnimationFrame(loop); controles.update(); render.render(cena, camera); })();
   return true;
 }
@@ -197,7 +198,7 @@ function aplicarTipo() {
 }
 function aplicarFonte() {
   const f = $("fonte").value;
-  $("paramNariz").hidden = f !== "parametrico"; $("modeloBox").hidden = f !== "modelo";
+  $("paramNariz").hidden = f !== "parametrico"; $("modeloBox").hidden = f !== "modelo"; $("narinasModeloBox").hidden = S.tipo !== "nariz";
 }
 document.querySelectorAll("#tipoSeg button").forEach((b) => (b.onclick = () => { S.tipo = b.dataset.tipo; aplicarTipo(); invalidar("tipo"); }));
 $("lado").onchange = () => { S.lado = $("lado").value; listarPontos(); invalidar("tipo"); };
@@ -343,7 +344,7 @@ function excluirDefeito() {
   const c = regiaoDefeito(), r = S.contorno.length ? Math.max(...S.contorno.map((p) => Math.hypot(...p.map((v, i) => v - (S.contorno.reduce((s, q) => s + q[i], 0) / S.contorno.length))))) + 10 : 40;
   return [{ c, r }];
 }
-["ajU", "ajV", "ajW", "ajGiro", "ajEscala"].concat(PARAM_NARIZ.map(idNariz)).forEach((id) => $(id).addEventListener("change", () => invalidar("forma")));
+["ajU", "ajV", "ajW", "ajGiro", "ajEscala", "narinasModelo"].concat(PARAM_NARIZ.map(idNariz)).forEach((id) => $(id).addEventListener("change", () => invalidar("forma")));
 
 // ------------------------------------------------------------------ etapa 4: prótese
 function lerParametros() {
@@ -367,7 +368,7 @@ $("limparImas").onclick = () => { S.imas = []; $("imasInfo").textContent = "Sem 
 function doadora() {
   const f = $("fonte").value, d = { tipo: f, ajuste: lerAjuste() };
   if (f === "parametrico") d.nariz = lerNariz();
-  if (f === "modelo") { const m = modeloNaCena(); if (!m) throw new Error("abra e alinhe o modelo importado (etapa 3)"); d.modelo = m; }
+  if (f === "modelo") { const m = modeloNaCena(); if (!m) throw new Error("abra e alinhe o modelo importado (etapa 3)"); d.modelo = m; d.narinas = $("narinasModelo").checked; }
   return d;
 }
 $("gerarProtese").onclick = async () => {
@@ -379,11 +380,13 @@ $("gerarProtese").onclick = async () => {
     S.protese = await NO.gerarProtese({
       tipo: S.tipo, lado: S.lado, malha: S.scan, pontos: S.pontos, plano: S.plano, contorno: S.contorno, doadora: doadora(),
       imas: S.imas.map((p) => ({ p })), imaDiam: +$("imaDiam").value, imaProf: +$("imaProf").value, parametros: lerParametros(), molde: lerMolde(),
+      escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null,
       aoProgresso: async (t) => { CASCA.ocupado(true, t); await UI.espera(15); },
     });
+    escRevAplicada = escRev; $("escAplicar").textContent = "Aplicar a escultura";
     S.molde = null; [...grpMolde.children].forEach(limpar); $("medidasMolde").innerHTML = ""; $("avisosMolde").innerHTML = "";
     $("gerarProtese").textContent = "Gerar a prótese";
-    mostrarProtese(); mostrarMedidas(); avancar(6);
+    mostrarProtese(); mostrarMedidas(); avancar(6); iniciarEscultura();
     $("vProtese").checked = true; aplicarCamadas(); enquadrar("frente");
     status(`Prótese gerada em ${fmt((performance.now() - t0) / 1000, 1)} s: ${fmt(S.protese.medidas.volume, 1)} mL. Confira de vários ângulos; depois gere o molde (etapa 5).`);
     autoSalvar(); checar();
@@ -405,10 +408,113 @@ function mostrarMedidas() {
   $("avisosProtese").innerHTML = S.protese.avisos.map((a) => `<li class="${a.n === "alerta" ? "alerta" : a.n === "info" ? "ok" : ""}">${esc(a.t)}</li>`).join("") + `<li class="ok">${esc(NO.REFERENCIAS[S.tipo])}</li>`;
 }
 
+// ------------------------------------------------------------------ escultura (etapa 4)
+// Os traços ficam em S.escultura (referencial local da prótese, grade em u, v). A prévia mostra, sobre a prótese gerada,
+// a diferença entre o campo atual e o campo com que ela foi gerada (S.campoBase), deslocando os vértices pela normal;
+// "Aplicar" refaz a prótese com a doadora esculpida.
+let escVert = null;   // { L: vértices locais, N: normais, p: peso (0 na pele, 1 acima) }
+function iniciarEscultura() {
+  const P = S.protese; if (!P) return;
+  if (!S.escultura) { const g = P.g, h = NO.ESCULTURA_PASSO; S.escultura = { o: [g.o[0], g.o[1]], h, nx: Math.round((g.nx * g.h) / h), ny: Math.round((g.ny * g.h) / h), tracos: [] }; }
+  S.campoBase = NO.campoEscultura(S.escultura); S.campoAtual = NO.campoEscultura(S.escultura);
+  const V = P.malha.V, N = E.normaisDeVertices(V, P.malha.F), p = new Float32Array(V.length / 3), g = P.g;
+  for (let i = 0, k = 0; i < V.length; i += 3, k++) {
+    const a = Math.round((V[i] - g.o[0]) / g.h), b = Math.round((V[i + 1] - g.o[1]) / g.h);
+    const pl = a >= 0 && b >= 0 && a < g.nx && b < g.ny ? P.pele[a + g.nx * b] : -Infinity, x = (V[i + 2] - pl - 0.3) / 1.5;
+    p[k] = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);   // a face de baixo, na pele, não se move na prévia
+  }
+  escVert = { L: Float32Array.from(V), N, p };
+  $("escBox").hidden = false; atualizarEsc();
+}
+// cada mudança nos traços muda a revisão; a prótese guarda a revisão com que foi gerada
+let escRev = 0, escRevAplicada = 0;
+const escPendente = () => !!(S.escultura && S.campoBase && escRev !== escRevAplicada);
+function atualizarEsc() {
+  const n = S.escultura ? S.escultura.tracos.length : 0;
+  $("escAplicar").disabled = !escPendente();
+  $("escDesfazer").disabled = !n; $("escLimpar").disabled = !n;
+  document.querySelectorAll("#escFerr button").forEach((b) => b.classList.toggle("on", b.dataset.esc === S.ferr));
+}
+// move os vértices da prévia dentro da caixa [u0, u1] × [v0, v1] (ou todos)
+function previaEsc(caixa) {
+  if (!mProtese || !escVert) return;
+  const pos = mProtese.geometry.attributes.position, A = pos.array, { L, N, p } = escVert, R = S.protese.R;
+  for (let i = 0, k = 0; i < L.length; i += 3, k++) {
+    const u = L[i], v = L[i + 1];
+    if (caixa && (u < caixa[0] || u > caixa[1] || v < caixa[2] || v > caixa[3])) continue;
+    const d = p[k] ? (NO.valorEscultura(S.campoAtual, u, v) - NO.valorEscultura(S.campoBase, u, v)) * p[k] : 0;
+    const q = [L[i] + N[i] * d, L[i + 1] + N[i + 1] * d, L[i + 2] + N[i + 2] * d];
+    for (let c = 0; c < 3; c++) A[i + c] = R.o[c] + q[0] * R.U[c] + q[1] * R.V[c] + q[2] * R.W[c];
+  }
+  pos.needsUpdate = true;
+}
+document.querySelectorAll("#escFerr button").forEach((b) => (b.onclick = () => {
+  S.ferr = S.ferr === b.dataset.esc ? null : b.dataset.esc; S.modo = null; atualizarEsc();
+  if (anelEsc) anelEsc.visible = false;
+  status(S.ferr ? `Esculpir: <b>${b.textContent}</b>. Arraste sobre a prótese; toque de novo no botão para parar.` : "Esculpir desligado.");
+}));
+$("escDesfazer").onclick = () => {
+  if (!S.escultura || !S.escultura.tracos.length) return;
+  S.escultura.tracos.pop(); escRev++; S.campoAtual = NO.campoEscultura(S.escultura); previaEsc(); mProtese.geometry.computeVertexNormals(); atualizarEsc(); autoSalvar();
+};
+let limparArmado = 0;
+$("escLimpar").onclick = () => {
+  if (!S.escultura || !S.escultura.tracos.length) return;
+  if (Date.now() - limparArmado > 4000) { limparArmado = Date.now(); status("Toque de novo em <b>Limpar escultura</b> para apagar todos os traços."); return; }
+  limparArmado = 0; S.escultura.tracos = []; escRev++; S.campoAtual = NO.campoEscultura(S.escultura); previaEsc(); mProtese.geometry.computeVertexNormals(); atualizarEsc(); autoSalvar();
+  status("Escultura apagada. Toque em <b>Aplicar a escultura</b> para refazer a prótese sem ela.");
+};
+$("escAplicar").onclick = () => { S.ferr = null; atualizarEsc(); $("gerarProtese").click(); };
+// pincel: arrastar sobre a prótese com uma ferramenta escolhida; fora dela, a órbita da câmera continua
+let anelEsc = null, gesto = null, ultimo = null;
+function pontoNaProtese(e) {
+  const el = render.domElement, r = el.getBoundingClientRect(), rc = new T.Raycaster();
+  rc.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  return mProtese ? rc.intersectObject(mProtese, false)[0] || null : null;
+}
+function mostrarAnel(h) {
+  if (!anelEsc) { anelEsc = new T.Mesh(new T.RingGeometry(0.92, 1, 48), new T.MeshBasicMaterial({ color: 0x6b3fd6, side: T.DoubleSide, depthTest: false, transparent: true, opacity: 0.85 })); anelEsc.renderOrder = 9; cena.add(anelEsc); }
+  if (!h) { anelEsc.visible = false; return; }
+  const r = +$("escRaio").value || 6, n = h.face.normal.clone().transformDirection(mProtese.matrixWorld);
+  anelEsc.position.copy(h.point); anelEsc.scale.set(r, r, r); anelEsc.lookAt(h.point.clone().add(n)); anelEsc.visible = true;
+}
+function toque(h) {
+  const R = S.protese.R, p = [h.point.x - R.o[0], h.point.y - R.o[1], h.point.z - R.o[2]];
+  const u = p[0] * R.U[0] + p[1] * R.U[1] + p[2] * R.U[2], v = p[0] * R.V[0] + p[1] * R.V[1] + p[2] * R.V[2];
+  const k = { t: S.ferr, u: +u.toFixed(2), v: +v.toFixed(2), r: +$("escRaio").value || 6, f: +$("escForca").value || 0.15 };
+  if (k.t === "s") k.f = Math.min(1, k.f * 4);   // suavizar: a força é a fração da distância até a média
+  gesto.push(k); NO.aplicarToque(S.campoAtual, k); previaEsc([u - k.r, u + k.r, v - k.r, v + k.r]);
+}
+function ligarEscultura() {
+  const el = render.domElement;
+  el.addEventListener("pointerdown", (e) => {
+    if (!S.ferr || !mProtese || e.button !== 0) return;
+    const h = pontoNaProtese(e); if (!h) return;
+    e.stopImmediatePropagation(); e.preventDefault(); controles.enabled = false; el.setPointerCapture(e.pointerId);
+    gesto = []; ultimo = h.point.clone(); toque(h);
+  }, { capture: true });
+  el.addEventListener("pointermove", (e) => {
+    if (!S.ferr || !mProtese) return;
+    const h = pontoNaProtese(e); mostrarAnel(h);
+    if (!gesto || !h) return;
+    const r = +$("escRaio").value || 6;
+    if (h.point.distanceTo(ultimo) >= r / 4) { ultimo = h.point.clone(); toque(h); }
+  });
+  const fim = () => {
+    if (!gesto) return;
+    if (gesto.length) { S.escultura.tracos.push(gesto); escRev++; }
+    gesto = null; controles.enabled = true; mProtese.geometry.computeVertexNormals(); atualizarEsc(); autoSalvar();
+    $("escAplicar").textContent = escPendente() ? "Aplicar a escultura" : "Escultura aplicada";
+  };
+  el.addEventListener("pointerup", fim); el.addEventListener("pointercancel", fim);
+  el.addEventListener("pointerleave", () => mostrarAnel(null));
+}
+
 // ------------------------------------------------------------------ etapa 5: molde
 const CORES_PECAS = { base: 0x7aa2e3, "externa-A": 0x8fcf9f, "externa-B": 0xe8cf7a, externa: 0x8fcf9f };
 $("gerarMolde").onclick = async () => {
   if (!S.protese) return;
+  if (escPendente()) { status("Há escultura ainda não aplicada: toque em <b>Aplicar a escultura</b> (etapa 4) antes de gerar o molde.", true); return; }
   await ocupado(true, "Gerando o molde…");
   try {
     const t0 = performance.now();
@@ -543,6 +649,7 @@ function projeto() {
     tipo: S.tipo, lado: S.lado, pontos: S.pontos, contorno: S.contorno, plano: S.plano, residuo: S.residuo, imas: S.imas,
     fonte: $("fonte").value, nariz: lerNariz(), ajuste: lerAjuste(), modelo: S.modelo ? { nome: S.modeloNome, T: S.modeloT, paresM: S.paresM, paresR: S.paresR } : null,
     parametros: lerParametros(), molde: lerMolde(), imaDiam: +$("imaDiam").value, imaProf: +$("imaProf").value,
+    escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null, narinasModelo: $("narinasModelo").checked,
   };
 }
 function coletar() {
@@ -556,6 +663,7 @@ function aplicarProjeto(f) {
   S.tipo = f.tipo === "nariz" ? "nariz" : "orelha"; S.lado = f.lado === "E" ? "E" : "D"; $("lado").value = S.lado;
   S.pontos = Object.assign({}, f.pontos || {}); S.contorno = (f.contorno || []).map((p) => p.slice()); S.plano = f.plano || null; S.residuo = f.residuo != null ? f.residuo : null; S.imas = (f.imas || []).map((p) => p.slice());
   aplicarTipo();
+  if (f.narinasModelo != null) $("narinasModelo").checked = !!f.narinasModelo;
   if (f.fonte) { $("fonte").value = f.fonte; aplicarFonte(); }
   if (f.nariz) for (const k of PARAM_NARIZ) if (f.nariz[k] != null) $(idNariz(k)).value = k === "narina" ? Math.round(f.nariz[k] * 100) : f.nariz[k];
   const a = f.ajuste || {}; $("ajU").value = a.du || 0; $("ajV").value = a.dv || 0; $("ajW").value = a.dw || 0; $("ajGiro").value = a.giro || 0; $("ajEscala").value = a.escala || 100;
@@ -563,6 +671,8 @@ function aplicarProjeto(f) {
   if (p.aba != null) { $("pAba").value = p.aba; $("pBorda").value = p.bordaEsp; $("pBase").value = p.baseEsp; $("pOco").checked = !!p.oco; $("pParede").value = p.parede; $("paredeBox").hidden = !p.oco; }
   if (f.imaDiam) $("imaDiam").value = f.imaDiam; if (f.imaProf) $("imaProf").value = f.imaProf;
   escreverMolde(f.molde);
+  S.escultura = f.escultura && f.escultura.tracos ? { o: f.escultura.o, h: f.escultura.h, nx: f.escultura.nx, ny: f.escultura.ny, tracos: f.escultura.tracos } : null;
+  S.campoAtual = S.campoBase = null; $("escBox").hidden = true; escRev++;
   if (S.scan) { desenharPontos(); desenharPlano(); listarPontos(); if (S.plano) avancar(4); }
 }
 function salvarFicha(silencioso) {

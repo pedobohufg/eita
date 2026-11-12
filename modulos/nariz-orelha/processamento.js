@@ -10,11 +10,11 @@
 import * as Vo from "../../nucleo/volume.js";
 import { decimar } from "../../nucleo/decimar.js";
 import { paraLocal, deLocal, transformarVertices, criarBuscaProxima } from "../../nucleo/superficie.js";
-import { volume as volumeMalha, verificarFechada, filtrarComponentes } from "../../nucleo/malha.js";
+import { volume as volumeMalha, verificarFechada, filtrarComponentes, normaisDeVertices } from "../../nucleo/malha.js";
 import { aplicarTransformacao, ajustarSimilaridade, comporTransformacoes } from "../../nucleo/alinhamento.js";
 import { componenteProxima, preencherBuracos } from "../../nucleo/imagem.js";
 
-export const VERSAO = "0.2";
+export const VERSAO = "0.3";
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], soma = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const esc = (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cruz = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -238,15 +238,71 @@ export function contornoNarina(p) {
   return pts;
 }
 // narinas: a gota de contornoNarina aberta na base e subindo profNarina para dentro do nariz (vestíbulo), com o fundo
-// arredondado e as paredes abrindo um pouco para cima; ficam a pelo menos 1,5 mm da superfície de fora
+// arredondado e as paredes abrindo um pouco para cima; ficam a pelo menos 2 mm da superfície de fora
 export function narinasParametricas(p) {
   const prof = p.profNarina || 10, topo = narizTopo(p), dir = contornoNarina(p), esq = dir.map(([u, w]) => [-u, w]);
   return function (u, v, w) {
     const h = v - alturaBase(p, u, w);   // altura acima da base
     const f2 = Vo.distanciaPoligono(u, w, u >= 0 ? dir : esq) - 0.12 * Math.max(0, Math.min(h, prof - 2));
     const q = h - prof, f = Math.hypot(Math.max(f2, 0), Math.max(q, 0)) + Math.min(Math.max(f2, q), 0);
-    return Math.max(f, 1.5 - (topo(u, v) - w));
+    if (f > 3) return f;   // longe da narina: não precisa da parede
+    // parede de pelo menos 2 mm até a superfície de fora, medida na perpendicular (na vertical, nas paredes inclinadas,
+    // o topo da narina chegava a marcar a pele de fora)
+    const e = 0.25, t = topo(u, v), gu = (topo(u + e, v) - topo(u - e, v)) / (2 * e), gv = (topo(u, v + e) - topo(u, v - e)) / (2 * e);
+    return maxSuave(f, 2 - (t - w) / Math.sqrt(1 + gu * gu + gv * gv), 1);
   };
+}
+
+// ------------------------------------------------------------------ escultura
+// O ajuste à mão é um campo d(u, v) em mm (para fora +, para dentro −) numa grade no plano local (u, v), feito de traços
+// aplicados em ordem; a doadora é deslocada ao longo da sua normal por d. Assim a escultura vale para qualquer forma
+// (espelho, paramétrica ou modelo) e a prótese e o molde saem de novo, fechados, a partir dela.
+// escultura: { o: [u0, v0], h, nx, ny, tracos: [[{ t: "+" | "-" | "s", u, v, r, f }, …] (um gesto), …] }
+export const ESCULTURA_PASSO = 0.5;
+export function gradeEscultura(o, nx, ny, h = ESCULTURA_PASSO) { return { o: o.slice(), h, nx, ny, d: new Float32Array(nx * ny) }; }
+// aplica um toque do pincel no campo (altera c.d); devolve a caixa [i0, i1, j0, j1] alterada
+export function aplicarToque(c, k) {
+  const { o, h, nx, ny, d } = c, R = k.r;
+  // núcleo (1 − ρ²/R²)³: 1 no centro, zero com derivadas nulas na borda (sem degrau no limite do pincel)
+  const nucleo = (x, y) => { const q = 1 - ((x - k.u) ** 2 + (y - k.v) ** 2) / (R * R); return q > 0 ? q * q * q : 0; };
+  const i0 = Math.max(0, Math.floor((k.u - R - o[0]) / h)), i1 = Math.min(nx - 1, Math.ceil((k.u + R - o[0]) / h));
+  const j0 = Math.max(0, Math.floor((k.v - R - o[1]) / h)), j1 = Math.min(ny - 1, Math.ceil((k.v + R - o[1]) / h));
+  if (i1 < i0 || j1 < j0) return null;
+  if (k.t === "s") {   // suavizar: aproxima da média da vizinhança (≈ 1,5 mm), com o peso do pincel
+    const viz = Math.max(1, Math.round(1.5 / h)), copia = d.slice();
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const g = nucleo(o[0] + i * h, o[1] + j * h); if (!g) continue;
+      let sm = 0, n = 0; for (let b = -viz; b <= viz; b++) for (let a = -viz; a <= viz; a++) { const ii = i + a, jj = j + b; if (ii >= 0 && jj >= 0 && ii < nx && jj < ny) { sm += copia[ii + nx * jj]; n++; } }
+      d[i + nx * j] = copia[i + nx * j] + Math.min(1, k.f) * g * (sm / n - copia[i + nx * j]);
+    }
+  } else {
+    const sinal = k.t === "-" ? -1 : 1;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) d[i + nx * j] += sinal * k.f * nucleo(o[0] + i * h, o[1] + j * h);
+  }
+  return [i0, i1, j0, j1];
+}
+// campo completo a partir dos traços
+export function campoEscultura(esc) {
+  const c = gradeEscultura(esc.o, esc.nx, esc.ny, esc.h || ESCULTURA_PASSO);
+  for (const gesto of esc.tracos || []) for (const k of gesto) aplicarToque(c, k);
+  return c;
+}
+// valor do campo em (u, v) (bilinear; fora da grade, 0)
+export function valorEscultura(c, u, v) {
+  const a = (u - c.o[0]) / c.h, b = (v - c.o[1]) / c.h;
+  if (!(a >= 0 && b >= 0 && a <= c.nx - 1 && b <= c.ny - 1)) return 0;
+  const i = Math.min(c.nx - 2, Math.floor(a)), j = Math.min(c.ny - 2, Math.floor(b)), x = a - i, y = b - j, q = i + c.nx * j, d = c.d;
+  return (d[q] * (1 - x) + d[q + 1] * x) * (1 - y) + (d[q + c.nx] * (1 - x) + d[q + c.nx + 1] * x) * y;
+}
+// malha local deslocada ao longo da normal (para fora) por d(u, v); a orientação da normal é conferida pela média
+// de w na região esculpida (pele e forma doadora olham para +w), o que cobre a malha espelhada (faces invertidas)
+export function esculpirMalha(m, c) {
+  const N = normaisDeVertices(m.V, m.F), V = Float64Array.from(m.V);
+  let soma = 0;
+  for (let i = 0; i < V.length; i += 3) { const d = valorEscultura(c, V[i], V[i + 1]); if (d !== 0) soma += N[i + 2] * Math.abs(d); }
+  const s = soma < 0 ? -1 : 1;
+  for (let i = 0; i < V.length; i += 3) { const d = valorEscultura(c, V[i], V[i + 1]); if (d) { V[i] += s * N[i] * d; V[i + 1] += s * N[i + 1] * d; V[i + 2] += s * N[i + 2] * d; } }
+  return { V, F: m.F };
 }
 
 // ------------------------------------------------------------------ prótese
@@ -309,6 +365,8 @@ export async function gerarProtese(e) {
     const malhaN = malhaNariz(nz, Math.min(h, 0.4));
     doadoraL = { V: transformarVertices(malhaN.V, (x, y, z) => aj(x, y, z)), F: malhaN.F };
   }
+  // escultura (ajuste à mão na tela): desloca a doadora ao longo da normal pelo campo esculpido
+  if (e.escultura && e.escultura.tracos && e.escultura.tracos.length) doadoraL = esculpirMalha(doadoraL, campoEscultura(e.escultura));
   // extensão da região em (u, v)
   if (!regiaoUV) {
     if (nz) regiaoUV = { lo: [-nz.largura / 2 - 4, -5, 0], hi: [nz.largura / 2 + 4, nz.comprimento + 4, 0] };
@@ -400,6 +458,8 @@ export async function gerarProtese(e) {
     if (difs.length) { difs.sort((a, b) => a - b); degrau = difs[difs.length >> 1]; }
   }
   // ímãs: cilindros ao longo de w a partir da pele
+  // modelo de nariz importado: narinas em gota pela base do próprio modelo (o scanner quase não vê dentro delas)
+  if (e.tipo === "nariz" && doa.tipo === "modelo" && doa.narinas !== false) narinas = narinasDoModelo(g, sD, regiao, e.pontos, R, doa);
   const imas = (e.imas || []).map((m) => { const q = paraLocal(R, m.p); const i = Math.round((q[0] - g.o[0]) / h), j = Math.round((q[1] - g.o[1]) / h); const w0 = i >= 0 && j >= 0 && i < g.nx && j < g.ny ? pele[i + g.nx * j] : q[2]; return { u: q[0], v: q[1], w0 }; });
   const rI = (e.imaDiam || 6) / 2, pI = e.imaProf || 3;
   // campo da prótese
@@ -427,7 +487,7 @@ export async function gerarProtese(e) {
         // rasgada); na raiz ela assenta direto na pele (sem a folga ficaria uma lâmina de ar fina sob a prótese)
         let f = Vo.uniaoSuave(Math.max(sD[q], d2, (raiz[c] ? 0 : FOLGA_PELE) - sh), fAba, par.raioUniao);
         if (ocoFundo) { const hb = ocoFundo[c]; if (hb < Infinity) f = Math.max(f, -Math.min(sD[q] + par.parede, w - hb)); }
-        if (narinas) f = maxSuave(f, -(par.oco ? narinas(u, v, w) : Math.max(narinas(u, v, w), 1.2 - sh)), 0.8);   // no nariz maciço a narina não fura a pele (fica cega); no oco ela se abre no oco, sem deixar ilhas junto da pele
+        if (narinas) { const na = narinas(u, v, w, q); if (na < 3) f = maxSuave(f, -(par.oco ? na : Math.max(na, 1.2 - sh)), 0.8); }   // no nariz maciço a narina não fura a pele (fica cega); no oco ela se abre no oco, sem deixar ilhas junto da pele
         for (const m of imas) f = Math.max(f, -Math.max(Math.hypot(u - m.u, v - m.v) - rI, m.w0 - 1 - w, w - (m.w0 + pI)));
         fP[q] = Math.max(f, -sh);
       }
@@ -448,6 +508,37 @@ export async function gerarProtese(e) {
   if (poligono && Math.abs(med.degrauContorno) > 2) avisos.push({ n: "atenção", t: `A pele espelhada fica, em média, ${fmt(med.degrauContorno, 1)} mm acima da pele real junto ao contorno (assimetria): pode sobrar material na base da orelha. Ajuste o contorno rente à orelha ou desloque a orelha (w).` });
   if (cobertura < 0.5) avisos.push({ n: "atenção", t: `O scan cobre só ${fmt(100 * cobertura, 0)} % da região de trabalho.` });
   return { R, g: { nx: g.nx, ny: g.ny, nz: g.nz, o: g.o, h }, fP, sH, pele, regiao, raiz, borda, poligono, malha, medidas: med, avisos, nariz: nz, parametros: par, cobertura, reparadas: rH.reparadas };
+}
+// Narinas num modelo de nariz importado. A base de referência é a face de baixo do próprio modelo: em cada coluna (u, w)
+// da grade, a menor altura v em que ele começa; a largura entre as asas sai da pegada perto da base (v de 5 a 20 % do
+// comprimento n–sn) e a projeção, do ponto mais à frente. O contorno é o mesmo da narina paramétrica (contornoNarina)
+// e a parede até a superfície de fora (pela distância à doadora, sD) fica com pelo menos 2 mm.
+function narinasDoModelo(g, sD, regiao, pontos, R, doa) {
+  const { nx, ny, nz, o, h } = g, NC = nx * ny, L = dist(pontos.n, pontos.sn);
+  const base = new Float32Array(nx * nz).fill(Infinity);
+  let proj = 0;
+  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+    for (let j = 0; j < ny; j++) { const c = i + nx * j; if (regiao[c] <= 0 && sD[c + NC * k] < 0) { base[i + nx * k] = o[1] + j * h; break; } }
+  }
+  for (let c = 0; c < NC; c++) if (regiao[c] <= 0) for (let k = nz - 1; k >= 0; k--) if (sD[c + NC * k] < 0) { proj = Math.max(proj, o[2] + k * h); break; }
+  const larg = [];
+  for (let j = 0; j < ny; j++) {
+    const v = o[1] + j * h; if (v < 0.05 * L || v > 0.2 * L) continue;
+    let a = Infinity, b = -Infinity; for (let i = 0; i < nx; i++) if (regiao[i + nx * j] <= 0) { const u = o[0] + i * h; a = Math.min(a, u); b = Math.max(b, u); }
+    if (b > a) larg.push(b - a);
+  }
+  if (!larg.length || !(proj > 5)) return null;
+  larg.sort((x, y) => x - y);
+  const p = { largura: larg[larg.length >> 1], projecao: proj, narina: doa.narina || 1, profNarina: doa.profNarina || 10 };
+  const dir = contornoNarina(p), esq = dir.map(([u, w]) => [-u, w]), prof = p.profNarina;
+  return function (u, v, w, q) {
+    const i = Math.round((u - o[0]) / h), k = Math.round((w - o[2]) / h);
+    if (i < 0 || k < 0 || i >= nx || k >= nz) return 1e3;
+    const bv = base[i + nx * k]; if (!(bv < Infinity)) return 1e3;
+    const hb = v - bv, f2 = Vo.distanciaPoligono(u, w, u >= 0 ? dir : esq) - 0.12 * Math.max(0, Math.min(hb, prof - 2));
+    const qq = hb - prof, f = Math.hypot(Math.max(f2, 0), Math.max(qq, 0)) + Math.min(Math.max(f2, qq), 0);
+    return hb > 2.5 && f < 3 ? maxSuave(f, 2 + sD[q], 1) : f;
+  };
 }
 // A aba é afinada até a borda (bordaEsp, p.ex. 0,3 mm), mais fina que o passo da grade: no campo ela entra com pelo menos
 // tMin = 1,8 × passo (≥ √3 × passo: senão, na pele inclinada, o marching cubes a perderia entre duas amostras) e aqui os vértices da camada são trazidos

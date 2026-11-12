@@ -281,6 +281,7 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
       <div class="row"><button id="parModelo" type="button">Ponto no modelo</button><button id="parRosto" type="button">Ponto no rosto</button><button id="parLimpar" type="button">Limpar pares</button></div>
       <div class="pares" id="pares"></div>
       <div class="row"><button class="primary" id="alinharModelo" type="button" disabled>Alinhar o modelo</button><button id="refinarModelo" type="button" disabled>Refinar pelo rosto</button></div>
+      <label class="chk" id="narinasModeloBox"><input type="checkbox" id="narinasModelo" checked> Abrir narinas na base do modelo (o scanner quase não vê dentro delas)</label>
       <div class="note" id="refinoInfo">Depois de alinhar pelos pares: se o modelo é um scan do mesmo paciente, <b>Refinar pelo rosto</b> encaixa a pele em volta (testa, olhos, bochechas, lábio), sem contar a região do defeito.</div>
     </div>
     <div class="sub-h">Ajuste fino da posição</div>
@@ -310,6 +311,15 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
     <button class="primary" id="gerarProtese" type="button">Gerar a prótese</button>
     <table class="m" id="medidas"></table>
     <ul class="avisos" id="avisosProtese"></ul>
+    <div id="escBox" hidden>
+      <div class="sub-h">Esculpir</div>
+      <div class="seg" id="escFerr"><button type="button" data-esc="+">Elevar</button><button type="button" data-esc="-">Afundar</button><button type="button" data-esc="s">Suavizar</button></div>
+      <label class="ctl">Raio do pincel (mm)<input type="number" id="escRaio" step="0.5" min="2" max="20" value="6"></label>
+      <label class="ctl">Força (mm por toque)<input type="number" id="escForca" step="0.05" min="0.02" max="1" value="0.15"></label>
+      <div class="row"><button type="button" id="escDesfazer">Desfazer</button><button type="button" id="escLimpar">Limpar escultura</button></div>
+      <button class="primary" id="escAplicar" type="button" disabled>Aplicar a escultura</button>
+      <div class="note" id="escInfo">Escolha a ferramenta e arraste sobre a prótese (o círculo mostra o pincel; fora da prótese, arrastar gira a vista). <b>Elevar</b> empurra a superfície para fora, <b>Afundar</b> para dentro e <b>Suavizar</b> alisa o que já foi esculpido. O que você vê é uma prévia; <b>Aplicar a escultura</b> refaz a prótese (fechada, pronta para o molde) com a forma nova. Os traços ficam na ficha.</div>
+    </div>
   </div>
 </section>
 

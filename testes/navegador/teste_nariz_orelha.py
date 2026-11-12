@@ -63,6 +63,23 @@ async def caso(nav, nome, tipo, base):
     med = await pg.inner_text("#medidas")
     ok("fechada" in med, f"{tipo}: prótese fechada")
     ok("Volume de silicone" in med, f"{tipo}: medidas da prótese")
+    # esculpir: elevar arrastando no meio da prótese, ver a prévia mudar e aplicar
+    ok(await pg.is_visible("#escBox"), f"{tipo}: painel de escultura aparece com a prótese")
+    med0 = await pg.inner_text("#medidas")
+    await pg.click("#escFerr [data-esc='+']")
+    await pg.fill("#escForca", "0.4")
+    cb = await pg.locator("#cena canvas").bounding_box(); cx, cy = cb["x"] + cb["width"] / 2, cb["y"] + cb["height"] / 2
+    await pg.mouse.move(cx - 15, cy); await pg.mouse.down()
+    for k in range(12): await pg.mouse.move(cx - 15 + 3 * k, cy + (k % 3))
+    await pg.mouse.up()
+    ok(await pg.is_enabled("#escAplicar"), f"{tipo}: traço registrado, aplicar habilitado")
+    await pg.click("[data-s=s5]"); await pg.click("#gerarMolde")
+    ok("Aplicar a escultura" in await pg.inner_text("#status"), f"{tipo}: molde espera a escultura ser aplicada")
+    await pg.click("[data-s=s4]"); await pg.click("#escAplicar")
+    await pg.wait_for_function("document.getElementById('escAplicar').disabled", timeout=180000)
+    med1 = await pg.inner_text("#medidas")
+    mudou = [l for l, a in zip(med1.splitlines(), med0.splitlines()) if l != a]
+    ok(mudou and "fechada" in med1, f"{tipo}: escultura aplicada, prótese fechada ({'; '.join(m.replace(chr(9), ' ') for m in mudou)[:120]})")
     await pg.click("[data-s=s5]")
     await pg.click("#gerarMolde")
     await pg.wait_for_function("document.getElementById('medidasMolde').rows.length > 2", timeout=240000)
