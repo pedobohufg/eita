@@ -200,3 +200,20 @@ test("contorno editável (E3c-4): borda de baixo assentada (sem alívio nem rese
   for (let k = 0; k < T.length; k += 3) { const x = T[k], y = T[k + 1], z = T[k + 2] - meta.zRef, th = Math.round(((Math.atan2(x, y) / O.GRAU) + 360) % 360 / 5) * 5 % 360; if (!lo[th] || z < lo[th].z) lo[th] = { z, rr: Math.hypot(x, y, z), ph: Math.asin(z / Math.hypot(x, y, z)) / O.GRAU }; }
   for (let th = 130; th <= 230; th += 10) { const q = lo[th], g = q.rr - P.t - O.amostrarGrade(an.rho, th, q.ph); assert.ok(g < P.c0 + 1, `azimute ${th}°: folga na borda ${g.toFixed(1)} mm`); }
 });
+
+test("contorno editável (E3c-4): borda de cima pelo contorno superior", () => {
+  const an = O.analisar(pos, meta.zRef), P = Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 40, bandTopBack: 70, split: "none", holeD: 0, cheek: "off", mast: "off" });
+  const ct = O.contornoPadrao(an, P), cs = O.contornoSuperiorPadrao(an, P);
+  assert.ok(cs.length === 12 && cs[0].th === 0 && cs.some((q) => q.th === 180));
+  // o contorno superior padrão reproduz o topo dos parâmetros (40° na frente, 70° atrás)
+  const el = O.elevacoesDoTopo(an, cs, 1);
+  assert.ok(Math.abs(el[0] - 40) < 0.5 && Math.abs(el[180] - 70) < 0.5, `frente ${el[0].toFixed(2)}°, trás ${el[180].toFixed(2)}°`);
+  const v = (sup) => O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: ct, contornoSup: sup }), pos);
+  const a = v(null), b = v(cs), c = v(cs.map((q) => ({ th: q.th, h: q.h - 10 })));
+  assert.ok(Math.abs(a.stats.volume_cm3 - b.stats.volume_cm3) < 0.02 * a.stats.volume_cm3, "igual ao topo dos parâmetros");
+  assert.ok(c.stats.volume_cm3 < b.stats.volume_cm3 - 3, "baixar o corte tira material");
+  assert.deepEqual(c.stats.mesh, { pinch: 0, dropped: 0 });
+  // a borda de cima na frente fica 10 mm mais baixa
+  const topoZ = (T) => { let m = -1e9; for (let k = 0; k < T.length; k += 3) { const th = ((Math.atan2(T[k], T[k + 1]) / O.GRAU) + 360) % 360; if (O.diferencaAzimute(th, 0) < 2) m = Math.max(m, T[k + 2]); } return m; };
+  const dz = topoZ(b.tris) - topoZ(c.tris); assert.ok(dz > 8 && dz < 12, `desceu ${dz.toFixed(1)} mm`);
+});

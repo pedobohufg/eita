@@ -576,11 +576,11 @@ export function raioInterno(an, th, ph, P) {
    órtese machucar. → função (θ, φ) → { peso 0–1, r } ou null fora das abas. */
 export function paredeDosApoios(an, P, ears) {
   const PH0 = -6, zonas = [];
-  // com contorno editado, os apoios podem estar em qualquer lugar à frente das orelhas: setor de 15° até a frente da
-  // janela da orelha de cada lado (atrás da orelha e no occipício a casca acompanha a cabeça); sem contorno, as abas
-  // dos parâmetros
-  if (P.contorno && P.contorno.length >= 4) ['R', 'L'].forEach((s) => {   // de 15° até a frente da orelha daquele lado
-    const e = ears[s], fim = Math.max(30, e.az - e.w), az = (15 + fim) / 2, larg = (fim - 15) / 2;
+  // com contorno editado, os apoios podem estar em qualquer lugar à frente das orelhas: setor de 5° até o meio da orelha
+  // de cada lado (a aba inteira fica lisa e reta; atrás da orelha e no occipício a casca acompanha a cabeça); sem
+  // contorno, as abas dos parâmetros
+  if (P.contorno && P.contorno.length >= 4) ['R', 'L'].forEach((s) => {   // de 5° até o meio da orelha daquele lado
+    const e = ears[s], fim = Math.max(30, e.az), az = (5 + fim) / 2, larg = (fim - 5) / 2;
     zonas.push({ az: s === 'R' ? az : 360 - az, larg });
   });
   else ['R', 'L'].forEach((s) => [ears['leg' + s], ears['mast' + s]].forEach((lg) => { if (lg) zonas.push({ az: s === 'R' ? lg.az : 360 - lg.az, larg: lg.w + 4 }); }));
@@ -729,15 +729,38 @@ export function contornoPadrao(an, P) {
   return [{ th: 0, h: arr(P.hf), k: 0 }].concat(dir, [{ th: 180, h: arr(brim(180)), k: -1 }], esq);
 }
 
+// Borda de cima por contorno (E3c-4): pontos { th, h } (h em mm em relação ao plano, como o contorno de baixo); a curva
+// passa por eles (Catmull-Rom) e, em cada azimute, vale a maior altura em que ela cruza → elevação (graus) por passo.
+export function elevacoesDoTopo(an, pts, passo) {
+  let Rm = 0; for (let t = 0; t < 360; t += 10) Rm += amostrarGrade(an.rho, t, 0) / 36;
+  const c = curvaDoContorno(pts, Rm), n = c.length, N = Math.round(360 / passo), hMax = new Float64Array(N).fill(-Infinity);
+  for (let i = 0; i < n; i++) {
+    const a = c[i], b = c[(i + 1) % n], bx = b.th + (i + 1 === n ? 360 : 0), x0 = Math.min(a.th, bx), x1 = Math.max(a.th, bx);
+    for (let g = Math.ceil(x0 / passo); g <= Math.floor(x1 / passo); g++) { const x = g * passo, t = x1 > x0 ? (x - a.th) / (bx - a.th) : 0, h = a.h + (b.h - a.h) * t, k = ((g % N) + N) % N; if (h > hMax[k]) hMax[k] = h; }
+  }
+  for (let k = 0; k < N; k++) if (!isFinite(hMax[k])) hMax[k] = hMax[(k + N - 1) % N];
+  return Array.from(hMax, (h, k) => elevacaoExata(an, k * passo, h));
+}
+// Contorno superior inicial: a borda de cima dos parâmetros (topo da faixa na frente e atrás), em 7 pontos de cada lado
+export function contornoSuperiorPadrao(an, P) {
+  const f = P.bandTop == null ? 55 : P.bandTop, t = P.bandTopBack == null ? f : P.bandTopBack;
+  const el = (th) => t + (f - t) * (1 + Math.cos(th * GRAU)) / 2, h = (th) => +(amostrarGrade(an.rho, th, el(th)) * Math.sin(el(th) * GRAU)).toFixed(1);
+  const dir = [30, 60, 90, 120, 150].map((th, i) => ({ th, h: h(th), k: i + 1 })), esq = dir.map((q) => ({ th: 360 - q.th, h: h(360 - q.th), k: q.k })).reverse();
+  return [{ th: 0, h: h(0), k: 0 }].concat(dir, [{ th: 180, h: h(180), k: -1 }], esq);
+}
+
 export function gerarOrtese(an, zRef, P, pos) {
   const lv = P.res === 'fine' ? 2 : (P.res === 'high' ? 1 : 0);
   const Nc = [360, 540, 720][lv], dPhT = [1, 0.67, 0.5][lv];
   const dTh = 360 / Nc;
   // faixa de topo aberto: borda superior na elevação bandTop (frente) e, se dado e diferente, bandTopBack (atrás),
   // variando com o azimute como a borda inferior (E3c-4, estilo do laboratório)
-  const topoVar = P.type === 'band' && P.bandTopBack != null && P.bandTopBack !== P.bandTop;
-  const phiTop = P.type === 'band' ? (topoVar ? Math.max(P.bandTop, P.bandTopBack) : P.bandTop) : 90;
-  const topoEm = topoVar ? (th) => P.bandTopBack + (P.bandTop - P.bandTopBack) * (1 + Math.cos(th * GRAU)) / 2 : () => phiTop;
+  // contorno superior editado (E3c-4): a borda de cima segue a curva (elevação por azimute, de 0,5 em 0,5°)
+  const sup = P.contornoSup && P.contornoSup.length >= 4 ? elevacoesDoTopo(an, P.contornoSup, 0.5) : null;
+  const topoVar = !!sup || (P.type === 'band' && P.bandTopBack != null && P.bandTopBack !== P.bandTop);
+  const phiTop = sup ? Math.min(89, Math.max(...sup) + 1) : P.type === 'band' ? (topoVar ? Math.max(P.bandTop, P.bandTopBack) : P.bandTop) : 90;
+  const topoEm = sup ? (th) => { const f = (((th % 360) + 360) % 360) / 0.5, j = Math.floor(f) % sup.length, w = f - Math.floor(f); return sup[j] * (1 - w) + sup[(j + 1) % sup.length] * w; }
+    : topoVar ? (th) => P.bandTopBack + (P.bandTop - P.bandTopBack) * (1 + Math.cos(th * GRAU)) / 2 : () => phiTop;
   const closed = phiTop >= 89.9;
   const wrap = th => ((th % 360) + 360) % 360;
 
