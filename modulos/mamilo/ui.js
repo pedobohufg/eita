@@ -419,6 +419,18 @@ $("exp").onclick = async () => {
     if (await salvar(`EITA-Mamilo_${caso}.zip`, zip)) feito("s6");
   } catch (e) { ocupado(false); status("Falha ao exportar: " + e.message, true); }
 };
+$("expMama").onclick = async () => {
+  if (!S.frontal) return; const caso = codigoArquivo();
+  try {
+    ocupado(true, "Gerando a mama de prova…"); await espera();
+    const G = geometria(0.3), M = E.mamaDeProva(G, Object.assign({}, S.p, { resolucao_mm: 0.3 })), m = M.espec;
+    const leia = `EITA! MAMILO — mama de prova (Lab.EITA/UFG)\n\nCalota esférica de raio ${m.raio_mama_mm} mm (o mesmo do verso da prótese), base de ${fmt(m.diametro_base_mm, 0)} mm e altura de ${fmt(m.altura_mm, 1)} mm, com pedestal de ${m.pedestal_mm} mm e base plana (imprimir sem suportes, base na mesa).\nSulco de ${m.sulco_mm.profundidade} mm a ${m.sulco_mm.afastamento_da_borda} mm além da borda da prótese; covinha no centro da papila.\nPara conferir: a prótese deve assentar dentro do sulco, com a papila sobre a covinha e a borda afinada rente à superfície, sem levantar.\nA peça é rígida: confere curvatura, borda e posição, não a maciez da pele.\nUse a mama de prova da mesma exportação da prótese (mesmo raio e mesmo lado).\n`;
+    const zip = await E.zip({ "mama_de_prova.stl": M.arquivo, "LEIA-ME.txt": leia });
+    ocupado(false);
+    $("mamaInfo").innerHTML = `<div class="okbox">Mama de prova: raio ${m.raio_mama_mm} mm · base ${fmt(m.diametro_base_mm, 0)} mm · altura ${fmt(m.altura_mm, 1)} mm · ${fmt(m.volume_cm3, 0)} cm³</div>`;
+    await salvar(`EITA-Mamilo_${caso}_mama-de-prova.zip`, zip);
+  } catch (e) { ocupado(false); status("Falha ao gerar a mama de prova: " + e.message, true); }
+};
 $("expPdf").onclick = async () => { if (!S.frontal) return; try { ocupado(true, "Montando o relatório…"); await espera(); const G = geometria(0.2); let vol = S.vol; if (vol == null) { const n = G.n, idx = Array.from({ length: n }, (_, i) => i); vol = E.volume(E.solido(G.xs, idx, n, G.S, Float32Array.from(G.S, (s, q) => s + Math.max(G.T[q], 1e-3)), G.dentro, false, false)) / 1000; } const pdf = await gerarPDF(G, vol); ocupado(false); await salvar(`EITA-Mamilo_${codigoArquivo()}_relatorio.pdf`, new Blob([pdf], { type: "application/pdf" })); } catch (e) { ocupado(false); status("Falha ao gerar o relatório: " + e.message, true); } };
 
 

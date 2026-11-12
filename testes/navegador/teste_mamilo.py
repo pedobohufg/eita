@@ -26,6 +26,13 @@ async def main():
             nomes = sorted(z.namelist()); print("pacote:", nomes)
             assert {"protese_referencia.stl", "molde_frontal.stl", "contramolde.stl", "relatorio.json", "relatorio.pdf", "mapa_pigmentacao.pdf", "mascara_pintura_areola.stl"} <= set(nomes)
             print("medidas:", json.loads(z.read("relatorio.json"))["medidas"])
+            async with pg.expect_download(timeout=180000) as d: await pg.click("#expMama")
+            zm = zipfile.ZipFile(await (await d.value).path())
+            assert sorted(zm.namelist()) == ["LEIA-ME.txt", "mama_de_prova.stl"], zm.namelist()
+            stlm = zm.read("mama_de_prova.stl"); ntri = int.from_bytes(stlm[80:84], "little")
+            assert len(stlm) == 84 + 50 * ntri and ntri > 10000, (len(stlm), ntri)
+            open(os.path.join(RAIZ, "dist", "mamilo-mama-de-prova.stl"), "wb").write(stlm)
+            print("mama de prova:", ntri, "triângulos ·", await pg.text_content("#mamaInfo"))
             await pg.screenshot(path=os.path.join(RAIZ, "dist", "mamilo-teste.png"))
             await b.close()
     finally:

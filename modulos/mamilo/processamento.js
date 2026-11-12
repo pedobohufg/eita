@@ -4,7 +4,7 @@
 import { clamp, hex, mediaDesvio, mediana, percentil, resolver3 } from "../../nucleo/base.js";
 import { detectarMarcador } from "../../nucleo/calibracao.js";
 import { abertura, bilinear, componenteProxima, desfocar, desfocar1d, elipseMomentos, kernel, medianaCanais, normalizar8, otsu, paraLab, preencherBuracos, rotular } from "../../nucleo/imagem.js";
-import { indicesAdaptativos, solido, stl as stlNucleo, volume } from "../../nucleo/malha.js";
+import { indicesAdaptativos, revolucao, solido, stl as stlNucleo, stlTriangulos, volume } from "../../nucleo/malha.js";
 
 export const CABECALHO_STL = "EITA!Mamilo - Lab.EITA/UFG";
 const stl = (malha, transformar) => stlNucleo(malha, transformar, CABECALHO_STL);
@@ -360,6 +360,63 @@ export function exportarConjunto(G, p, zonaFina) {
     volume_ml: volume(prot) / 1000
   };
 };
+
+// ------------------------------------------------------------------ mama de prova
+// Calota esférica com o mesmo raio do verso da prótese (S = √(R² − r²) − R, ápice em z = 0 no centro
+// da aréola), sobre um pedestal de base plana, para imprimir e testar o assentamento da prótese.
+// Um sulco raso acompanha o contorno da prótese (ρ = ρ_out, já espelhado se for o caso), afastado
+// para fora para a borda afinada assentar em superfície lisa, e uma covinha marca o centro da papila. Sólido de revolução: cada raio tem os mesmos pontos, com passo fino
+// em torno do contorno para o sulco sair redondo.
+export const MAMA_PROVA = { diametro_mm: 120, pedestal_mm: 4, sulco_prof_mm: 0.4, sulco_larg_mm: 1.2, sulco_afastamento_mm: 1.5, covinha_diam_mm: 3, covinha_prof_mm: 0.5, nAngulos: 360 };
+
+export function mamaDeProva(G, p, opc = {}) {
+  const o = Object.assign({}, MAMA_PROVA, opc), R = p.raio_mama_mm;
+  const { n, xs, rho, rho_out } = G, x0 = xs[0], dx = xs[1] - xs[0];
+  const rhoEm = (X, Y) => {                                  // ρ da prótese (bilinear na grade de G)
+    const fi = (X - x0) / dx, fj = (Y - x0) / dx;
+    if (fi < 0 || fj < 0 || fi > n - 1.001 || fj > n - 1.001) return Infinity;
+    const i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, q = j * n + i;
+    return (rho[q] * (1 - u) + rho[q + 1] * u) * (1 - v) + (rho[q + n] * (1 - u) + rho[q + n + 1] * u) * v;
+  };
+  // raio do contorno da prótese em cada direção (bisseção ao longo do raio)
+  const nT = o.nAngulos, rLim = 0.98 * Math.abs(x0), rc = new Float64Array(nT);
+  for (let t = 0; t < nT; t++) {
+    const th = (t / nT) * 2 * Math.PI, c = Math.cos(th), s = Math.sin(th);
+    let lo = 0, hi = rLim;
+    if (rhoEm(hi * c, hi * s) <= rho_out) { rc[t] = hi; continue; }
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2; if (rhoEm(m * c, m * s) <= rho_out) lo = m; else hi = m; }
+    rc[t] = (lo + hi) / 2;
+  }
+  let rcMax = 0; for (const v of rc) rcMax = Math.max(rcMax, v);
+  const Rb = Math.min(Math.max(o.diametro_mm / 2, rcMax + 15), 0.9 * R);
+  if (rcMax + o.sulco_afastamento_mm + 3 > Rb) throw new Error(`a prótese (${(2 * rcMax).toFixed(0)} mm) não cabe numa mama de raio ${R} mm`);
+  const esfera = (r) => Math.sqrt(R * R - r * r) - R;
+  const zBorda = esfera(Rb), zBase = zBorda - o.pedestal_mm;
+  const [px, py] = G.papila_offset_mm || [0, 0], rCov = o.covinha_diam_mm / 2, w = o.sulco_larg_mm / 2;
+  const cosJ = (d, l) => (d < l ? 0.5 * (1 + Math.cos((Math.PI * d) / l)) : 0);
+  const topo = (r, th, rs) => {
+    const X = r * Math.cos(th), Y = r * Math.sin(th);
+    return esfera(r) - o.sulco_prof_mm * cosJ(Math.abs(r - rs), w) - o.covinha_prof_mm * cosJ(Math.hypot(X - px, Y - py), rCov);
+  };
+  // pontos por raio: grosso até o sulco, fino no sulco, grosso até a borda (mesma contagem em todos)
+  const nA = 60, nS = 24, nB = 40, faixa = 1.5 * w;
+  const perfil = (th, t) => {
+    const r0 = rc[t] + o.sulco_afastamento_mm, a = Math.max(0.5, r0 - faixa), b = Math.min(Rb - 0.5, r0 + faixa), P = [[0, zBase]];
+    P.push([Rb, zBase], [Rb, zBorda]);
+    for (let k = nB; k >= 1; k--) { const r = b + ((Rb - b) * k) / nB; if (r < Rb) P.push([r, topo(r, th, r0)]); }
+    for (let k = nS; k >= 0; k--) { const r = a + ((b - a) * k) / nS; P.push([r, topo(r, th, r0)]); }
+    for (let k = nA - 1; k >= 0; k--) { const r = (a * k) / nA; P.push([r, topo(r, th, r0)]); }
+    return P;
+  };
+  const malha = revolucao(nT, perfil, null, false);
+  const pos = malha.pos; for (let q = 2; q < pos.length; q += 3) pos[q] -= zBase;   // base na mesa (z = 0)
+  return {
+    malha, arquivo: stlTriangulos([malha], CABECALHO_STL), zBase,          // zBase: deslocamento exato aplicado (ápice da esfera em z = −zBase)
+    espec: { raio_mama_mm: R, diametro_base_mm: +(2 * Rb).toFixed(1), altura_mm: +(-zBase).toFixed(1), pedestal_mm: o.pedestal_mm,
+      sulco_mm: { profundidade: o.sulco_prof_mm, largura: o.sulco_larg_mm, afastamento_da_borda: o.sulco_afastamento_mm }, covinha_papila_mm: { diametro: o.covinha_diam_mm, profundidade: o.covinha_prof_mm },
+      contorno_protese_mm: { min: +(2 * Math.min(...rc)).toFixed(1), max: +(2 * rcMax).toFixed(1) }, volume_cm3: +(malha.vol / 1000).toFixed(1), triangulos: malha.ntri }
+  };
+}
 
 // ------------------------------------------------------------------ corpo de prova
 export function corpoDeProva(res) {
