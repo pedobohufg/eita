@@ -183,7 +183,7 @@ const T = window.THREE, TEM3D = !!(T && T.OrbitControls);
 const S3 = { arquivo: "", unidade: "", pos: null, alinhado: false, pontos: {}, alinhamento: null, armado: false, pendente: null, eixo: "axial", z: 0, caixa: null, maxDim: 100, versoes: [], medidas: null };
 const PONTOS = { anterior: { nome: "Glabela", cor: 0x34D399 }, posterior: { nome: "Opistocrânio", cor: 0x38BDF8 }, left: { nome: "Eúrio E", cor: 0xFBBF24 }, right: { nome: "Eúrio D", cor: 0xFB923C }, vertex: { nome: "Vértice", cor: 0xE879F9 } };
 const COR_MED = { AP: "#38BDF8", LL: "#FBBF24", D1: "#34D399", D2: "#FB923C" };
-let cena = null, camera, desenhista, controles, malha = null, planoMesh = null, linhasCorte = null, grupoMedidas, grupoAvisos, marcadores = {};
+let cena = null, camera, desenhista, controles, malha = null, planoMesh = null, linhasCorte = null, grupoMedidas, grupoAvisos, grupoContorno, marcadores = {};
 function iniciar3D() {
   if (cena || !TEM3D) return !!cena;
   const caixa = $("cena");
@@ -195,7 +195,7 @@ function iniciar3D() {
   cena.add(new T.AmbientLight(0xffffff, 0.7));
   const l1 = new T.DirectionalLight(0xffffff, 0.9); l1.position.set(150, 200, 250); cena.add(l1);
   const l2 = new T.DirectionalLight(0xffffff, 0.4); l2.position.set(-150, -100, -200); cena.add(l2);
-  grupoMedidas = new T.Group(); cena.add(grupoMedidas); grupoAvisos = new T.Group(); cena.add(grupoAvisos); CRO.grupo = new T.Group(); cena.add(CRO.grupo);
+  grupoMedidas = new T.Group(); cena.add(grupoMedidas); grupoAvisos = new T.Group(); cena.add(grupoAvisos); grupoContorno = new T.Group(); cena.add(grupoContorno); CRO.grupo = new T.Group(); cena.add(CRO.grupo);
   if (window.ResizeObserver) new ResizeObserver(ajustarTamanho).observe($("v3d"));
   window.addEventListener("resize", ajustarTamanho);
   ligarCliques();
@@ -461,7 +461,7 @@ $("btn-perfil-max").onclick = () => {
 };
 
 /* ================================================================== órtese craniana (mapa de pressão + casca) */
-const CRO = { an: null, zRef: 0, range: 3, casco: null, tris: null, stale: false, icTouched: false, tool: "none", earMan: { r: false, l: false }, polar: null, lastParams: null, lastStats: null, lastLines: null, grupo: null };
+const CRO = { contorno: null, an: null, zRef: 0, range: 3, casco: null, tris: null, stale: false, icTouched: false, tool: "none", earMan: { r: false, l: false }, polar: null, lastParams: null, lastStats: null, lastLines: null, grupo: null };
 const fN = (n, d) => (Number.isFinite(n) ? n.toLocaleString("pt-BR", { minimumFractionDigits: d == null ? 1 : d, maximumFractionDigits: d == null ? 1 : d }) : "—");
 const numOf = (id, d) => { const v = parseFloat(String($(id).value).replace(",", ".")); return Number.isFinite(v) ? v : d; };
 const POLAR_EDGE = -10, POLAR_S = 340, POLAR_M = 16;
@@ -471,6 +471,7 @@ const sgn = (v) => (v < 0 ? "−" : "+") + fN(Math.abs(v), 0);
 function croHabilitar(on) { $("btn-cro-analyze").disabled = !on; $("btn-cro-generate").disabled = !on; }
 function setTool(t) { CRO.tool = t; $("cro-tool").value = t; const c = t === "none" ? "" : "crosshair"; if (desenhista) desenhista.domElement.style.cursor = c; $("cro-polar").style.cursor = c; }
 function resetCRO() {
+  CRO.contorno = null; if (grupoContorno) esvaziar(grupoContorno); if ($("contornoUsar")) $("contornoUsar").checked = false;
   descartar(CRO.casco); CRO.casco = null; if (CRO.grupo) esvaziar(CRO.grupo);
   CRO.an = null; CRO.tris = null; CRO.stale = false; CRO.lastParams = null; CRO.lastStats = null; CRO.lastLines = null; CRO.polar = null; CRO.earMan = { r: false, l: false };
   setTool("none");
@@ -523,7 +524,8 @@ function readParams() {
     split: $("cro-split").value, splitPos: g("cro-split-pos", -35, -80, 80), gap: g("cro-gap", 2, 1.5, 6),
     occDrop: g("cro-occ-drop", 8, 0, 30), occWidth: g("cro-occ-w", 50, 20, 90), occSoft: 0.6, frontArc: g("cro-front-arc", 0, 0, 90),
     mast: $("cro-mast").value, mastWidth: g("cro-mast-w", 24, 8, 50), mastDepth: g("cro-mast-depth", 24, 5, 50), mastGap: g("cro-mast-gap", 4, 0, 20), legRound: 0.45,
-    res: $("cro-res").value
+    res: $("cro-res").value,
+    contorno: $("contornoUsar").checked && CRO.contorno ? CRO.contorno.pts.map((q) => ({ th: q.th, h: q.h })) : null
   };
 }
 const dirOf = (th, ph) => new T.Vector3(Math.cos(ph * D2R) * Math.sin(th * D2R), Math.cos(ph * D2R) * Math.cos(th * D2R), Math.sin(ph * D2R));
@@ -540,10 +542,11 @@ function croMarcadores(an, zRef) {
     const sp = rotulo3D(e.label + "  " + (e.kind === "zero" ? "anulado" : (e.kind === "contact" ? "+" : "−") + fN(e.mm, 1) + " mm"), hex); sp.position.copy(pt).addScaledVector(dir, md * 0.075); CRO.grupo.add(sp);
   });
   // linha de corte (borda) pré-visualizada sobre a cabeça e as orelhas usadas no projeto
-  const P = readParams(), tl = O.linhaDeCorte(an, P, 240), arr = new Float32Array(tl.line.length * 3);
+  const P0 = readParams(), P = Object.assign({}, P0, { contorno: null }), tl = O.linhaDeCorte(an, P, 240), arr = new Float32Array(tl.line.length * 3);
   tl.line.forEach((q, i) => { const dir = dirOf(q.th, q.ph), r = O.amostrarGrade(an.rho, q.th, q.ph) + 3; arr[i * 3] = dir.x * r; arr[i * 3 + 1] = dir.y * r; arr[i * 3 + 2] = zRef + dir.z * r; });
   const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.BufferAttribute(arr, 3));
-  const linha = new T.LineLoop(geo, new T.LineBasicMaterial({ color: 0xF5B301 })); linha.renderOrder = 999; CRO.grupo.add(linha);
+  const linha = new T.LineLoop(geo, new T.LineBasicMaterial({ color: 0xF5B301 })); linha.renderOrder = 999; if (!P0.contorno) CRO.grupo.add(linha); else descartar(linha);
+  desenharContorno();
   ["R", "L"].forEach((s) => {
     const e = tl.ears[s]; if (!e) return;
     const th = s === "R" ? e.az : 360 - e.az, ph = Math.atan2(e.top, O.amostrarGrade(an.rho, th, 0)) / D2R;
@@ -556,6 +559,7 @@ function croTrimLines(an, P) {
   const ears = O.resolverOrelhas(an, P), L = [];
   ["R", "L"].forEach((s) => { const e = ears[s]; L.push("Orelha " + (s === "R" ? "D" : "E") + ": " + e.src + " (az " + fN(e.az, 0) + "°, arco " + sgn(e.top) + " mm)"); });
   if (["R", "L"].some((s) => ears[s].src !== "detectada" && ears[s].src !== "manual")) L.push('⚠ Detecção da orelha duvidosa ou ausente: use "Marcar D/E" e clique no topo de cada orelha na malha 3D.');
+  if (P.contorno) L.push("Borda: pelo contorno editado (" + P.contorno.length + " pontos); as abas e as janelas das orelhas saem dele");
   if (P.cheek === "off") L.push("Apoio na bochecha: desativado");
   else {
     if (P.mast === "on") L.push("Aba atrás da orelha: " + fN(P.mastWidth, 0) + " mm de largura, até " + fN(P.mastDepth, 0) + " mm abaixo do plano");
@@ -709,10 +713,78 @@ function addManualEdit(th, ph) {
   croRefresh();
   status(esc(ed.label) + ": " + KIND_LABEL[kind].toLowerCase() + (kind === "zero" ? "" : " " + fN(mm, 1) + " mm") + " em " + esc(ed.region) + ".");
 }
+// ------------------------------------------------------------------ contorno editável da borda (E3c-4)
+// pontos { th (azimute, graus), h (mm em relação ao plano), k (chave do par D/E; 0 = frente, −1 = trás) }, em ordem de azimute
+function pontoDoContorno3D(th, h, extra) {
+  const an = CRO.an, ph = Math.max(O.GRADE.PMIN + 1, Math.min(88, O.elevacaoNaAltura(an, th, h))), dir = dirOf(th, ph), r = O.amostrarGrade(an.rho, th, ph) + (extra == null ? 2.5 : extra);
+  return new T.Vector3(0, 0, CRO.zRef).addScaledVector(dir, r);
+}
+function desenharContorno() {
+  if (!grupoContorno) return; esvaziar(grupoContorno);
+  const C = CRO.contorno, an = CRO.an; if (!C || !an) return;
+  let Rm = 0; for (let t = 0; t < 360; t += 10) Rm += O.amostrarGrade(an.rho, t, 0) / 36;
+  const curva = O.curvaDoContorno(C.pts, Rm, 10), arr = new Float32Array(curva.length * 3);
+  curva.forEach((q, i) => { const p = pontoDoContorno3D(q.th, q.h); arr[i * 3] = p.x; arr[i * 3 + 1] = p.y; arr[i * 3 + 2] = p.z; });
+  const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.BufferAttribute(arr, 3));
+  const linha = new T.LineLoop(geo, new T.LineBasicMaterial({ color: 0xE11D48, depthTest: false })); linha.renderOrder = 1003; grupoContorno.add(linha);
+  if (!C.editando) return;
+  C.pts.forEach((q, i) => {
+    const sel = i === C.sel, m = new T.Mesh(new T.SphereGeometry(S3.maxDim * (sel ? 0.016 : 0.011), 12, 12), new T.MeshBasicMaterial({ color: sel ? 0xE11D48 : 0xF97316, depthTest: false }));
+    m.position.copy(pontoDoContorno3D(q.th, q.h)); m.renderOrder = 1004; m.userData.ponto = i; grupoContorno.add(m);
+  });
+}
+function atualizarInfoContorno() {
+  const C = CRO.contorno;
+  $("contornoInfo").textContent = !C ? "" : `${C.pts.length} pontos${C.editando ? " · editando: arraste os pontos laranja; duplo clique perto da linha acrescenta um ponto" : ""}${$("contornoUsar").checked ? " · a órtese sai deste contorno" : " · marque “Gerar a órtese pelo contorno” para usá-lo"}.`;
+  $("btn-contorno-editar").textContent = C && C.editando ? "Parar de editar" : "Editar no modelo";
+  $("btn-contorno-editar").disabled = !C; $("btn-contorno-apagar").disabled = !C || C.sel == null;
+}
+function thHDoPonto(p) { const q = malha.worldToLocal(p.clone()); let th = Math.atan2(q.x, q.y) / D2R; if (th < 0) th += 360; return { th, h: q.z - CRO.zRef }; }
+const parDoPonto = (C, i) => { const k = C.pts[i].k; if (!(k > 0) || !$("contornoEspelho").checked) return -1; return C.pts.findIndex((q, j) => j !== i && q.k === k); };
+function limitarAzimute(C, i, th) {
+  const q = C.pts[i]; if (q.k === 0) return 0; if (q.k === -1) return 180;
+  const ant = i > 0 ? C.pts[i - 1].th : 0, prox = i < C.pts.length - 1 ? C.pts[i + 1].th : 360;
+  return Math.min(prox, Math.max(ant, th));
+}
+let quadroContorno = 0;
+function moverPontoDoContorno(i, p) {
+  const C = CRO.contorno, { th, h } = thHDoPonto(p);
+  C.pts[i].th = +limitarAzimute(C, i, th).toFixed(1); C.pts[i].h = +h.toFixed(1);
+  const j = parDoPonto(C, i); if (j >= 0) { C.pts[j].th = +limitarAzimute(C, j, 360 - C.pts[i].th).toFixed(1); C.pts[j].h = C.pts[i].h; }
+  if (!quadroContorno) quadroContorno = requestAnimationFrame(() => { quadroContorno = 0; desenharContorno(); });
+}
+function inserirPontoDoContorno(p) {
+  const C = CRO.contorno, { th, h } = thHDoPonto(p);
+  const pos = (t) => { let k = C.pts.findIndex((q) => q.th > t); return k < 0 ? C.pts.length : k; };
+  const novo = { th: +th.toFixed(1), h: +h.toFixed(1), k: ++C.seq };
+  C.pts.splice(pos(novo.th), 0, novo);
+  if ($("contornoEspelho").checked && Math.abs(novo.th - 180) > 1 && novo.th > 1 && novo.th < 359) { const g = { th: +(360 - novo.th).toFixed(1), h: novo.h, k: novo.k }; C.pts.splice(pos(g.th), 0, g); }
+  C.sel = C.pts.indexOf(novo); desenharContorno(); croDesatualizar(); croResumo(); atualizarInfoContorno();
+  status("Ponto acrescentado ao contorno" + ($("contornoEspelho").checked ? " (e o par do outro lado)" : "") + ". Arraste para ajustar.");
+}
+$("btn-contorno-criar").onclick = () => {
+  if (!CRO.an) return;
+  if (CRO.contorno && !doisCliques("contornoNovo", $("btn-contorno-criar"), "Confirmar: refazer o contorno", "O contorno atual será trocado pelo inicial. Toque de novo para confirmar.")) return;
+  const ct = O.contornoPadrao(CRO.an, Object.assign(readParams(), { contorno: null }));
+  CRO.contorno = { pts: ct, sel: null, editando: true, seq: 1000 }; $("contornoUsar").checked = true; setTool("none");
+  mostrarVista("3d"); croMarcadores(CRO.an, CRO.zRef); croDesatualizar(); croResumo(); atualizarInfoContorno(); atualizarEstado();
+  status("Contorno criado a partir do desenho do laboratório e das orelhas. Arraste os pontos laranja sobre a cabeça para acertar a borda; depois, <b>Gerar órtese</b>.");
+};
+$("btn-contorno-editar").onclick = () => { const C = CRO.contorno; if (!C) return; C.editando = !C.editando; if (C.editando) { setTool("none"); mostrarVista("3d"); } else C.sel = null; desenharContorno(); atualizarInfoContorno(); };
+$("btn-contorno-apagar").onclick = () => {
+  const C = CRO.contorno; if (!C || C.sel == null) return;
+  const q = C.pts[C.sel]; if (q.k === 0 || q.k === -1) { status("O ponto da frente e o de trás não saem (fecham a volta); arraste-os.", true); return; }
+  if (C.pts.length <= 8) { status("O contorno precisa de pelo menos 8 pontos.", true); return; }
+  const j = parDoPonto(C, C.sel), fora = [C.sel, j].filter((x) => x >= 0).sort((a, b) => b - a); fora.forEach((x) => C.pts.splice(x, 1));
+  C.sel = null; desenharContorno(); croDesatualizar(); croResumo(); atualizarInfoContorno();
+};
+$("contornoUsar").addEventListener("change", () => { if (CRO.an) { croMarcadores(CRO.an, CRO.zRef); croDesatualizar(); croResumo(); } atualizarInfoContorno(); });
+
 function ligarCliques() {
   const el = desenhista.domElement, rc = new T.Raycaster();
   const acerto = (e) => { const r = el.getBoundingClientRect(); rc.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera); return malha ? rc.intersectObject(malha, false)[0] : null; };
   el.addEventListener("dblclick", (e) => {
+    if (CRO.contorno && CRO.contorno.editando && !S3.armado && malha) { const h = acerto(e); if (h) inserirPontoDoContorno(h.point); return; }
     if (!S3.armado || !malha) return;
     const h = acerto(e); if (!h) return;
     const k = $("landmark-select").value; marcarPonto(k, [h.point.x, h.point.y, h.point.z]); if (S3.pontosAuto) { delete S3.pontosAuto[k]; listarPontos(); }
@@ -720,9 +792,22 @@ function ligarCliques() {
     const prox = O.PONTOS_DE_REFERENCIA.find((q) => !S3.pontos[q]); if (prox) $("landmark-select").value = prox;
     status(`Ponto <b>${PONTOS[k].nome}</b> marcado.${prox ? ` Próximo: ${PONTOS[prox].nome}.` : S3.alinhado ? " Toque em <b>Alinhar aos eixos anatômicos</b> para realinhar com ele." : " Os 5 pontos estão marcados: toque em <b>Alinhar aos eixos anatômicos</b>."}`);
   });
-  let down = null;
-  el.addEventListener("pointerdown", (e) => { down = { x: e.clientX, y: e.clientY }; });
+  let down = null, arraste = null;
+  // contorno: pegar um ponto e arrastar sobre a malha (a câmera fica parada enquanto isso)
+  const pontoSob = (e) => { const r = el.getBoundingClientRect(); rc.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera); const hs = rc.intersectObjects(grupoContorno.children.filter((m) => m.userData.ponto != null), false); return hs.length ? hs[0].object.userData.ponto : null; };
+  el.addEventListener("pointerdown", (e) => {
+    down = { x: e.clientX, y: e.clientY };
+    if (!CRO.contorno || !CRO.contorno.editando) return;
+    const i = pontoSob(e); if (i == null) return;
+    CRO.contorno.sel = i; arraste = { i }; controles.enabled = false; el.setPointerCapture(e.pointerId); desenharContorno(); $("btn-contorno-apagar").disabled = false;
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (!arraste) return;
+    const h = acerto(e); if (!h) return;
+    moverPontoDoContorno(arraste.i, h.point);
+  });
   el.addEventListener("pointerup", (e) => {
+    if (arraste) { arraste = null; controles.enabled = true; down = null; croDesatualizar(); croResumo(); atualizarInfoContorno(); return; }
     const d = down; down = null;
     if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;      // arraste = girar a câmera
     if (CRO.tool === "none" || !CRO.an || !malha || S3.armado) return;
@@ -839,6 +924,7 @@ function atualizarEstado() {
   w("why-analyze", !tem ? "Abra o STL do scan na etapa 1." : !S3.alinhado ? "Alinhe o modelo aos eixos anatômicos (etapa 1)." : "");
   w("why-generate", !tem ? "Abra o STL do scan na etapa 1." : !an ? "Analise a pressão primeiro (etapa 4)." : CRO.stale ? "Parâmetros alterados: gere novamente." : "");
   w("why-export", CRO.tris && !CRO.stale ? "" : "Gere a órtese primeiro.");
+  $("btn-contorno-criar").disabled = !an; atualizarInfoContorno();
   listarPontos(); earInfo(); conditionals(); renderChecklist();
 }
 ["cro-ear-mode", "cro-ear-az-r", "cro-ear-az-l", "cro-ear-top-r", "cro-ear-top-l", "cro-ear-w-r", "cro-ear-w-l", "cro-ear-clear"].forEach((id) => $(id).addEventListener("input", earInfo));
@@ -928,7 +1014,7 @@ function coletarOrtese() {
     if (S3.pendente) return Object.assign({}, S3.pendente, { entradas: lerEntradas(), versoes: S3.versoes });
     return S3.versoes.length ? { scan: null, alinhamento: null, planoZ: null, entradas: lerEntradas(), edicoes: [], earMan: null, analisado: false, gerada: false, resultado: null, versoes: S3.versoes } : null;
   }
-  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked, semSaliencias: $("semSaliencias").checked }, retrato(), { versoes: S3.versoes });
+  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked, semSaliencias: $("semSaliencias").checked, contorno: CRO.contorno ? { pontos: CRO.contorno.pts.map((q) => Object.assign({}, q)), usar: $("contornoUsar").checked } : null }, retrato(), { versoes: S3.versoes });
 }
 function coletar() {
   if (!S.fichaId) S.fichaId = E.novoIdFicha("c");
@@ -992,7 +1078,7 @@ function aplicarOrtese(o) {
     if (o.planoZ != null) { if ($("plane-axis").value !== "axial") { $("plane-axis").value = "axial"; ajustarFaixaPlano(); } $("plane-offset").value = o.planoZ; lerPlano(); }
     if (o.analisado && S3.alinhado) {
       if (CRO.an) CRO.an.edits = [];
-      if (runAnalysis(null, true)) { escreverEntradas(o.entradas); aplicarCorrecoes(o.edicoes); if (o.earMan) CRO.earMan = { r: !!o.earMan.r, l: !!o.earMan.l }; croRefresh(); }
+      if (runAnalysis(null, true)) { escreverEntradas(o.entradas); aplicarCorrecoes(o.edicoes); if (o.earMan) CRO.earMan = { r: !!o.earMan.r, l: !!o.earMan.l }; if (o.contorno && o.contorno.pontos) { CRO.contorno = { pts: o.contorno.pontos.map((q) => Object.assign({}, q)), sel: null, editando: false, seq: 1000 }; $("contornoUsar").checked = !!o.contorno.usar; } croRefresh(); }
     }
     status("Projeto da órtese aplicado: pontos, plano, parâmetros e correções restaurados." + (o.gerada ? " Toque em <b>Gerar órtese</b> para recriar a casca." : ""));
   } catch (e) { console.error(e); status("Não foi possível aplicar todo o projeto da órtese: " + esc(e.message), true); }
@@ -1163,7 +1249,7 @@ async function secoesDoScan(R, imgs) {
     if (q && s) {
       const gp = s.gap || {}, ear = (x) => esc(x.src) + " (az " + fN(x.az, 0) + "°, arco " + (x.top < 0 ? "-" : "+") + fN(Math.abs(x.top), 0) + " mm)";
       R.pg.text(36, R.y, 9, "Parâmetros de projeto", true, E.CORES_PDF.roxo); R.y -= 13;
-      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto (borda superior a " + fN(q.bandTop, 0) + "° na frente" + (q.bandTopBack != null && q.bandTopBack !== q.bandTop ? " e " + fN(q.bandTopBack, 0) + "° atrás" : "") + ")" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano" + (q.cheekWall === "on" ? ", face interna lisa com " + fN(q.cheekFoam, 1) + " mm para espuma" : "")}${q.earBack > 0 ? "; curva de " + fN(q.earBack, 0) + "° atrás da orelha" : ""}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm${q.holeZone === "ap" ? ", só na frente e atrás" : ""}; ${q.split === "none" ? "peça inteira, sem fenda" : /^lateral/.test(q.split) ? "peça inteira com fenda lateral " + (q.split === "lateralR" ? "D" : "E") + " de " + fN(q.gap, 1) + " mm" : "duas valvas, corte " + (q.split === "coronal" ? "coronal" : "sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
+      paragrafo(R, `${q.type === "band" ? "Faixa de topo aberto (borda superior a " + fN(q.bandTop, 0) + "° na frente" + (q.bandTopBack != null && q.bandTopBack !== q.bandTop ? " e " + fN(q.bandTopBack, 0) + "° atrás" : "") + ")" : "Capacete fechado"}; modo ${q.mode === "active" ? "ativo (compressão máx. " + fN(q.compMax, 1) + " mm)" : "passivo"}; fator de correção ${fN(q.relief * 100, 0)}%; alívio máx. ${fN(q.reliefMax, 1)} mm; folga/forro ${fN(q.c0, 1)} mm; espessura da casca ${fN(q.t, 1)} mm; borda posterior ${fN(q.hb, 0)} mm com descida extra de ${fN(q.occDrop || 0, 0)} mm no occipício (±${fN(q.occWidth || 0, 0)}°); reserva de crescimento ${fN(q.growMonths, 0)} meses × ${fN(q.growRate, 1)} mm/mês (${fN(q.growContactPct, 0)}% nas áreas de contato; +${fN(q.growVertex, 1)} mm no vértice); borda: ${q.cheek === "off" ? "sem apoio na bochecha" : "apoio na bochecha de " + fN(q.cheekWidth, 0) + " mm de largura, até " + fN(q.cheekDepth, 0) + " mm abaixo do plano" + (q.cheekWall === "on" ? ", face interna lisa com " + fN(q.cheekFoam, 1) + " mm para espuma" : "")}${q.earBack > 0 ? "; curva de " + fN(q.earBack, 0) + "° atrás da orelha" : ""}${q.contorno ? "; borda pelo contorno editado (" + q.contorno.length + " pontos)" : ""}; orelhas ${s.ears && s.ears.R ? "D: " + ear(s.ears.R) + "; E: " + ear(s.ears.L) : "—"}; aba atrás da orelha: ${q.mast === "on" ? fN(q.mastWidth, 0) + " mm de largura, até " + fN(q.mastDepth, 0) + " mm abaixo do plano" : "sem aba"}; folga nos apoios ${fN(q.cheekClear, 1)} mm; furos Ø ${fN(q.holeD, 1)} mm, passo ${fN(q.pitch, 1)} mm${q.holeZone === "ap" ? ", só na frente e atrás" : ""}; ${q.split === "none" ? "peça inteira, sem fenda" : /^lateral/.test(q.split) ? "peça inteira com fenda lateral " + (q.split === "lateralR" ? "D" : "E") + " de " + fN(q.gap, 1) + " mm" : "duas valvas, corte " + (q.split === "coronal" ? "coronal" : "sagital") + " (" + fN(q.splitPos, 0) + " mm, fenda " + fN(q.gap, 1) + " mm)"}.`);
       R.pg.text(36, R.y, 9, "Modelo gerado", true, E.CORES_PDF.roxo); R.y -= 13;
       paragrafo(R, `Volume ${fN(s.volume_cm3, 1)} cm³ · massa estimada ${fN(s.mass_g, 0)} g (PA12, sem forro) · dimensões ${s.size.map((v) => fN(v, 0)).join(" × ")} mm · folga média à cabeça: contato ${fN(gp.contact, 1)} mm, neutra ${fN(gp.neutral, 1)} mm, alívio ${fN(gp.relief, 1)} mm · interferência máxima com a malha: ${s.interference ? fN(s.interference.mm, 1) + " mm" : "—"} · ${s.triangles.toLocaleString("pt-BR")} triângulos · malha ${s.mesh && s.mesh.pinch === 0 && s.mesh.dropped === 0 ? "fechada" : "com defeitos (gerar em resolução maior)"}.`);
       if (casco.length) { R.pg.text(36, R.y, 9, "Órtese gerada", true, E.CORES_PDF.roxo); R.y -= 13; gradeImagens(R, casco); }
@@ -1226,7 +1312,8 @@ $("expPdf").onclick = async () => {
   } catch (e) { console.error(e); CASCA.ocupado(false); status("Erro ao gerar o relatório: " + esc(e.message), true); }
 };
 window.__eitaRelatorio = gerarPDF; // usado nos testes
-window.__eitaCranio = { S, S3, CRO, readParams };   // usado nos testes (só leitura)
+window.__eitaCranio = { S, S3, CRO, readParams,   // usado nos testes (só leitura)
+  contornoNaTela: (i) => { const q = CRO.contorno.pts[i], p = pontoDoContorno3D(q.th, q.h).project(camera), r = desenhista.domElement.getBoundingClientRect(); return [r.left + (p.x + 1) / 2 * r.width, r.top + (1 - p.y) / 2 * r.height]; } };
 
 /* ------------------------------------------------------------------ início */
 if (!TEM3D) $("scanInfo").innerHTML = "O visualizador 3D não carregou (three.js indisponível nesta página). As medidas manuais, o acompanhamento e o relatório continuam funcionando.";

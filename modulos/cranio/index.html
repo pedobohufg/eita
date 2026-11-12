@@ -330,6 +330,12 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
       <p class="note" id="cro-ear-info">Analise a pressão para detectar as orelhas.</p>
       <div class="row"><button type="button" id="btn-cro-mark-ear-r">◎ Marcar D</button><button type="button" id="btn-cro-mark-ear-l">◎ Marcar E</button><button type="button" id="btn-cro-ear-auto">Voltar à detecção automática</button></div>
       <div class="note">A linha amarela e as bolas verdes no modelo mostram onde o programa achou as orelhas. Se errar, toque em <b>Marcar</b> e clique no topo da orelha na malha.</div>
+      <div class="sub-h">Contorno da órtese (borda editável)</div>
+      <p class="note">Em vez da borda calculada, desenhe a borda: <b>Criar contorno</b> parte do desenho do laboratório (frente reta, aba na bochecha, arco da orelha, curva até o occipício); em <b>Editar no modelo</b>, arraste os pontos sobre a cabeça, dê duplo clique perto da linha para acrescentar um ponto e toque num ponto e em <b>Apagar ponto</b> para tirá-lo. Depois, gere a órtese.</p>
+      <div class="row"><button type="button" id="btn-contorno-criar" disabled>Criar contorno</button><button type="button" id="btn-contorno-editar" disabled>Editar no modelo</button><button type="button" id="btn-contorno-apagar" disabled>Apagar ponto</button></div>
+      <label class="chk"><input type="checkbox" id="contornoUsar"> Gerar a órtese pelo contorno</label>
+      <label class="chk"><input type="checkbox" id="contornoEspelho" checked> Editar os dois lados juntos (espelho)</label>
+      <p class="note" id="contornoInfo"></p>
       <details class="av"><summary>Avançado: reserva de crescimento</summary>
         <label class="ctl sel" id="row-cro-grow-src">Origem do crescimento<select id="cro-grow-src"><option value="age">Curva OMS pela idade</option><option value="manual">Manual (mm/mês)</option></select></label>
         <label class="ctl dec" id="row-cro-grow-m">Meses até o reajuste<input type="text" inputmode="decimal" id="cro-grow-m" value="4"></label>

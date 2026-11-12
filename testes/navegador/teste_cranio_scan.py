@@ -6,7 +6,8 @@
       o plano, analisam e reaplicam as correções sozinhas. Depois: gerar a órtese e exportar o STL.
       Confere: STL da órtese idêntico (bytes), resumo técnico idêntico, mapa em vista superior idêntico (pixels) e
       D1/D2/AP/LL extraídos do plano iguais (a página antiga usa raios do three.js; a nova, o corte da malha).
-   2) Na página nova: pontos automáticos, alinhamento, correção do pescoço e conferência do scan ao abrir um scan sem ficha; ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
+   2) Na página nova: pontos automáticos, alinhamento, correção do pescoço e conferência do scan ao abrir um scan sem ficha;
+      contorno editável (criar, arrastar um ponto com o par espelhado, gerar pelo contorno); ficha salva com o projeto da órtese, unidade deduzida do tamanho do modelo, relatório PDF com as vistas do modelo, "limpar
       correções" em dois cliques, marcação de ponto por duplo clique e importação de uma base antiga com protocolo.
    Uso: python3 testes/navegador/teste_cranio_scan.py
    © 2026 Lab.EITA/UFG. Autor: Pedro Henrique Gonçalves. Todos os direitos reservados."""
@@ -140,6 +141,21 @@ async def main():
             ok(st["al"] and st["n"] == 5 and st["dA"] != "" and st["corr"] and st["corr"]["corte"] > 0, f"scan sem ficha: pontos automáticos, alinhamento, medidas e correção do pescoço ({st['corr']})")
             cf = await pn.evaluate("({ vis: !document.getElementById('conferencia').hidden, n: document.querySelectorAll('#conferencia li').length, c: window.__eitaCranio.S3.conferencia, P: window.__eitaCranio.readParams() })")
             ok(cf["vis"] and cf["n"] >= 1 and cf["c"] is not None and cf["P"]["cheekWall"] == "on" and cf["P"]["earBack"] == 35, f"conferência do scan mostrada ({cf['n']} item(ns)); apoio liso e curva atrás da orelha no protocolo")
+            # contorno editável: criar, arrastar um ponto do lado D (o par do lado E acompanha), gerar pelo contorno
+            await clicar(pn, "btn-cro-analyze"); await esperar_texto(pn, "status", "Mapa de pressão")
+            await clicar(pn, "btn-contorno-criar"); await pn.wait_for_timeout(200)
+            await pn.evaluate("document.querySelector('#vistas3d button[data-view=\"right\"]').click()"); await pn.wait_for_timeout(400)
+            C0 = await pn.evaluate("window.__eitaCranio.CRO.contorno.pts.map((q) => Object.assign({}, q))")
+            i = next(j for j, q in enumerate(C0) if q["k"] > 0 and 95 < q["th"] < 125)
+            par = next(j for j, q in enumerate(C0) if q["k"] == C0[i]["k"] and j != i)
+            x, y = await pn.evaluate(f"window.__eitaCranio.contornoNaTela({i})")
+            await pn.mouse.move(x, y); await pn.mouse.down(); await pn.mouse.move(x, y + 25, steps=5); await pn.mouse.up(); await pn.wait_for_timeout(200)
+            C1 = await pn.evaluate("window.__eitaCranio.CRO.contorno.pts.map((q) => Object.assign({}, q))")
+            ok(C1[i]["h"] < C0[i]["h"] - 2 and abs(C1[par]["h"] - C1[i]["h"]) < 0.05 and abs(C1[par]["th"] - (360 - C1[i]["th"])) < 0.2, f"contorno: ponto arrastado para baixo ({C0[i]['h']} → {C1[i]['h']} mm) e o par do outro lado acompanhou")
+            await clicar(pn, "btn-cro-generate"); await esperar_texto(pn, "cro-summary", "Órtese (", 120000)
+            g = await pn.evaluate("({ n: (window.__eitaCranio.CRO.lastParams.contorno || []).length, m: window.__eitaCranio.CRO.lastStats.mesh, b: document.getElementById('cro-summary').textContent.includes('contorno editado') })")
+            ok(g["n"] == len(C1) and g["m"]["pinch"] == 0 and g["b"], f"órtese gerada pelo contorno ({g['n']} pontos, malha fechada)")
+            await clicar(pn, "btn-contorno-editar"); await pn.evaluate("document.querySelector('#vistas3d button[data-view=\"top\"]').click()"); await pn.wait_for_timeout(400)
             await pn.evaluate("document.getElementById('landmark-select').value = 'vertex'"); await clicar(pn, "btn-arm-mark")
             cx = await pn.evaluate("(() => { const r = document.querySelector('#cena canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()")
             await pn.mouse.dblclick(cx[0], cx[1]); await pn.wait_for_timeout(200)

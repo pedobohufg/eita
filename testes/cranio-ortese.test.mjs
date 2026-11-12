@@ -149,3 +149,29 @@ test("apoio liso e curva atrás da orelha (E3c-4): a face interna do apoio não 
   assert.ok(d1 < 0.6 * d0, `descida máx. por meio grau: ${d0.toFixed(2)} → ${d1.toFixed(2)} mm`);
   for (let th = 0; th < e.az; th += 1) assert.equal(b1(th), b0(th));   // à frente da orelha nada muda
 });
+
+test("contorno editável (E3c-4): a borda segue a curva, inclusive com parte que volta (janela da orelha fechada)", () => {
+  const an = O.analisar(pos, meta.zRef), P = Object.assign({}, CENARIOS.A.P, { type: "band", bandTop: 55, cheek: "on", cheekDepth: 40, mast: "off", frontArc: 40, hf: 0, hb: -30 });
+  const ct = O.contornoPadrao(an, P);
+  assert.ok(ct.length > 20 && ct[0].th === 0 && ct.some((q) => q.th === 180));
+  for (let i = 1; i < ct.length; i++) assert.ok(ct[i].th >= ct[i - 1].th, `ordem do azimute em ${i}`);
+  for (const q of ct) if (q.k > 0) assert.equal(ct.filter((r) => r.k === q.k).length, 2, "cada ponto tem o par do outro lado");
+  // campo: acima da curva = material; abaixo = vazio; o valor é a distância em mm (até 4)
+  const cp = O.campoDoContorno(an, ct), h = (th, ph) => O.amostrarGrade(an.rho, th, ph) * Math.sin(ph * O.GRAU);
+  assert.ok(cp.f(0, 30) > 3.9 && cp.f(180, 50) > 3.9, "calota é material");
+  assert.ok(cp.f(0, -40) < -3.9, "rosto abaixo da borda frontal é vazio");
+  // borda da frente na altura 0: o sinal troca entre −2 e +2 mm de altura
+  const phAlt = (th, alt) => O.elevacaoNaAltura(an, th, alt);
+  assert.ok(cp.f(0, phAlt(0, -2)) < 0 && cp.f(0, phAlt(0, 2)) > 0);
+  // uma ilha: contorno com um "bolso" que volta (orelha em arco fechado): o ponto dentro do bolso é vazio, acima e abaixo dele, material
+  const bolso = [{ th: 0, h: 0 }, { th: 80, h: 0 }, { th: 90, h: -30 }, { th: 110, h: -30 }, { th: 110, h: 10 }, { th: 90, h: 10 }, { th: 90, h: 0.5 }, { th: 85, h: 0 }, { th: 180, h: -20 }, { th: 360 - 85, h: 0 }];
+  const cb = O.campoDoContorno(an, bolso);
+  assert.ok(cb.f(100, phAlt(100, 0)) < 0, "dentro do bolso: vazio"); assert.ok(cb.f(100, phAlt(100, 25)) > 0, "acima do bolso: material");
+  // a órtese gerada pelo contorno é fechada e a borda frontal fica na altura do contorno
+  const g = O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: ct }), pos);
+  assert.deepEqual(g.stats.mesh, { pinch: 0, dropped: 0 });
+  let zmin = 1e9; const T = g.tris; for (let k = 0; k < T.length; k += 3) { const th = ((Math.atan2(T[k], T[k + 1]) / O.GRAU) + 360) % 360; if (O.diferencaAzimute(th, 0) < 3) zmin = Math.min(zmin, T[k + 2] - meta.zRef); }
+  assert.ok(Math.abs(zmin) < 4, `borda frontal a ${zmin.toFixed(1)} mm do plano`);
+  // sem contorno, a casca é a mesma de antes
+  assert.deepEqual(O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, Object.assign({}, P, { contorno: null }), pos).tris), O.stlDaOrtese(O.gerarOrtese(an, meta.zRef, P, pos).tris));
+});

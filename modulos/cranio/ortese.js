@@ -585,6 +585,7 @@ export function paredeDosApoios(an, P, ears) {
 /* Campo de corte (mm, >0 = material). Une a borda-base (com janela da orelha) às abas
    (retângulos de cantos arredondados definidos em mm). Serve à malha e à pré-visualização. */
 export function campoDeCorte(an, P, ears) {
+  if (P.contorno && P.contorno.length >= 4) return campoDoContorno(an, P.contorno);
   const brim = funcaoDaBorda(P, ears, true), tabs = [];
   ['R', 'L'].forEach(function (s) {
     ['leg', 'mast'].forEach(function (k) { const lg = ears[k + s]; if (lg) tabs.push({ lg: lg, left: s === 'L' }); });
@@ -614,6 +615,91 @@ export function campoDeCorte(an, P, ears) {
     return 60;
   }
   return { f: f, lowest: lowest };
+}
+
+/* Contorno editável da borda (E3c-4). Em vez da borda calculada (altura por azimute + janelas das orelhas + abas), a
+   pessoa ajusta uma curva fechada que dá a volta na cabeça uma vez: pontos de controle { th (azimute, graus), h (altura
+   em mm em relação ao plano de referência) }, em ordem de azimute crescente (0 → 360; pontos com o mesmo azimute fazem
+   bordas verticais, como as das abas e da janela da orelha). A curva passa pelos pontos (Catmull-Rom centrípeta, em mm:
+   x = azimute × raio médio, y = h). Material = acima da curva: um raio vertical (mesmo azimute, para cima) a partir de
+   um ponto abaixo dela cruza a curva um número ímpar de vezes; assim a curva pode ter partes que voltam (orelha em
+   arco fechado). O campo é a distância (mm) à curva, com sinal, limitada a ±4 mm, como o campo da borda calculada. */
+export function curvaDoContorno(pts, Rm, sub) {
+  const n = pts.length, K = sub || 12, k = (Rm || 70) * GRAU, out = [];
+  const P = (i) => { const q = pts[((i % n) + n) % n], volta = Math.floor(i / n); return [(q.th + 360 * volta) * k, q.h]; };
+  for (let i = 0; i < n; i++) {
+    const p0 = P(i - 1), p1 = P(i), p2 = P(i + 1), p3 = P(i + 2);
+    const d = (a, b) => Math.max(1e-3, Math.sqrt(Math.hypot(b[0] - a[0], b[1] - a[1])));   // centrípeta (α = 0,5)
+    const t1 = d(p0, p1), t2 = t1 + d(p1, p2), t3 = t2 + d(p2, p3);
+    for (let j = 0; j < K; j++) {
+      const t = t1 + (t2 - t1) * j / K, L = (a, b, ta, tb) => [0, 1].map((c) => ((tb - t) * a[c] + (t - ta) * b[c]) / (tb - ta));
+      const A1 = L(p0, p1, 0, t1), A2 = L(p1, p2, t1, t2), A3 = L(p2, p3, t2, t3), B1 = L(A1, A2, 0, t2), B2 = L(A2, A3, t1, t3);
+      const c = L(B1, B2, t1, t2); out.push({ th: c[0] / k, h: c[1] });
+    }
+  }
+  return out;   // polilinha fechada (o último liga ao primeiro + 360°)
+}
+export function campoDoContorno(an, pts) {
+  let Rm = 0; for (let t = 0; t < 360; t += 10) Rm += amostrarGrade(an.rho, t, 0) / 36;
+  const poli = curvaDoContorno(pts, Rm), k = Rm * GRAU, segs = [], n = poli.length;
+  for (let i = 0; i < n; i++) {   // segmentos em x = azimute (graus, desembrulhado), y = h
+    const a = poli[i], b = poli[(i + 1) % n], bx = b.th + (i + 1 === n ? 360 : 0);
+    segs.push([a.th, a.h, bx, b.h]);
+  }
+  // baldes de 1° (com as cópias −360/+360) para achar depressa os segmentos perto de um azimute
+  const baldes = Array.from({ length: 360 }, () => []);
+  for (const s0 of segs) for (const off of [-360, 0, 360]) {
+    const x0 = Math.min(s0[0], s0[2]) + off, x1 = Math.max(s0[0], s0[2]) + off;
+    if (x1 < -8 || x0 > 368) continue;
+    for (let g = Math.max(-8, Math.floor(x0) - 6); g <= Math.min(367, Math.ceil(x1) + 6); g++) baldes[((g % 360) + 360) % 360].push([s0[0] + off, s0[1], s0[2] + off, s0[3]]);
+  }
+  function f(th, ph) {
+    const r = amostrarGrade(an.rho, th, ph), h = r * Math.sin(ph * GRAU), cp = Math.max(0.2, Math.cos(ph * GRAU));
+    const lista = baldes[Math.floor(((th % 360) + 360) % 360)];
+    let cruz = 0, d2 = 16;
+    const x = ((th % 360) + 360) % 360;   // as cópias −360/+360 dos segmentos já cobrem a emenda em 0°/360°
+    for (const s0 of lista) {
+      // cruzamentos do raio vertical (para cima) com o segmento (intervalo semiaberto)
+      if ((s0[0] <= x) !== (s0[2] <= x)) { const y = s0[1] + (s0[3] - s0[1]) * (x - s0[0]) / (s0[2] - s0[0]); if (y > h) cruz++; }
+      // distância em mm (azimute em mm na altura do ponto)
+      const ax = (s0[0] - x) * k * cp, bx = (s0[2] - x) * k * cp, ay = s0[1] - h, by = s0[3] - h, dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+      const t = L2 > 0 ? limitar(-(ax * dx + ay * dy) / L2, 0, 1) : 0, ex = ax + t * dx, ey = ay + t * dy;
+      d2 = Math.min(d2, ex * ex + ey * ey);
+    }
+    return (cruz % 2 ? -1 : 1) * Math.min(4, Math.sqrt(d2));
+  }
+  function lowest(th) {
+    let prev = GRADE.PMIN + 1;
+    if (f(th, prev) > 0) return prev;
+    for (let ph = GRADE.PMIN + 2; ph <= 60; ph += 1) {
+      if (f(th, ph) > 0) { let lo = ph - 1, hi = ph; for (let q = 0; q < 10; q++) { const m = (lo + hi) / 2; if (f(th, m) > 0) hi = m; else lo = m; } return hi; }
+    }
+    return 60;
+  }
+  return { f: f, lowest: lowest, curva: poli };
+}
+
+// Contorno inicial no estilo do laboratório, a partir das orelhas e dos parâmetros: frente reta na altura da borda
+// frontal, aba pré-auricular (largura e profundidade do apoio), janela da orelha em arco, descida em curva atrás da orelha
+// até a borda do occipício. Cada lado usa a sua orelha; os pontos dos dois lados têm a mesma chave `k` (para editar em
+// espelho). → [{ th, h, k }] em ordem de azimute
+export function contornoPadrao(an, P) {
+  const ears = resolverOrelhas(an, P), brim = funcaoDaBorda(Object.assign({}, P, { earBack: P.earBack || 35 }), ears, true);
+  const fa = P.frontArc > 0 ? P.frontArc : 30, arr = (v) => +v.toFixed(1);
+  // pontos de um lado no espaço da orelha D (azimute 0 → 180); b(t) = borda calculada daquele lado
+  const lado = (e, lg, b) => {
+    const L = [[fa * 0.5, P.hf]];
+    if (lg) {
+      const a0 = lg.az - lg.w, a1 = lg.az + lg.w, D = -lg.depth;
+      L.push([Math.min(fa, a0 - 4), b(Math.min(fa, a0 - 4))], [a0, b(a0) - 6], [a0, D + 8], [a0 + 2, D], [a1 - 2, D], [a1, D + 8]);
+    }
+    const w = e.w;
+    L.push([e.az - w * 0.8, e.top - 10], [e.az - w * 0.45, e.top - 1.5], [e.az, e.top], [e.az + w * 0.45, e.top - 1.5], [e.az + w * 0.8, e.top - 8]);
+    for (const t of [e.az + w + 8, e.az + w + 22, 150, 165]) if (t < 172 && t > L[L.length - 1][0] + 4) L.push([t, b(t)]);
+    return L.map(([th, h], i) => ({ th: arr(th), h: arr(h), k: i + 1 }));
+  };
+  const dir = lado(ears.R, ears.legR, (t) => brim(t)), esq = lado(ears.L, ears.legL, (t) => brim(360 - t)).map((q) => ({ th: arr(360 - q.th), h: q.h, k: q.k })).reverse();
+  return [{ th: 0, h: arr(P.hf), k: 0 }].concat(dir, [{ th: 180, h: arr(brim(180)), k: -1 }], esq);
 }
 
 export function gerarOrtese(an, zRef, P, pos) {
