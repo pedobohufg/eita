@@ -136,7 +136,15 @@ function desenharPlano() {
 function listarPontos() {
   const ks = Object.keys(NO.PONTOS);
   $("listaPontos").innerHTML = ks.map((k) => `<li data-k="${k}" class="${S.pontos[k] ? "ok" : ""}${S.ponto === k ? " cur" : ""}"><i style="background:${S.pontos[k] ? CORES[k] : "transparent"}"></i>${esc(NO.PONTOS[k])}</li>`).join("");
-  $("listaPontos").querySelectorAll("li").forEach((li) => (li.onclick = () => { S.ponto = li.dataset.k; S.modo = "ponto"; listarPontos(); status(`Dê duplo clique no modelo para marcar: <b>${esc(NO.PONTOS[S.ponto])}</b>.`); }));
+  const escolher = (k) => { S.ponto = k; S.modo = "ponto"; listarPontos(); status(`Dê duplo clique no modelo para marcar: <b>${esc(NO.PONTOS[S.ponto])}</b>.`); };
+  $("listaPontos").querySelectorAll("li").forEach((li) => (li.onclick = () => escolher(li.dataset.k)));
+  // figura de referência: o ponto da vez contornado, os já marcados esmaecidos; clicar na figura escolhe o ponto
+  $("refPontos").querySelectorAll("circle[data-k]").forEach((c) => {
+    const k = c.dataset.k;
+    c.classList.toggle("ok", !!S.pontos[k]);
+    c.classList.toggle("cur", S.ponto === k && (S.modo === "ponto" || !S.pontos[k]));
+    c.style.cursor = "pointer"; c.onclick = () => escolher(k);
+  });
   const falta = NO.faltando(S.pontos), cont = S.tipo !== "orelha" || S.contorno.length >= 5;
   $("calcPlano").disabled = !!falta.length || !cont;
   $("whyPlano").textContent = falta.length ? `Faltam: ${falta.map((k) => NO.PONTOS[k].split(" (")[0].toLowerCase()).join(", ")}.` : !cont ? `Marque o contorno da orelha sadia (${S.contorno.length} de pelo menos 5 pontos).` : "";
