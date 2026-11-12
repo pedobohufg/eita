@@ -12,7 +12,7 @@ import { decimar } from "../../nucleo/decimar.js";
 import { paraLocal, deLocal, transformarVertices, criarBuscaProxima } from "../../nucleo/superficie.js";
 import { volume as volumeMalha, verificarFechada, filtrarComponentes, normaisDeVertices } from "../../nucleo/malha.js";
 import { aplicarTransformacao, ajustarSimilaridade, comporTransformacoes } from "../../nucleo/alinhamento.js";
-import { componenteProxima, preencherBuracos } from "../../nucleo/imagem.js";
+import { componenteProxima, preencherBuracos, desfocar } from "../../nucleo/imagem.js";
 
 export const VERSAO = "0.4";
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], soma = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -208,10 +208,12 @@ export function narizParametrico(p) {
   const topo = narizTopo(p), L = p.comprimento, ca = Math.cos(((p.nasolabial - 90) * Math.PI) / 180), e = 0.25;
   return function (u, v, w) {
     const t = topo(u, v), gu = (topo(u + e, v) - topo(u - e, v)) / (2 * e), gv = (topo(u, v + e) - topo(u, v - e)) / (2 * e);
-    // o corte da base vale só dentro da largura das asas: do lado de fora (rampa até a bochecha) a forma desce direto
-    // até a pele, e a asa termina no sulco alar-facial em curva, sem prateleira nos cantos
-    const fora = Math.max(0, Math.abs(u) - (p.largura / 2 - 1));
-    return Math.max(maxSuave((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca - 2 * fora * fora, 1.8), v - (L + 3));
+    // o corte da base vale só na faixa das narinas e da columela (até ≈ 0,3 W, a borda livre da asa junto da narina):
+    // a parte de fora da asa desce direto até a pele e se prende ao rosto, como a base da asa de verdade — sem um teto
+    // solto sobre o lábio (que deixava um vão, um sulco e a aba em degraus nos cantos)
+    // (a passagem é gradual, em ~6 mm: uma rampa curta deixava um vinco reto por baixo, na divisa)
+    const fora = Math.max(0, Math.abs(u) - 0.3 * p.largura);
+    return Math.max(maxSuave((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca - 0.35 * fora * fora, 2.5), v - (L + 3));
   };
 }
 // malha fechada do nariz paramétrico no referencial do nariz, cortada a 40 mm atrás do subnasal (dentro do rosto);
@@ -445,7 +447,8 @@ export async function gerarProtese(e) {
     for (let k = 0; k < g.nz; k++) { const q = c + NC * k; if (sD[q] < 0 && sH[q] > FOLGA_PELE) { if (sH[q] <= vaoRaiz) raiz[c] = 1; else acima[c] = 1; break; } }
   }
   if (!raiz.some((x) => x)) throw new Error("a forma doadora não encosta na pele: confira o alinhamento, o contorno e os pontos");
-  const dAba = Vo.distanciaMascara2D(raiz, g.nx, g.ny, h);
+  // distância à raiz, alisada (σ ≈ 1 mm): a borda da aba segue a máscara da grade e saía em degraus de 0,5 mm (serrilhada)
+  const dAba = Float32Array.from(desfocar(Vo.distanciaMascara2D(raiz, g.nx, g.ny, h), g.nx, g.ny, 1 / h));
   // assimetria: perto do contorno (por dentro), quanto a pele espelhada fica acima da pele real
   // (mediana numa faixa de 2,5 mm por dentro do contorno: as colunas em que a orelha chega perto do contorno não pesam)
   let degrau = 0;
