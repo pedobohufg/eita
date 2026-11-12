@@ -13,7 +13,7 @@ const S = {
   tipo: "orelha", lado: "D", scan: null, scanNome: "", fator: 1, pontos: {}, ponto: "exD", contorno: [], plano: null, residuo: null,
   modo: null, imas: [], modelo: null, modeloNome: "", paresM: [], paresR: [], modeloT: null,
   protese: null, molde: null, fichaId: null, pendente: null,
-  escultura: null, ferr: null, campoAtual: null, campoBase: null,
+  escultura: null, ferr: null, campoAtual: null, campoBase: null, oculos: [],
 };
 const CORES = { exD: "#2B5FD0", exE: "#C2281F", n: "#6B3FD6", sn: "#25774F", enD: "#5d86e6", enE: "#e2635a" };
 const PARAM_NARIZ = ["comprimento", "largura", "projecao", "alturaPonta", "nasolabial", "dorso", "larguraPonta", "narina", "profNarina"];
@@ -117,6 +117,7 @@ function desenharPontos() {
   }
   [...grpImas.children].forEach(limpar);
   for (const p of S.imas) grpImas.add(esfera(p, "#1f2937", raioMarca() * 0.9));
+  for (const p of S.oculos) grpImas.add(esfera(p, "#0f766e", raioMarca() * 0.9));
   [...grpPares.children].forEach(limpar);
   S.paresM.forEach((p, i) => grpPares.add(esfera(p, "#0075BE", raioMarca() * 0.8)));
   S.paresR.forEach((p, i) => grpPares.add(esfera(p, "#25774F", raioMarca() * 0.8)));
@@ -157,7 +158,7 @@ function ligarCliques() {
     if (!S.modo) return;
     const r = el.getBoundingClientRect();
     rc.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
-    const alvo = S.modo === "parModelo" ? mModelo : mScan; if (!alvo) return;
+    const alvo = S.modo === "parModelo" ? mModelo : S.modo === "oculos" && mProtese ? mProtese : mScan; if (!alvo) return;
     const h = rc.intersectObject(alvo, false)[0]; if (!h) return;
     const p = [h.point.x, h.point.y, h.point.z].map((v) => +v.toFixed(3));
     if (S.modo === "ponto") {
@@ -166,6 +167,12 @@ function ligarCliques() {
       status(`Marcado: <b>${esc(NO.PONTOS[S.ponto])}</b>.${prox ? ` Próximo: ${esc(NO.PONTOS[prox])} (duplo clique).` : S.tipo === "orelha" && S.contorno.length < 5 ? " Agora o contorno da orelha sadia." : " Toque em <b>Calcular o plano</b>."}`);
       if (prox) S.ponto = prox; else S.modo = null;
     } else if (S.modo === "contorno") { S.contorno.push(p); status(`Contorno: ${S.contorno.length} ponto(s). Continue em volta da orelha; toque em <b>Marcar contorno</b> de novo para terminar.`); }
+    else if (S.modo === "oculos") {
+      if (S.oculos.length >= 2) S.oculos = [];
+      S.oculos.push(p); infoOculos();
+      if (S.oculos.length === 2) { S.modo = null; $("marcarOculos").classList.remove("on"); status("Armação marcada. Toque em <b>Gerar a prótese de novo</b> para abrir o assento."); }
+      else status("Agora o outro lado do dorso (duplo clique).");
+    }
     else if (S.modo === "ima") { S.imas.push(p); $("imasInfo").innerHTML = `${S.imas.length} ímã(s) marcado(s): cada um abre um nicho de ${fmt(+$("imaDiam").value, 1)} × ${fmt(+$("imaProf").value, 1)} mm na face interna.`; }
     else if (S.modo === "parModelo") { S.paresM.push(p); S.modo = "parRosto"; status(`Par ${S.paresM.length}: agora o mesmo ponto no <b>rosto</b> (duplo clique).`); }
     else if (S.modo === "parRosto") { S.paresR.push(p); S.modo = null; status(`Par ${S.paresR.length} marcado.${S.paresR.length >= 3 ? " Já dá para alinhar." : " Marque outro par (Ponto no modelo)."}`); listarPares(); }
@@ -185,7 +192,7 @@ $("limparContorno").onclick = () => { S.contorno = []; desenharPontos(); listarP
 // ------------------------------------------------------------------ etapa 1: tipo e scan
 function aplicarTipo() {
   document.querySelectorAll("#tipoSeg button").forEach((b) => b.classList.toggle("on", b.dataset.tipo === S.tipo));
-  $("ladoBox").hidden = S.tipo !== "orelha"; $("contornoBox").hidden = S.tipo !== "orelha";
+  $("ladoBox").hidden = S.tipo !== "orelha"; $("contornoBox").hidden = S.tipo !== "orelha"; $("oculosBox").hidden = S.tipo !== "nariz";
   const fontes = S.tipo === "orelha" ? [["espelho", "Espelho da orelha sadia"], ["modelo", "Modelo importado (alinhado por pontos)"]] : [["parametrico", "Nariz paramétrico"], ["modelo", "Modelo importado (alinhado por pontos)"]];
   const atual = $("fonte").value;
   $("fonte").innerHTML = fontes.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
@@ -364,6 +371,23 @@ $("marcarIma").onclick = () => {
   if (S.modo === "ima") { S.modo = null; $("marcarIma").classList.remove("on"); status(`${S.imas.length} ímã(s) marcado(s).`); return; }
   S.modo = "ima"; $("marcarIma").classList.add("on"); status("Dê duplo clique na pele (ou no pilar do implante) onde vai cada ímã. Toque de novo em <b>Marcar ímãs</b> para terminar.");
 };
+// armação de óculos (nariz)
+function infoOculos() {
+  $("ocCampos").hidden = !$("ocUsar").checked;
+  $("ocImaDiamBox").hidden = $("ocImaProfBox").hidden = !$("ocImas").checked;
+  if (S.oculos.length) $("ocInfo").textContent = `${S.oculos.length} de 2 pontos da armação marcados.` + (S.oculos.length === 2 ? " A prótese sai com o assento da ponte" + ($("ocImas").checked ? " e os nichos dos ímãs." : ".") : "");
+}
+$("ocUsar").onchange = () => { infoOculos(); invalidar("forma"); };
+$("ocImas").onchange = () => { infoOculos(); invalidar("forma"); };
+["ocLarg", "ocProf", "ocImaDiam", "ocImaProf"].forEach((id) => $(id).addEventListener("change", () => invalidar("forma")));
+$("marcarOculos").onclick = () => {
+  if (S.modo === "oculos") { S.modo = null; $("marcarOculos").classList.remove("on"); return; }
+  if (!mProtese) status("Dá para marcar no rosto, mas é melhor gerar a prótese antes e marcar sobre ela.", true);
+  S.modo = "oculos"; S.ferr = null; atualizarEsc(); S.oculos = []; desenharPontos(); $("marcarOculos").classList.add("on");
+  status("Duplo clique no ponto em que a ponte da armação apoia num lado do dorso; depois, no outro lado.");
+};
+$("limparOculos").onclick = () => { S.oculos = []; desenharPontos(); infoOculos(); $("ocInfo").textContent = "Pontos da armação apagados."; invalidar("forma"); };
+const lerOculos = () => (S.tipo === "nariz" && $("ocUsar").checked && S.oculos.length === 2 ? { pontos: S.oculos, largura: +$("ocLarg").value || 5, prof: +$("ocProf").value || 1.2, imas: $("ocImas").checked, imaDiam: +$("ocImaDiam").value || 4, imaProf: +$("ocImaProf").value || 2 } : null);
 $("limparImas").onclick = () => { S.imas = []; $("imasInfo").textContent = "Sem ímãs marcados, a prótese sai para adesivo."; desenharPontos(); invalidar("forma"); };
 function doadora() {
   const f = $("fonte").value, d = { tipo: f, ajuste: lerAjuste() };
@@ -373,6 +397,7 @@ function doadora() {
 }
 $("gerarProtese").onclick = async () => {
   if (!S.plano) { status("Calcule o plano (etapa 2) antes.", true); return; }
+  if (S.tipo === "nariz" && $("ocUsar").checked && S.oculos.length !== 2 && S.protese) status("Armação de óculos ligada, mas sem os 2 pontos: a prótese sai sem o assento.", true);
   S.modo = null;
   await ocupado(true, "Gerando a prótese…");
   try {
@@ -380,7 +405,7 @@ $("gerarProtese").onclick = async () => {
     S.protese = await NO.gerarProtese({
       tipo: S.tipo, lado: S.lado, malha: S.scan, pontos: S.pontos, plano: S.plano, contorno: S.contorno, doadora: doadora(),
       imas: S.imas.map((p) => ({ p })), imaDiam: +$("imaDiam").value, imaProf: +$("imaProf").value, parametros: lerParametros(), molde: lerMolde(),
-      escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null,
+      escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null, oculos: lerOculos(),
       aoProgresso: async (t) => { CASCA.ocupado(true, t); await UI.espera(15); },
     });
     escRevAplicada = escRev; $("escAplicar").textContent = "Aplicar a escultura";
@@ -616,6 +641,8 @@ async function gerarPDF() {
   const doa = { espelho: "espelho da orelha sadia", parametrico: "nariz paramétrico", modelo: "modelo importado (" + (S.modeloNome || "") + ")" }[$("fonte").value];
   const par = pr.parametros, aj = lerAjuste();
   const l1 = [["Tipo", S.tipo === "nariz" ? "prótese nasal" : "prótese auricular " + (S.lado === "D" ? "direita" : "esquerda")], ["Forma", doa], ["Scan", S.scanNome], ["Plano sagital", S.residuo != null ? `refinado (resíduo ${fmt(S.residuo, 2)} mm)` : "pelos pontos"], ["Ajuste (mm, °, %)", `${fmt(aj.du, 1)} / ${fmt(aj.dv, 1)} / ${fmt(aj.dw, 1)} · ${fmt(aj.giro, 0)}° · ${fmt(aj.escala, 0)} %`], ["Resolução", fmt(par.passo, 1) + " mm"], ["Aba: largura", fmt(par.aba, 1) + " mm"], ["Aba: borda / raiz", `${fmt(par.bordaEsp, 2)} / ${fmt(par.baseEsp, 1)} mm`], ["Oca", par.oco ? `sim, parede ${fmt(par.parede, 1)} mm` : "não"], ["Ímãs", S.imas.length ? `${S.imas.length} (nicho ${fmt(+$("imaDiam").value, 1)} × ${fmt(+$("imaProf").value, 1)} mm)` : "—"]];
+  const oc = lerOculos(); if (S.tipo === "nariz") l1.push(["Armação de óculos", oc ? `assento ${fmt(oc.largura, 1)} × ${fmt(oc.prof, 1)} mm${oc.imas ? ` + 2 ímãs ${fmt(oc.imaDiam, 1)} mm` : ""}` : "—"]);
+  if (S.escultura && S.escultura.tracos.length) l1.push(["Escultura", `${S.escultura.tracos.length} traço(s)`]);
   const l2 = [["Volume de silicone", fmt(m.volume, 1) + " mL"], ["Massa (≈ 1,1 g/mL)", fmt(m.massa, 1) + " g"], ["Altura × largura (com aba)", `${fmt(m.altura, 1)} × ${fmt(m.largura, 1)} mm`], ["Projeção máxima", fmt(m.projecao, 1) + " mm"], ["Área de contato", fmt(m.areaBase / 100, 1) + " cm2"]];
   if (S.tipo === "nariz" && pr.nariz) l2.push(["Comprimento n–sn", fmt(pr.nariz.comprimento, 1) + " mm"], ["Largura alar", fmt(pr.nariz.largura, 1) + " mm"], ["Projeção da ponta", fmt(pr.nariz.projecao, 1) + " mm"], ["Ângulo nasolabial", fmt(pr.nariz.nasolabial, 0) + "°"]);
   R.par("Projeto", l1, "Prótese", l2);
@@ -650,6 +677,7 @@ function projeto() {
     fonte: $("fonte").value, nariz: lerNariz(), ajuste: lerAjuste(), modelo: S.modelo ? { nome: S.modeloNome, T: S.modeloT, paresM: S.paresM, paresR: S.paresR } : null,
     parametros: lerParametros(), molde: lerMolde(), imaDiam: +$("imaDiam").value, imaProf: +$("imaProf").value,
     escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null, narinasModelo: $("narinasModelo").checked,
+    oculos: S.oculos.length || $("ocUsar").checked ? { usar: $("ocUsar").checked, pontos: S.oculos, largura: +$("ocLarg").value, prof: +$("ocProf").value, imas: $("ocImas").checked, imaDiam: +$("ocImaDiam").value, imaProf: +$("ocImaProf").value } : null,
   };
 }
 function coletar() {
@@ -664,6 +692,8 @@ function aplicarProjeto(f) {
   S.pontos = Object.assign({}, f.pontos || {}); S.contorno = (f.contorno || []).map((p) => p.slice()); S.plano = f.plano || null; S.residuo = f.residuo != null ? f.residuo : null; S.imas = (f.imas || []).map((p) => p.slice());
   aplicarTipo();
   if (f.narinasModelo != null) $("narinasModelo").checked = !!f.narinasModelo;
+  const oc = f.oculos || {}; S.oculos = (oc.pontos || []).map((p) => p.slice()); $("ocUsar").checked = !!oc.usar; $("ocImas").checked = !!oc.imas;
+  if (oc.largura) $("ocLarg").value = oc.largura; if (oc.prof) $("ocProf").value = oc.prof; if (oc.imaDiam) $("ocImaDiam").value = oc.imaDiam; if (oc.imaProf) $("ocImaProf").value = oc.imaProf; infoOculos();
   if (f.fonte) { $("fonte").value = f.fonte; aplicarFonte(); }
   if (f.nariz) for (const k of PARAM_NARIZ) if (f.nariz[k] != null) $(idNariz(k)).value = k === "narina" ? Math.round(f.nariz[k] * 100) : f.nariz[k];
   const a = f.ajuste || {}; $("ajU").value = a.du || 0; $("ajV").value = a.dv || 0; $("ajW").value = a.dw || 0; $("ajGiro").value = a.giro || 0; $("ajEscala").value = a.escala || 100;

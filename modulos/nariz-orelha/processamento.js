@@ -462,6 +462,10 @@ export async function gerarProtese(e) {
   if (e.tipo === "nariz" && doa.tipo === "modelo" && doa.narinas !== false) narinas = narinasDoModelo(g, sD, regiao, e.pontos, R, doa);
   const imas = (e.imas || []).map((m) => { const q = paraLocal(R, m.p); const i = Math.round((q[0] - g.o[0]) / h), j = Math.round((q[1] - g.o[1]) / h); const w0 = i >= 0 && j >= 0 && i < g.nx && j < g.ny ? pele[i + g.nx * j] : q[2]; return { u: q[0], v: q[1], w0 }; });
   const rI = (e.imaDiam || 6) / 2, pI = e.imaProf || 3;
+  // armação de óculos (nariz): assento da ponte e nichos de ímãs na face de fora, tirados da doadora (o oco acompanha)
+  const oculos = e.oculos && e.oculos.pontos && e.oculos.pontos.length === 2 ? assentoOculos(g, sD, R, e.oculos) : null;
+  if (oculos) avisos.push(...oculos.avisos);
+  if (oculos && par.oco && oculos.prof + (oculos.imas ? oculos.imaProf : 0) > par.parede - 1) avisos.push({ n: "atenção", t: `Assento de ${fmt(oculos.prof, 1)} mm${oculos.imas ? ` e nichos de ${fmt(oculos.imaProf, 1)} mm` : ""} numa prótese oca de parede ${fmt(par.parede, 1)} mm: o oco recua junto, mas confira a espessura atrás dos ímãs.` });
   // campo da prótese
   await prog("Prótese: combinação das formas…", 0.55);
   const fP = g.f, La = par.aba, t0 = par.baseEsp, tb = par.bordaEsp, tMin = 1.8 * h;
@@ -539,6 +543,52 @@ function narinasDoModelo(g, sD, regiao, pontos, R, doa) {
     const qq = hb - prof, f = Math.hypot(Math.max(f2, 0), Math.max(qq, 0)) + Math.min(Math.max(f2, qq), 0);
     return hb > 2.5 && f < 3 ? maxSuave(f, 2 + sD[q], 1) : f;
   };
+}
+// Assento da ponte dos óculos e nichos de ímãs. oc: { pontos: [p1, p2] (no scan, nos dois lados do dorso, onde a
+// armação apoia), largura (mm, faixa do assento), prof (mm), imas (bool), imaDiam, imaProf }. Altera sD (a doadora):
+// tira uma faixa de "prof" mm de profundidade entre os dois pontos (a ponte fica rente e esconde a margem de cima) e, se
+// pedido, um nicho cilíndrico em cada ponto, ao longo da normal, a partir do fundo do assento.
+export const OCULOS_PADRAO = { largura: 5, prof: 1.2, imas: false, imaDiam: 4, imaProf: 2 };
+function assentoOculos(g, sD, R, oc) {
+  const o = Object.assign({}, OCULOS_PADRAO, oc), { nx, ny, nz, h } = g, NC = nx * ny, avisos = [];
+  const [a, b] = o.pontos.map((p) => paraLocal(R, p)).sort((x, y) => x[0] - y[0]);
+  const grade = { nx, ny, nz, o: g.o, h, f: sD }, amostra = (p) => Vo.amostrarGrade(grade, p[0], p[1], p[2]);
+  // normal da doadora em cada ponto (gradiente de sD) e o ponto levado à superfície
+  const naSup = (p) => {
+    let q = p.slice();
+    for (let it = 0; it < 4; it++) {
+      const e = 0.5, gr = [0, 1, 2].map((k) => { const m = q.slice(), n = q.slice(); m[k] += e; n[k] -= e; return (amostra(m) - amostra(n)) / (2 * e); });
+      const l = Math.hypot(...gr) || 1, d = amostra(q); q = q.map((x, k) => x - (d * gr[k]) / l);
+      if (it === 3) return { p: q, n: gr.map((x) => x / l) };
+    }
+  };
+  const A = naSup(a), B = naSup(b);
+  if (Math.abs(amostra(a)) > 3 || Math.abs(amostra(b)) > 3) avisos.push({ n: "atenção", t: "Um dos pontos da armação ficou longe da superfície do nariz: marque-os sobre a prótese, nos lados do dorso." });
+  const u0 = A.p[0], u1 = B.p[0], vb = (u) => (u1 - u0 > 1e-6 ? A.p[1] + ((Math.min(u1, Math.max(u0, u)) - u0) / (u1 - u0)) * (B.p[1] - A.p[1]) : A.p[1]);
+  const orig = Float32Array.from(sD), rI = o.imaDiam / 2;
+  const nichos = o.imas ? [A, B].map((P) => ({ s: P.p.map((x, k) => x - P.n[k] * o.prof), n: P.n })) : [];
+  for (let k = 0; k < nz; k++) {
+    const w = g.o[2] + k * h;
+    for (let j = 0; j < ny; j++) {
+      const v = g.o[1] + j * h;
+      for (let i = 0; i < nx; i++) {
+        const q = i + nx * j + NC * k, u = g.o[0] + i * h;
+        if (orig[q] > 3 || orig[q] < -(o.prof + o.imaProf + 3)) continue;
+        // faixa do assento: perto da linha da ponte, "prof" para dentro da superfície entre os pontos e cada vez mais rasa
+        // nos 4 mm depois deles (a armação sai do nariz)
+        const fora = Math.max(0, u0 - u, u - u1), pe = o.prof * (1 - sstep(fora / 4));
+        const G = Math.max(Math.abs(v - vb(u)) - o.largura / 2, fora - 4, -orig[q] - pe);
+        let f = maxSuave(orig[q], -G, 0.8);
+        for (const N of nichos) {
+          const d = [u - N.s[0], v - N.s[1], w - N.s[2]], x = d[0] * N.n[0] + d[1] * N.n[1] + d[2] * N.n[2];
+          const rad = Math.hypot(d[0] - x * N.n[0], d[1] - x * N.n[1], d[2] - x * N.n[2]);
+          f = Math.max(f, -Math.max(rad - rI, -x - o.imaProf, x - o.prof - 1));
+        }
+        sD[q] = f;
+      }
+    }
+  }
+  return { prof: o.prof, imas: o.imas, imaProf: o.imaProf, largura: o.largura, pontos: [A.p, B.p], avisos };
 }
 // A aba é afinada até a borda (bordaEsp, p.ex. 0,3 mm), mais fina que o passo da grade: no campo ela entra com pelo menos
 // tMin = 1,8 × passo (≥ √3 × passo: senão, na pele inclinada, o marching cubes a perderia entre duas amostras) e aqui os vértices da camada são trazidos

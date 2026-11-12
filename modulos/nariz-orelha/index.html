@@ -308,6 +308,19 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
     <label class="ctl">Diâmetro do nicho (mm)<input type="number" id="imaDiam" step="0.5" value="6" min="2" max="15"></label>
     <label class="ctl">Profundidade do nicho (mm)<input type="number" id="imaProf" step="0.5" value="3" min="1" max="8"></label>
     <div class="note" id="imasInfo">Sem ímãs marcados, a prótese sai para adesivo. Cada ímã abre um nicho cilíndrico na face interna, sobre o ponto da pele (ou do pilar) marcado.</div>
+    <div id="oculosBox">
+      <div class="sub-h">Armação de óculos</div>
+      <label class="chk"><input type="checkbox" id="ocUsar"> Prótese presa à armação (assento da ponte)</label>
+      <div id="ocCampos" hidden>
+        <div class="row"><button id="marcarOculos" type="button">Marcar a armação (2 pontos)</button><button id="limparOculos" type="button">Limpar</button></div>
+        <label class="ctl">Largura do assento (mm)<input type="number" id="ocLarg" step="0.5" min="2" max="12" value="5"></label>
+        <label class="ctl">Profundidade do assento (mm)<input type="number" id="ocProf" step="0.1" min="0.3" max="3" value="1.2"></label>
+        <label class="chk"><input type="checkbox" id="ocImas"> Nichos de ímãs nos dois pontos (face de fora)</label>
+        <label class="ctl" id="ocImaDiamBox">Diâmetro do ímã (mm)<input type="number" id="ocImaDiam" step="0.5" min="2" max="8" value="4"></label>
+        <label class="ctl" id="ocImaProfBox">Profundidade do nicho (mm)<input type="number" id="ocImaProf" step="0.5" min="0.5" max="4" value="2"></label>
+        <div class="note" id="ocInfo">Gere a prótese uma vez, prove os óculos e marque, com duplo clique sobre a prótese, os dois pontos dos lados do dorso em que a ponte da armação apoia. A prótese é refeita com um rebaixo raso entre eles (a ponte fica rente e esconde a margem de cima) e, se pedido, um nicho para ímã em cada ponto, para colar o par na armação.</div>
+      </div>
+    </div>
     <button class="primary" id="gerarProtese" type="button">Gerar a prótese</button>
     <table class="m" id="medidas"></table>
     <ul class="avisos" id="avisosProtese"></ul>

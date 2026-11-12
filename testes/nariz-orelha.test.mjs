@@ -245,3 +245,21 @@ test("modelo de nariz importado: narinas abertas pela base do próprio modelo", 
   assert.deepEqual(topologia(com.malha), { componentes: 1, genero: 2 }, "duas narinas até o oco");
   assert.equal(topologia(sem.malha).genero, 0, "sem a opção, a base fica fechada");
 });
+
+test("armação de óculos: assento raso no dorso entre os dois pontos, nichos de ímãs, prótese fechada", async () => {
+  const { info, malha } = rosto("rosto_sem_nariz");
+  const plano = P.planoSagital(info.pontos), base = { tipo: "nariz", malha, pontos: info.pontos, plano };
+  const a = await P.gerarProtese(base);
+  const T = P.narizTopo(a.nariz), v = 0.7 * a.nariz.comprimento;
+  const ponto = (u) => Array.from(P.malhaParaScan({ V: new Float32Array([u, v, T(u, v)]), F: new Uint32Array([0, 0, 0]) }, a.R).V);
+  const oculos = { pontos: [ponto(-6), ponto(6)], largura: 5, prof: 1.2, imas: true, imaDiam: 4, imaProf: 2 };
+  const b = await P.gerarProtese(Object.assign({}, base, { oculos }));
+  assert.ok(b.medidas.fechada); assert.equal(variedade(b.malha), 0);
+  assert.equal(topologia(b.malha).genero, topologia(a.malha).genero, "o assento e os nichos não furam a parede");
+  // altura da superfície de fora no meio da ponte: ≈ 1,2 mm mais baixa
+  const topoEm = (m, u0, v0) => { let w = -Infinity; for (let i = 0; i < m.V.length; i += 3) if (Math.abs(m.V[i] - u0) < 0.6 && Math.abs(m.V[i + 1] - v0) < 0.6) w = Math.max(w, m.V[i + 2]); return w; };
+  const d = topoEm(a.malha, 0, v) - topoEm(b.malha, 0, v);
+  assert.ok(d > 0.8 && d < 1.6, "assento no meio " + d);
+  const longe = topoEm(a.malha, 0, v + 8) - topoEm(b.malha, 0, v + 8);
+  assert.ok(Math.abs(longe) < 0.3, "fora da faixa não muda " + longe);
+});

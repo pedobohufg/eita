@@ -80,6 +80,17 @@ async def caso(nav, nome, tipo, base):
     med1 = await pg.inner_text("#medidas")
     mudou = [l for l, a in zip(med1.splitlines(), med0.splitlines()) if l != a]
     ok(mudou and "fechada" in med1, f"{tipo}: escultura aplicada, prótese fechada ({'; '.join(m.replace(chr(9), ' ') for m in mudou)[:120]})")
+    if tipo == "nariz":   # armação de óculos: marcar 2 pontos no dorso e refazer
+        ok(await pg.is_visible("#oculosBox"), "nariz: caixa da armação de óculos")
+        await pg.check("#ocUsar"); await pg.check("#ocImas"); await pg.click("#marcarOculos")
+        await pg.click("button[data-view=frente]"); await pg.wait_for_timeout(400)
+        cb = await pg.locator("#cena canvas").bounding_box(); cx, cy = cb["x"] + cb["width"] / 2, cb["y"] + cb["height"] / 2
+        await pg.mouse.dblclick(cx - 10, cy - 45); await pg.wait_for_timeout(150); await pg.mouse.dblclick(cx + 10, cy - 45)
+        ok("Armação marcada" in await pg.inner_text("#status"), f"nariz: 2 pontos da armação ({(await pg.inner_text('#status'))[:60]})")
+        medA = await pg.inner_text("#medidas")
+        await pg.click("#gerarProtese")
+        await pg.wait_for_function(f"document.getElementById('medidas').innerText !== {json.dumps(medA)}", timeout=180000)
+        ok("fechada" in await pg.inner_text("#medidas"), "nariz: prótese com o assento da armação, fechada")
     await pg.click("[data-s=s5]")
     await pg.click("#gerarMolde")
     await pg.wait_for_function("document.getElementById('medidasMolde').rows.length > 2", timeout=240000)
