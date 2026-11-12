@@ -143,15 +143,15 @@ export function narizPadrao(pontos) {
 //   asas: lobos ovais arredondados (um pouco mais largos que altos), com o sulco alar onde encontram o lóbulo e
 //     queda íngreme para o rosto (sulco alar-facial).
 // Todas as partes têm inclinação contínua na borda (sem quinas, que apareciam como vincos na luz); fora da pegada a
-// descida vai ficando forte (até 3 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
+// descida vai ficando forte (até 3,5 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
 // pegada é a do nariz, não a da caixa de trabalho. As narinas ficam à parte (narinasParametricas).
-const QUEDA = 3;   // inclinação fora da pegada (mm de descida por mm para fora)
+const QUEDA = 3.5;   // inclinação fora da pegada (mm de descida por mm para fora)
 // Descida fora da borda de uma parte, a d mm da borda, partindo da inclinação s1 que a parte tem na borda: a inclinação
-// cresce aos poucos (3 mm) até QUEDA. Sem quina na borda: a quina aparecia como um vinco ao longo da parede do nariz.
+// cresce aos poucos (2 mm) até QUEDA. Sem quina na borda: a quina aparecia como um vinco ao longo da parede do nariz.
 function descida(d, s1) {
   if (s1 >= QUEDA) return -s1 * d;
-  const c = (QUEDA - s1) / 6;
-  return d < 3 ? -(s1 * d + c * d * d) : -(s1 * 3 + c * 9) - QUEDA * (d - 3);
+  const c = (QUEDA - s1) / 4;
+  return d < 2 ? -(s1 * d + c * d * d) : -(s1 * 2 + c * 4) - QUEDA * (d - 2);
 }
 // cúpula elíptica de altura H e semieixos a, b (mm), perfil parabólico: H·(1 − r²) dentro e descida() fora, com a
 // mesma inclinação na borda (2·H·|∇r|)
@@ -193,10 +193,14 @@ const maxSuave = (a, b, r) => -Vo.uniaoSuave(-a, -b, r);
 // Base do nariz (por baixo): altura v da base em cada (u, w).
 //   columela: a parte mais baixa, na linha média, pelo ângulo nasolabial (sobe 10° para a frente em 100°);
 //   bordas das asas: até 1,2 mm acima da columela, subindo aos poucos para os lados (de perfil a columela aparece um pouco abaixo da asa);
+//   pé da columela: atrás, a base desce em curva até o lábio;
 //   ponta: na frente (w > 0,55 P) a base curva para cima e encontra o lóbulo sem quina (ângulo columela-lóbulo).
 function alturaBase(p, u, w) {
   const W = p.largura, P = p.projecao, tg = Math.tan(((p.nasolabial - 90) * Math.PI) / 180), f = Math.max(0, w - 0.55 * P);
-  return tg * w + 1.2 * sstep((Math.abs(u) - 0.14 * W) / (0.2 * W)) + 0.035 * f * f;
+  // junção columela-lábio: atrás (w < 0,3 P) e no meio, a base desce até 3 mm em curva para encontrar o lábio
+  // (cobre o que houver de pele saliente no subnasal, em vez de a aba desenhar uma bolinha por cima)
+  const pe = 3 * (1 - sstep(w / (0.3 * P))) * (1 - sstep(Math.abs(u) / (0.16 * W)));
+  return tg * w + 1.2 * sstep((Math.abs(u) - 0.14 * W) / (0.2 * W)) + 0.035 * f * f - pe;
 }
 // campo do nariz (distância aproximada: altura normalizada pela inclinação, base e raiz); o encontro da base com a
 // superfície de fora é arredondado (raio 1,8 mm): bordas das asas, columela e ponta sem fio
@@ -204,7 +208,10 @@ export function narizParametrico(p) {
   const topo = narizTopo(p), L = p.comprimento, ca = Math.cos(((p.nasolabial - 90) * Math.PI) / 180), e = 0.25;
   return function (u, v, w) {
     const t = topo(u, v), gu = (topo(u + e, v) - topo(u - e, v)) / (2 * e), gv = (topo(u, v + e) - topo(u, v - e)) / (2 * e);
-    return Math.max(maxSuave((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca, 1.8), v - (L + 3));
+    // o corte da base vale só dentro da largura das asas: do lado de fora (rampa até a bochecha) a forma desce direto
+    // até a pele, e a asa termina no sulco alar-facial em curva, sem prateleira nos cantos
+    const fora = Math.max(0, Math.abs(u) - (p.largura / 2 - 1));
+    return Math.max(maxSuave((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca - 2 * fora * fora, 1.8), v - (L + 3));
   };
 }
 // malha fechada do nariz paramétrico no referencial do nariz, cortada a 40 mm atrás do subnasal (dentro do rosto);
@@ -247,7 +254,7 @@ export const PARAMETROS_PADRAO = {
   // filete: sob a parte solta da doadora, a aba entra até esta distância da raiz (fecha a ponta do sulco atrás da orelha,
   // sem cunha fina de ar); no nariz fica 0 (taparia o fundo das narinas)
   orelha: { passo: 0.5, aba: 8, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 1.5, oco: false, parede: 3, filete: 3 },
-  nariz: { passo: 0.5, aba: 4, bordaEsp: 0.3, baseEsp: 1.2, raioUniao: 2, oco: true, parede: 3, filete: 0 },
+  nariz: { passo: 0.5, aba: 3, bordaEsp: 0.3, baseEsp: 1.2, raioUniao: 2, oco: true, parede: 3, filete: 0 },
 };
 export const MOLDE_PADRAO = { parede: 8, base: 6, topo: 6, dividir: true, anguloDivisao: 90, deslocDivisao: 0, chaveRaio: 2.5, folga: 0.2, canal: 4, respiro: 1.5, respiros: 2, tolerancia: 0.03 };
 
