@@ -263,3 +263,18 @@ test("armação de óculos: assento raso no dorso entre os dois pontos, nichos d
   const longe = topoEm(a.malha, 0, v + 8) - topoEm(b.malha, 0, v + 8);
   assert.ok(Math.abs(longe) < 0.3, "fora da faixa não muda " + longe);
 });
+
+test("cor: amostra mediana num disco e diferença CIELAB para a base, com as direções da pintura", async () => {
+  const C = await import("../modulos/nariz-orelha/cor.js");
+  const w = 40, h = 20, data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = (y * w + x) * 4, ponta = x >= 20; data.set(ponta ? [214, 140, 124, 255] : [205, 160, 138, 255], o); }
+  data.set([0, 0, 255, 255], (10 * w + 10) * 4);   // um pixel estranho não muda a mediana
+  const img = { data, width: w, height: h };
+  const base = C.amostrarCor(img, 10, 10, 4), ponta = C.amostrarCor(img, 30, 10, 4);
+  assert.equal(base.hex, "#cda08a"); assert.equal(ponta.hex, "#d68c7c");
+  const c = C.compararCor(base, ponta);
+  assert.ok(c.da > 5 && !c.igual && c.dicas.some((d) => d.startsWith("mais vermelha")), JSON.stringify(c));
+  assert.match(C.sugestaoPintura(c), /vermelho/);
+  assert.ok(C.compararCor(base, base).igual);
+  assert.equal(C.ZONAS_COR.nariz[0].id, "base"); assert.equal(C.ZONAS_COR.orelha[0].id, "base");
+});

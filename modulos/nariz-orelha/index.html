@@ -123,6 +123,7 @@ figure.refPts .rot text{font:600 10px "Instrument Sans",sans-serif;fill:var(--in
 figure.refNz .cota{fill:none;stroke:#b3a8d6;stroke-width:1.2}figure.refNz .cota .tr{stroke-dasharray:3 3}figure.refNz .cota .narina{fill:#e6e0f5}
 figure.refNz svg{max-width:none}figure.refNz .cota text{stroke:none;fill:#6b3fd6;font:700 13px "Instrument Sans",sans-serif}figure.refNz .cota.on{stroke:#6b3fd6;stroke-width:2.2}figure.refNz .cota.on .narina{fill:#cbbcf2}
 figure.refNz .rot text.p{fill:var(--muted);font-weight:500}b.letra{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--accent-soft);color:#6b3fd6;font-size:10.5px;margin-right:3px}
+#corResumo .cz{display:flex;gap:8px;align-items:flex-start;margin:6px 0;font-size:12px}#corResumo .cz i{width:26px;height:26px;border-radius:6px;flex:none;border:1px solid var(--line-strong)}#corResumo .cz b{display:block;font-size:12.5px}#corResumo .cz small{color:var(--muted)}
 ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px solid var(--line-strong)}ul.pts li.ok{color:var(--ink)}ul.pts li.ok i{border-color:transparent}ul.pts li.cur{background:var(--accent-soft);color:var(--ink);font-weight:600}
 .why{font-size:12px;color:var(--warn);margin:4px 0 0}.why:empty{display:none}
 .pares{font:500 12px var(--f-mono);margin:6px 0}.pares div{padding:2px 0}
@@ -358,8 +359,19 @@ ul.pts li i{width:10px;height:10px;border-radius:50%;flex:none;border:1.5px soli
 </section>
 
 <section id="s6" class="off collapsed">
-  <h2><span class="n">6</span>Arquivos e relatório</h2>
+  <h2><span class="n">6</span>Cor, arquivos e relatório</h2>
   <div class="bd">
+    <div class="sub-h">Cor da pele (foto)</div>
+    <div class="drop" id="corDrop" tabindex="0" role="button"><b>Abrir a foto da pele</b>com o marcador do Lab.EITA ao lado, luz difusa, sem flash</div>
+    <input type="file" id="corFile" accept="image/*" hidden>
+    <div class="note" id="corInfo">A cor é corrigida pelo marcador (anel cinza ou branco do papel), como no MAMILO. Sem marcador, toque em <b>Equilibrar pelo branco</b> e clique num branco da foto. A foto não fica guardada: só as cores medidas.</div>
+    <div id="corBox" hidden>
+      <canvas id="corCanvas" style="width:100%;border-radius:8px;cursor:crosshair;display:block;margin:6px 0"></canvas>
+      <div class="row"><button type="button" id="corBranco">Equilibrar pelo branco</button><button type="button" id="corLimpar">Limpar cores</button></div>
+    </div>
+    <ul class="pts" id="corZonas"></ul>
+    <div id="corResumo"></div>
+    <div class="sub-h">Arquivos</div>
     <div class="dl">
       <button class="primary" id="baixarPacote" type="button">Pacote completo (.zip)</button>
       <button id="baixarProtese" type="button">Só a prótese (STL, no lugar do scan)</button>

@@ -14,7 +14,7 @@ import { volume as volumeMalha, verificarFechada, filtrarComponentes, normaisDeV
 import { aplicarTransformacao, ajustarSimilaridade, comporTransformacoes } from "../../nucleo/alinhamento.js";
 import { componenteProxima, preencherBuracos } from "../../nucleo/imagem.js";
 
-export const VERSAO = "0.3";
+export const VERSAO = "0.4";
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], soma = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const esc = (a, k) => [a[0] * k, a[1] * k, a[2] * k], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const cruz = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];

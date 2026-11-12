@@ -14,6 +14,7 @@ const S = {
   modo: null, imas: [], modelo: null, modeloNome: "", paresM: [], paresR: [], modeloT: null,
   protese: null, molde: null, fichaId: null, pendente: null,
   escultura: null, ferr: null, campoAtual: null, campoBase: null, oculos: [],
+  cor: null, corImg: null, corZona: "base", corBranco: false,
 };
 const CORES = { exD: "#2B5FD0", exE: "#C2281F", n: "#6B3FD6", sn: "#25774F", enD: "#5d86e6", enE: "#e2635a" };
 const PARAM_NARIZ = ["comprimento", "largura", "projecao", "alturaPonta", "nasolabial", "dorso", "larguraPonta", "narina", "profNarina"];
@@ -21,7 +22,7 @@ const idNariz = (k) => "nz" + k[0].toUpperCase() + k.slice(1);
 
 // ------------------------------------------------------------------ etapas
 const ETP = UI.criarEtapas({
-  etapas: [["s1", "Prótese e scan"], ["s2", "Pontos"], ["s3", "Forma"], ["s4", "Prótese"], ["s5", "Molde"], ["s6", "Arquivos"]],
+  etapas: [["s1", "Prótese e scan"], ["s2", "Pontos"], ["s3", "Forma"], ["s4", "Prótese"], ["s5", "Molde"], ["s6", "Cor e arquivos"]],
   bloqueada: "Conclua as etapas anteriores primeiro.", status,
 });
 ETP.montar();
@@ -192,6 +193,7 @@ $("limparContorno").onclick = () => { S.contorno = []; desenharPontos(); listarP
 // ------------------------------------------------------------------ etapa 1: tipo e scan
 function aplicarTipo() {
   document.querySelectorAll("#tipoSeg button").forEach((b) => b.classList.toggle("on", b.dataset.tipo === S.tipo));
+  if ($("corZonas")) { if (S.cor) S.cor.zonas = {}; S.corZona = "base"; listarZonasCor(); }
   $("ladoBox").hidden = S.tipo !== "orelha"; $("contornoBox").hidden = S.tipo !== "orelha"; $("oculosBox").hidden = S.tipo !== "nariz";
   const fontes = S.tipo === "orelha" ? [["espelho", "Espelho da orelha sadia"], ["modelo", "Modelo importado (alinhado por pontos)"]] : [["parametrico", "Nariz paramétrico"], ["modelo", "Modelo importado (alinhado por pontos)"]];
   const atual = $("fonte").value;
@@ -422,7 +424,7 @@ function mostrarProtese() {
   limpar(mProtese); mProtese = null;
   if (!S.protese) return;
   const m = NO.malhaParaScan(S.protese.malha, S.protese.R);
-  mProtese = new T.Mesh(geometria(m), material(0xd98c6e)); cena.add(mProtese);
+  mProtese = new T.Mesh(geometria(m), material(0xd98c6e)); cena.add(mProtese); corNaProtese();
 }
 function mostrarMedidas() {
   const m = S.protese.medidas, L = [];
@@ -534,6 +536,69 @@ function ligarEscultura() {
   el.addEventListener("pointerup", fim); el.addEventListener("pointercancel", fim);
   el.addEventListener("pointerleave", () => mostrarAnel(null));
 }
+
+// ------------------------------------------------------------------ cor da pele (etapa 6)
+// S.cor = { foto, ref, zonas: { id: { hex, lab, x, y } } } (x, y: posição na foto, de 0 a 1); a foto (S.corImg) só fica
+// na memória enquanto a página está aberta
+const zonasCor = () => NO.ZONAS_COR[S.tipo] || NO.ZONAS_COR.nariz;
+UI.soltavel($("corDrop"), $("corFile"), async (arq) => {
+  await ocupado(true, "Abrindo a foto…");
+  try {
+    const orig = await UI.carregarImagem(await UI.lerArquivo(arq), 1600);
+    const mk = E.detectarMarcador(orig);
+    let img = orig, ref = null;
+    if (mk) { const c = E.calibrarCor(orig, mk.cantos); if (c.ref) { img = c.img; ref = c.ref; } }
+    S.corImg = img; S.cor = Object.assign({ zonas: {} }, S.cor || {}, { foto: arq.name, ref });
+    $("corBox").hidden = false; desenharFotoCor(); listarZonasCor();
+    $("corInfo").innerHTML = ref ? `Cor calibrada pelo marcador (${esc(ref)}). Escolha a região na lista e clique na foto.` : 'Marcador não encontrado (ou sem contraste): a cor não está calibrada. Toque em <b>Equilibrar pelo branco</b> e clique num branco da foto (papel, jaleco), ou refaça a foto com o marcador.';
+    status(ref ? "Foto calibrada. Clique na foto para medir a cor de cada região." : "Foto sem calibração de cor: use Equilibrar pelo branco.", !ref);
+  } catch (e) { status("Não foi possível abrir a foto: " + esc(e.message), true); }
+  await ocupado(false);
+});
+function desenharFotoCor() {
+  const cv = $("corCanvas"), img = S.corImg; if (!img) return;
+  cv.width = img.width; cv.height = img.height;
+  const x = cv.getContext("2d"); x.putImageData(new ImageData(new Uint8ClampedArray(img.data), img.width, img.height), 0, 0);
+  const r = Math.max(raioCor(), 0.018 * img.width), fonte = Math.round(0.03 * img.width);   // marca visível na foto reduzida
+  for (const z of zonasCor()) {
+    const m = S.cor && S.cor.zonas[z.id]; if (!m || m.x == null) continue;
+    x.lineWidth = Math.max(2, r / 4); x.strokeStyle = "#fff"; x.beginPath(); x.arc(m.x * img.width, m.y * img.height, r, 0, 7); x.stroke();
+    x.strokeStyle = "#6b3fd6"; x.lineWidth = Math.max(1, r / 8); x.stroke();
+    x.font = `bold ${fonte}px sans-serif`; x.lineWidth = Math.max(2, fonte / 8); x.strokeStyle = "rgba(0,0,0,.55)"; x.strokeText(z.nome.split(" ")[0], m.x * img.width + r * 1.3, m.y * img.height + fonte / 3); x.fillStyle = "#fff"; x.fillText(z.nome.split(" ")[0], m.x * img.width + r * 1.3, m.y * img.height + fonte / 3);
+  }
+}
+const raioCor = () => (S.corImg ? Math.max(3, Math.round(0.012 * Math.min(S.corImg.width, S.corImg.height))) : 4);
+$("corCanvas").addEventListener("click", (e) => {
+  if (!S.corImg) return;
+  const cv = $("corCanvas"), r = cv.getBoundingClientRect(), x = ((e.clientX - r.left) / r.width) * cv.width, y = ((e.clientY - r.top) / r.height) * cv.height;
+  if (S.corBranco) {   // balanço de branco pelo ponto clicado (sem marcador)
+    const g = E.ganhosBranco(S.corImg.data, S.corImg.width, S.corImg.height, x, y, raioCor());
+    S.corImg = { data: E.aplicarGanhos(S.corImg.data, g), width: S.corImg.width, height: S.corImg.height }; S.corBranco = false; S.cor.ref = "branco clicado";
+    S.cor.zonas = {}; $("corBranco").classList.remove("on"); desenharFotoCor(); listarZonasCor();
+    $("corInfo").innerHTML = "Cor equilibrada pelo branco clicado (sem marcador: menos exata). Escolha a região e clique na foto."; return;
+  }
+  const m = NO.amostrarCor(S.corImg, x, y, raioCor()); if (!m) return;
+  S.cor.zonas[S.corZona] = { hex: m.hex, lab: m.lab, x: +(x / cv.width).toFixed(4), y: +(y / cv.height).toFixed(4) };
+  const prox = zonasCor().find((z) => !S.cor.zonas[z.id]); if (prox) S.corZona = prox.id;
+  desenharFotoCor(); listarZonasCor(); corNaProtese(); autoSalvar();
+});
+$("corBranco").onclick = () => { S.corBranco = !S.corBranco; $("corBranco").classList.toggle("on", S.corBranco); if (S.corBranco) status("Clique num ponto branco da foto (papel, jaleco, o branco do marcador)."); };
+$("corLimpar").onclick = () => { if (!S.cor) return; S.cor.zonas = {}; S.corZona = "base"; desenharFotoCor(); listarZonasCor(); corNaProtese(); autoSalvar(); };
+function listarZonasCor() {
+  const zs = S.cor ? S.cor.zonas : {};
+  $("corZonas").innerHTML = zonasCor().map((z) => `<li data-z="${z.id}" class="${zs[z.id] ? "ok" : ""}${S.corZona === z.id ? " cur" : ""}"><i style="background:${zs[z.id] ? zs[z.id].hex : "transparent"}"></i><span>${esc(z.nome)}<small style="display:block;color:var(--muted);font-weight:400">${esc(z.dica)}</small></span></li>`).join("");
+  $("corZonas").querySelectorAll("li").forEach((li) => (li.onclick = () => { S.corZona = li.dataset.z; listarZonasCor(); if (S.corImg) status(`Clique na foto: <b>${esc(zonasCor().find((z) => z.id === S.corZona).nome)}</b>.`); }));
+  const base = zs.base, lin = [];
+  for (const z of zonasCor()) {
+    const m = zs[z.id]; if (!m) continue;
+    const L = `L* ${fmt(m.lab[0], 1)} · a* ${fmt(m.lab[1], 1)} · b* ${fmt(m.lab[2], 1)}`;
+    const sug = z.id === "base" ? "cor de massa do silicone (intrínseca, todo o volume)" : base ? NO.sugestaoPintura(NO.compararCor(base, m)) : "meça a base para comparar";
+    lin.push(`<div class="cz"><i style="background:${m.hex}"></i><div><b>${esc(z.nome)} · ${m.hex.toUpperCase()}</b><small>${L}<br>${esc(sug)}</small></div></div>`);
+  }
+  $("corResumo").innerHTML = lin.length ? lin.join("") + `<div class="note">${S.cor && S.cor.ref ? "Calibração: " + esc(S.cor.ref) + "." : "Sem calibração de cor."} As diferenças são em CIELAB (ΔE abaixo de 2 não se distingue). A receita de pigmentos depende da linha de silicone do laboratório: use estas direções para ajustar a base e as camadas.</div>` : "";
+}
+// a prótese na tela ganha a cor da base medida
+function corNaProtese() { if (mProtese) mProtese.material.color.set(S.cor && S.cor.zonas.base ? S.cor.zonas.base.hex : 0xd98c6e); }
 
 // ------------------------------------------------------------------ etapa 5: molde
 const CORES_PECAS = { base: 0x7aa2e3, "externa-A": 0x8fcf9f, "externa-B": 0xe8cf7a, externa: 0x8fcf9f };
@@ -660,6 +725,18 @@ async function gerarPDF() {
     R.par("Molde", [["Partes", S.molde.pecas.map((p) => p.nome).join(", ")], ["Bloco", `${fmt(B.u1 - B.u0, 0)} × ${fmt(B.v1 - B.v0, 0)} × ${fmt(B.w1 - B.w0, 0)} mm`], ["Parede / base / topo", `${fmt(o.parede, 1)} / ${fmt(o.base, 1)} / ${fmt(o.topo, 1)} mm`], ["Chaves", `${S.molde.chaves.length + S.molde.chavesAB.length} (raio ${fmt(o.chaveRaio, 2)}, folga ${fmt(o.folga, 2)} mm)`], ["Canal / respiros", `${fmt(o.canal, 1)} mm / ${o.respiros} × ${fmt(o.respiro, 2)} mm`]],
       "Peças", S.molde.pecas.map((p) => [p.nome, `${fmt(p.volume, 1)} mL${p.fechada ? "" : " (aberta)"}`]).concat([["Retenções", fmt(S.molde.retencoes, 2) + " mL"]]));
   }
+  // cor da pele: amostras e o que pintar em cada região
+  const zc = S.cor ? zonasCor().filter((z) => S.cor.zonas[z.id]) : [];
+  if (zc.length) {
+    for (let i = 0; i < zc.length; i += 3) R.cores(i ? "" : "Cor da pele (foto" + (S.cor.ref ? ", calibrada: " + S.cor.ref : ", sem calibração") + ")", zc.slice(i, i + 3).map((z) => [z.nome.split(" (")[0], S.cor.zonas[z.id].hex]));
+    const base = S.cor.zonas.base;
+    for (const z of zc) {
+      const m = S.cor.zonas[z.id], t = `${z.nome}: L* ${fmt(m.lab[0], 1)}, a* ${fmt(m.lab[1], 1)}, b* ${fmt(m.lab[2], 1)} — ` + (z.id === "base" ? "cor de massa do silicone." : base ? NO.sugestaoPintura(NO.compararCor(base, m)) + "." : "sem base para comparar.");
+      const lin = E.quebrarTexto(t, 8.4, 523); if (R.y - lin.length * 11 < 60) R.novaPagina();
+      lin.forEach((l, k) => R.pg.text(36, R.y - k * 11, 8.4, l, false, E.CORES_PDF.tinta)); R.y -= lin.length * 11 + 3;
+    }
+    R.y -= 8;
+  }
   R.seguranca(checar());
   R.avisoFinal(`${NO.REFERENCIAS[S.tipo]} Ferramenta de apoio ao projeto: a forma, a posição, a adaptação às margens, a cor e a validação da prótese dependem da avaliação clínica e do trabalho do anaplastologista. Arquivos para impressão em mm; a prótese "no scan" fica no referencial do scan original. Versão ${NO.VERSAO}.`);
   return R.finalizar(imgs);
@@ -677,6 +754,7 @@ function projeto() {
     fonte: $("fonte").value, nariz: lerNariz(), ajuste: lerAjuste(), modelo: S.modelo ? { nome: S.modeloNome, T: S.modeloT, paresM: S.paresM, paresR: S.paresR } : null,
     parametros: lerParametros(), molde: lerMolde(), imaDiam: +$("imaDiam").value, imaProf: +$("imaProf").value,
     escultura: S.escultura && S.escultura.tracos.length ? S.escultura : null, narinasModelo: $("narinasModelo").checked,
+    cor: S.cor && Object.keys(S.cor.zonas || {}).length ? { foto: S.cor.foto, ref: S.cor.ref, zonas: S.cor.zonas } : null,
     oculos: S.oculos.length || $("ocUsar").checked ? { usar: $("ocUsar").checked, pontos: S.oculos, largura: +$("ocLarg").value, prof: +$("ocProf").value, imas: $("ocImas").checked, imaDiam: +$("ocImaDiam").value, imaProf: +$("ocImaProf").value } : null,
   };
 }
@@ -692,6 +770,7 @@ function aplicarProjeto(f) {
   S.pontos = Object.assign({}, f.pontos || {}); S.contorno = (f.contorno || []).map((p) => p.slice()); S.plano = f.plano || null; S.residuo = f.residuo != null ? f.residuo : null; S.imas = (f.imas || []).map((p) => p.slice());
   aplicarTipo();
   if (f.narinasModelo != null) $("narinasModelo").checked = !!f.narinasModelo;
+  S.cor = f.cor ? { foto: f.cor.foto, ref: f.cor.ref, zonas: Object.assign({}, f.cor.zonas) } : null; S.corImg = null; $("corBox").hidden = true; listarZonasCor();
   const oc = f.oculos || {}; S.oculos = (oc.pontos || []).map((p) => p.slice()); $("ocUsar").checked = !!oc.usar; $("ocImas").checked = !!oc.imas;
   if (oc.largura) $("ocLarg").value = oc.largura; if (oc.prof) $("ocProf").value = oc.prof; if (oc.imaDiam) $("ocImaDiam").value = oc.imaDiam; if (oc.imaProf) $("ocImaProf").value = oc.imaProf; infoOculos();
   if (f.fonte) { $("fonte").value = f.fonte; aplicarFonte(); }

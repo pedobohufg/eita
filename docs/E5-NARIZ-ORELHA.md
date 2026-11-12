@@ -80,8 +80,13 @@ Primeiro teste com scans reais de uma paciente (rosto sem nariz e um scan anteri
 - Narinas paramétricas: parede de 2 mm medida na perpendicular (na vertical, o topo da narina marcava a pele de fora no alto das asas).
 - **Armação de óculos (nariz, etapa 4):** com a prótese gerada, marcam-se os dois pontos dos lados do dorso em que a ponte apoia. A doadora perde uma faixa rasa entre eles (assento, padrão 5 × 1,2 mm, ficando mais rasa nos 4 mm depois de cada ponto): a ponte fica rente e esconde a margem de cima. Opcionalmente, um nicho de ímã em cada ponto, ao longo da normal, a partir do fundo do assento (padrão 4 × 2 mm), para colar o par na armação. Como a mudança é na doadora, o oco recua junto e a parede mantém a espessura; aviso quando assento + nicho passam de parede − 1 mm. Fica na ficha e no relatório.
 
+## 3d. v0.4 (12/11/2026): cor da pele por foto
+- Etapa 6 ("Cor e arquivos"): foto da pele com o marcador do Lab.EITA ao lado; cor corrigida por `calibrarCor` (anel cinza ou branco do papel, a mesma calibração do MAMILO); sem marcador, balanço pelo branco clicado (`ganhosBranco`), com aviso de menor exatidão. Clique na foto mede a cor mediana num disco (1,2 % do lado menor) da região escolhida: nariz — base, ponta, asas e sulco alar, dorso, margem; orelha — base, hélice, concha, lóbulo, margem (`modulos/nariz-orelha/cor.js`).
+- Para cada região: hex, L*a*b* e a diferença para a base (ΔE CIE76; abaixo de 2 não se distingue), com a direção da pintura intrínseca (mais vermelha, mais amarela, mais escura ou clara) — não é receita de pigmentos, que depende da linha de silicone do laboratório. A base vira a cor da prótese na tela.
+- Na ficha ficam só as cores e o nome da foto (a foto não é guardada); o relatório traz as amostras e as sugestões.
+
 ## 4. Limites desta versão (E5)
 - O nariz paramétrico é um ponto de partida: precisa da conferência e, se for o caso, de ajuste fino (Esculpir, na etapa 4). Quando houver um scan anterior do paciente com o nariz, ele é a melhor forma doadora (modelo importado + Refinar pelo rosto).
 - Barra sobre implantes, subestrutura rígida e moldes de 4 partes não estão implementados (a armação de óculos tem o assento e os nichos de ímãs; a peça que vai na armação não é desenhada).
-- Cor: o app não faz a receita de pigmentos da pele (o MAMILO tem a lógica de cor por foto; pode ser trazida depois).
+- Cor: o app mede as cores por região numa foto calibrada e diz a direção da pintura; a receita de pigmentos (quantidades) depende da linha de silicone e ainda não é calculada.
 - Validação: dados sintéticos (`ferramentas/rosto_sintetico.mjs`) e um caso real de nariz (v0.2). Falta orelha real e imprimir os moldes.
