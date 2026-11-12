@@ -140,7 +140,7 @@ export function narizPadrao(pontos) {
 //   corpo (dorso e paredes laterais): perfil D(v) na linha média, base de meia-largura b(v) que alarga da raiz para baixo
 //     (pirâmide, não tubo), seção arredondada no dorso;
 //   lóbulo da ponta: cúpula elíptica de largura larguraPonta, centrada na altura da ponta;
-//   asas: lobos ovais alongados na vertical, com o sulco alar onde encontram o lóbulo e
+//   asas: lobos ovais arredondados (um pouco mais largos que altos), com o sulco alar onde encontram o lóbulo e
 //     queda íngreme para o rosto (sulco alar-facial).
 // Todas as partes têm inclinação contínua na borda (sem quinas, que apareciam como vincos na luz); fora da pegada a
 // descida vai ficando forte (até 3 : 1): ao lado do nariz a forma fica abaixo da bochecha e a
@@ -164,8 +164,8 @@ function cupula(x, y, a, b, H) {
 export function narizTopo(p) {
   const L = p.comprimento, W = p.largura, P = p.projecao, vt = Math.min(p.alturaPonta, 0.4 * L), r0 = 1.5, Rt = Math.max(4, 0.14 * L);
   const Wt = Math.min(p.larguraPonta || 0.5 * W, 0.8 * W);
-  // corpo: meia-largura da base da raiz (0,22 W) até o terço inferior (0,33 W)
-  const bR = 0.22 * W, bB = 0.33 * W, vB = 0.35 * L;
+  // corpo: meia-largura da base da raiz (0,17 W) até o terço inferior (0,29 W): dorso estreito em cima, abrindo para as asas
+  const bR = 0.17 * W, bB = 0.29 * W, vB = 0.3 * L;
   const D = (v) => {
     if (v >= vt) { const s = (L - v) / (L - vt); return r0 + (P - r0) * s + (p.dorso || 0) * 4 * s * (1 - s); }
     return P - ((vt - v) * (vt - v)) / (2 * Rt);
@@ -173,7 +173,7 @@ export function narizTopo(p) {
   const b = (v) => (v >= vB ? bB + (bR - bB) * sstep((v - vB) / (L - vB)) : bB);
   // lóbulo e asas (cúpulas)
   const ru = 0.62 * Wt, rvL = 0.22 * L, rzL = 0.55 * P, vL = vt - 0.5;
-  const rau = 0.2 * W, ua = W / 2 - rau, rav = 0.22 * L, va = 0.13 * L, Ha = 0.46 * P;
+  const rau = 0.22 * W, ua = W / 2 - 0.85 * rau, rav = 0.19 * L, va = 0.13 * L, Ha = 0.56 * P;
   const forma = (dl) => function (u, v) {
     const vv = Math.min(L + 3, v), au = Math.abs(u), bv = b(vv), x = au / bv, Dv = Math.max(0, D(vv) - dl * sstep(1 - Math.abs(vv - vt) / (0.4 * L)));
     // seção do corpo: 1 − x^1,8 (dorso arredondado, paredes quase retas); fora, descida() a partir da mesma inclinação
@@ -188,17 +188,23 @@ export function narizTopo(p) {
   let dl = 0; for (let i = 0; i < 3; i++) dl += pico(forma(dl)) - P;
   return forma(dl);
 }
-// base: columela pelo ângulo nasolabial; as bordas das asas sobem até 2,5 mm (columela aparente de perfil)
+// máximo suave (raio r, mm): arredonda a quina entre duas formas que se cortam
+const maxSuave = (a, b, r) => -Vo.uniaoSuave(-a, -b, r);
+// Base do nariz (por baixo): altura v da base em cada (u, w).
+//   columela: a parte mais baixa, na linha média, pelo ângulo nasolabial (sobe 10° para a frente em 100°);
+//   bordas das asas: até 1,2 mm acima da columela, subindo aos poucos para os lados (de perfil a columela aparece um pouco abaixo da asa);
+//   ponta: na frente (w > 0,55 P) a base curva para cima e encontra o lóbulo sem quina (ângulo columela-lóbulo).
 function alturaBase(p, u, w) {
-  const W = p.largura, P = p.projecao, tg = Math.tan(((p.nasolabial - 90) * Math.PI) / 180);
-  return tg * w + 2.5 * sstep((Math.abs(u) - 0.17 * W) / (0.12 * W)) * sstep((w - 0.15 * P) / (0.3 * P));
+  const W = p.largura, P = p.projecao, tg = Math.tan(((p.nasolabial - 90) * Math.PI) / 180), f = Math.max(0, w - 0.55 * P);
+  return tg * w + 1.2 * sstep((Math.abs(u) - 0.14 * W) / (0.2 * W)) + 0.035 * f * f;
 }
-// campo do nariz (distância aproximada: altura normalizada pela inclinação, base e raiz)
+// campo do nariz (distância aproximada: altura normalizada pela inclinação, base e raiz); o encontro da base com a
+// superfície de fora é arredondado (raio 1,8 mm): bordas das asas, columela e ponta sem fio
 export function narizParametrico(p) {
   const topo = narizTopo(p), L = p.comprimento, ca = Math.cos(((p.nasolabial - 90) * Math.PI) / 180), e = 0.25;
   return function (u, v, w) {
     const t = topo(u, v), gu = (topo(u + e, v) - topo(u - e, v)) / (2 * e), gv = (topo(u, v + e) - topo(u, v - e)) / (2 * e);
-    return Math.max((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca, v - (L + 3));
+    return Math.max(maxSuave((w - t) / Math.sqrt(1 + gu * gu + gv * gv), (alturaBase(p, u, w) - v) * ca, 1.8), v - (L + 3));
   };
 }
 // malha fechada do nariz paramétrico no referencial do nariz, cortada a 40 mm atrás do subnasal (dentro do rosto);
@@ -209,22 +215,29 @@ export function malhaNariz(p, passo = 0.4) {
   Vo.preencherGrade(g, (u, v, w) => Math.max(f(u, v, w), -40 + passo - w, Math.abs(u) - (W / 2 + m - passo)));
   return decimar(Vo.extrairSuperficie(g), { tolerancia: 0.01 });
 }
-// narinas: ovais na base, inclinadas para a ponta (o eixo maior vai da asa para a frente e para dentro), afastadas
-// da columela; sobem profNarina para dentro do nariz e ficam a pelo menos 1,5 mm da superfície de fora
+// Contorno de uma narina vista de baixo, no plano (u, w), lado direito (u > 0): gota com a ponta fina para a frente e
+// para a linha média (rumo à ponta do nariz) e a parte larga atrás e para fora (junto da base da asa).
+// → polígono [[u, w], …]
+export function contornoNarina(p) {
+  const W = p.largura, P = p.projecao, k = p.narina || 1;
+  const tras = [0.2 * W, 0.17 * P], frente = [0.1 * W, 0.17 * P + 0.55 * P * k];   // eixo da gota
+  const ex = [frente[0] - tras[0], frente[1] - tras[1]], comp = Math.hypot(ex[0], ex[1]), d = [ex[0] / comp, ex[1] / comp], nrm = [d[1], -d[0]];
+  const larg = 0.155 * W * k, pts = [];
+  // meia-largura ao longo do eixo (t de 0 atrás a 1 na frente): cheia em t ≈ 0,3, afinando para a frente
+  const meia = (t) => (t < 0.3 ? Math.sqrt(Math.max(0, 1 - ((0.3 - t) / 0.3) ** 2)) : 1 - 0.75 * sstep((t - 0.3) / 0.7)) * larg / 2;
+  const N = 24;
+  for (let i = 0; i <= N; i++) { const t = i / N, a = meia(t); pts.push([tras[0] + ex[0] * t + nrm[0] * a, tras[1] + ex[1] * t + nrm[1] * a]); }
+  for (let i = N - 1; i >= 1; i--) { const t = i / N, a = meia(t); pts.push([tras[0] + ex[0] * t - nrm[0] * a, tras[1] + ex[1] * t - nrm[1] * a]); }
+  return pts;
+}
+// narinas: a gota de contornoNarina aberta na base e subindo profNarina para dentro do nariz (vestíbulo), com o fundo
+// arredondado e as paredes abrindo um pouco para cima; ficam a pelo menos 1,5 mm da superfície de fora
 export function narinasParametricas(p) {
-  const W = p.largura, P = p.projecao, alfa = ((p.nasolabial - 90) * Math.PI) / 180, k = p.narina || 1, topo = narizTopo(p);
-  const u0 = 0.2 * W, w0 = 0.4 * P, beta = (25 * Math.PI) / 180, cb = Math.cos(beta), sb = Math.sin(beta);
-  const ca = Math.cos(alfa), sa = Math.sin(alfa), prof = p.profNarina || 10;
-  const a = 0.35 * P * k, c = 0.1 * W * k, h = prof / 2;
+  const prof = p.profNarina || 10, topo = narizTopo(p), dir = contornoNarina(p), esq = dir.map(([u, w]) => [-u, w]);
   return function (u, v, w) {
-    let f = Infinity;
-    for (const s of [-1, 1]) {
-      // no plano da base: eixo maior d (para a frente e para a linha média), eixo menor e; n sobe para dentro do nariz
-      const du = u - s * u0, dw = w - w0, vb = alturaBase(p, s * u0, w0);
-      const y = v - vb, al = dw * ca + y * sa, no = y * ca - dw * sa;   // al: ao longo da base (frente); no: normal
-      const ad = al * cb - s * du * sb, ae = s * du * cb + al * sb;
-      f = Math.min(f, Vo.elipsoide(ae, ad, no - h + 1, c, a, h + 1));
-    }
+    const h = v - alturaBase(p, u, w);   // altura acima da base
+    const f2 = Vo.distanciaPoligono(u, w, u >= 0 ? dir : esq) - 0.12 * Math.max(0, Math.min(h, prof - 2));
+    const q = h - prof, f = Math.hypot(Math.max(f2, 0), Math.max(q, 0)) + Math.min(Math.max(f2, q), 0);
     return Math.max(f, 1.5 - (topo(u, v) - w));
   };
 }
@@ -234,7 +247,7 @@ export const PARAMETROS_PADRAO = {
   // filete: sob a parte solta da doadora, a aba entra até esta distância da raiz (fecha a ponta do sulco atrás da orelha,
   // sem cunha fina de ar); no nariz fica 0 (taparia o fundo das narinas)
   orelha: { passo: 0.5, aba: 8, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 1.5, oco: false, parede: 3, filete: 3 },
-  nariz: { passo: 0.5, aba: 6, bordaEsp: 0.3, baseEsp: 1.5, raioUniao: 3, oco: true, parede: 3, filete: 0 },
+  nariz: { passo: 0.5, aba: 4, bordaEsp: 0.3, baseEsp: 1.2, raioUniao: 2, oco: true, parede: 3, filete: 0 },
 };
 export const MOLDE_PADRAO = { parede: 8, base: 6, topo: 6, dividir: true, anguloDivisao: 90, deslocDivisao: 0, chaveRaio: 2.5, folga: 0.2, canal: 4, respiro: 1.5, respiros: 2, tolerancia: 0.03 };
 
@@ -407,7 +420,7 @@ export async function gerarProtese(e) {
         // rasgada); na raiz ela assenta direto na pele (sem a folga ficaria uma lâmina de ar fina sob a prótese)
         let f = Vo.uniaoSuave(Math.max(sD[q], d2, (raiz[c] ? 0 : FOLGA_PELE) - sh), fAba, par.raioUniao);
         if (ocoFundo) { const hb = ocoFundo[c]; if (hb < Infinity) f = Math.max(f, -Math.min(sD[q] + par.parede, w - hb)); }
-        if (narinas) f = Math.max(f, -Math.max(narinas(u, v, w), 1.2 - sh));   // a narina não fura a pele por baixo (no nariz maciço fica cega)
+        if (narinas) f = maxSuave(f, -(par.oco ? narinas(u, v, w) : Math.max(narinas(u, v, w), 1.2 - sh)), 0.8);   // no nariz maciço a narina não fura a pele (fica cega); no oco ela se abre no oco, sem deixar ilhas junto da pele
         for (const m of imas) f = Math.max(f, -Math.max(Math.hypot(u - m.u, v - m.v) - rI, m.w0 - 1 - w, w - (m.w0 + pI)));
         fP[q] = Math.max(f, -sh);
       }
