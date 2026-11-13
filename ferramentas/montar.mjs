@@ -29,19 +29,23 @@ const RE_IMPORT = /^import\s+(.+?)\s+from\s+"(.+?)";?\s*$/gm;
 const RE_EXPORT_ALL = /^export\s+\*\s+from\s+"(.+?)";?\s*$/gm;
 
 // Empacota um grafo de ES modules em um único script clássico (cada módulo em seu próprio escopo).
-export function empacotar(entrada) {
-  const ordem = [], visitados = new Map();
-  const id = (abs) => "__m" + visitados.size;
+// entrada: um caminho ou uma lista. o.externos: caminho absoluto → expressão JS de um módulo já carregado por outro
+// script (núcleo compartilhado da plataforma); esses não entram no pacote. o.final: código no fim, dentro do escopo
+// do pacote, com acesso a o.aoFim({ relativo: nome }) dos módulos empacotados.
+export function empacotar(entrada, o = {}) {
+  const ordem = [], visitados = new Map(), externos = o.externos || new Map();
+  let n = 0;
   function visitar(abs) {
     if (visitados.has(abs)) return visitados.get(abs);
-    const meu = { abs, nome: id(abs), fonte: fs.readFileSync(abs, "utf8") };
+    if (externos.has(abs)) { const ext = { abs, nome: externos.get(abs), externo: true }; visitados.set(abs, ext); return ext; }
+    const meu = { abs, nome: "__m" + n++, fonte: fs.readFileSync(abs, "utf8") };
     visitados.set(abs, meu);
     const deps = [...meu.fonte.matchAll(RE_IMPORT)].map((m) => m[2]).concat([...meu.fonte.matchAll(RE_EXPORT_ALL)].map((m) => m[1]));
     for (const d of deps) visitar(path.resolve(path.dirname(abs), d));
     ordem.push(meu);
     return meu;
   }
-  visitar(path.resolve(RAIZ, entrada));
+  for (const e of [].concat(entrada)) visitar(path.resolve(RAIZ, e));
   const dep = (de, rel) => visitados.get(path.resolve(path.dirname(de.abs), rel)).nome;
   const partes = [];
   for (const m of ordem) {
@@ -61,21 +65,51 @@ export function empacotar(entrada) {
     const obj = `Object.assign({}, ${reexporta.concat([`{ ${exportados.join(", ")} }`]).join(", ")})`;
     partes.push(`// ── ${path.relative(RAIZ, m.abs)}\nconst ${m.nome} = (() => {\n"use strict";\n${s.trim()}\nreturn Object.freeze(${obj});\n})();`);
   }
-  return `(function () {\n${partes.join("\n\n")}\n})();\n`;
+  const fim = o.aoFim ? "\n" + o.aoFim(Object.fromEntries(ordem.map((m) => [path.relative(RAIZ, m.abs).split(path.sep).join("/"), m.nome]))) : "";
+  return `(function () {\n${o.inicio ? o.inicio + "\n" : ""}${partes.join("\n\n")}${fim}\n})();\n`;
 }
 
-export function montar(nome, destinoBase = path.join(RAIZ, "dist"), pasta = nome) {
+// Núcleo compartilhado da plataforma (desde a E5b): nucleo/ inteiro num script só (nucleo.js na raiz), que publica
+// os módulos em window.__EITA_NUCLEO__ (chave = caminho relativo, "nucleo/malha.js"). Cada página da plataforma o
+// carrega antes do seu app.js, e o app.js do módulo usa esses mesmos objetos em vez de copiar o núcleo.
+// Os apps avulsos (dist/<modulo>/) continuam autocontidos.
+export const NUCLEO = { entradas: ["nucleo/index.js", "nucleo/interface/index.js"], global: "__EITA_NUCLEO__", arquivo: "nucleo.js" };
+const arquivosDoNucleo = () => {
+  const out = [], ir = (d) => { for (const f of fs.readdirSync(path.join(RAIZ, d), { withFileTypes: true })) { const r = d + "/" + f.name; if (f.isDirectory()) ir(r); else if (f.name.endsWith(".js")) out.push(r); } };
+  ir("nucleo"); return out.sort();
+};
+export function empacotarNucleo() {
+  const js = empacotar(NUCLEO.entradas, { aoFim: (nomes) => {
+    const faltam = arquivosDoNucleo().filter((r) => !nomes[r]);
+    if (faltam.length) throw new Error("arquivos do núcleo fora de nucleo/index.js e nucleo/interface/index.js: " + faltam.join(", "));
+    return `window.${NUCLEO.global} = Object.freeze({ ${Object.entries(nomes).map(([r, nm]) => `${JSON.stringify(r)}: ${nm}`).join(", ")} });`;
+  } });
+  return `/* Plataforma EITA — núcleo compartilhado, montado por ferramentas/montar.mjs. Não editar: edite nucleo/. */\n${COPYRIGHT}\n${js}`;
+}
+// externos de um módulo que usa o núcleo compartilhado: todo arquivo de nucleo/ vem de window.__EITA_NUCLEO__
+function externosDoNucleo() {
+  return new Map(arquivosDoNucleo().map((r) => [path.resolve(RAIZ, r), `__N[${JSON.stringify(r)}]`]));
+}
+const INICIO_COMPARTILHADO = `const __N = window.${NUCLEO.global};\nif (!__N) throw new Error("EITA: o núcleo compartilhado (${NUCLEO.arquivo}) não carregou; abra o módulo pela Plataforma EITA.");`;
+
+export function montar(nome, destinoBase = path.join(RAIZ, "dist"), pasta = nome, { nucleoCompartilhado = false } = {}) {
   const cfg = MODULOS[nome]; if (!cfg) throw new Error("módulo desconhecido: " + nome);
   const destino = path.join(destinoBase, pasta);
   fs.rmSync(destino, { recursive: true, force: true }); fs.mkdirSync(destino, { recursive: true });
   let ui = cfg.interface.map((f) => fs.readFileSync(path.join(RAIZ, f), "utf8")).join("\n");
   if (cfg.escopo) ui = `(function () {\n${ui}\n})();\n`;
-  const js = `/* ${cfg.titulo} — montado pela Plataforma EITA (ferramentas/montar.mjs). Não editar: edite nucleo/ e modulos/${nome}/. */\n${COPYRIGHT}\n${empacotar(cfg.entrada)}\n${ui}`;
+  const js = `/* ${cfg.titulo} — montado pela Plataforma EITA (ferramentas/montar.mjs). Não editar: edite nucleo/ e modulos/${nome}/. */\n${COPYRIGHT}\n${nucleoCompartilhado ? empacotar(cfg.entrada, { externos: externosDoNucleo(), inicio: INICIO_COMPARTILHADO }) : empacotar(cfg.entrada)}\n${ui}`;
   fs.writeFileSync(path.join(destino, "app.js"), js);
   for (const e of cfg.estaticos) fs.cpSync(path.join(RAIZ, e), path.join(destino, path.basename(e)), { recursive: true });
   return { destino, bytes: Buffer.byteLength(js) };
 }
 
+// carrega o núcleo compartilhado antes do app.js da página (prefixo: "" no portal, "../" nos módulos)
+function carregarNucleo(html, quem, prefixo) {
+  const tag = '<script src="app.js"></script>', n = html.split(tag).length - 1;
+  if (n !== 1) throw new Error(`a página de ${quem} precisa ter exatamente um ${tag} (achei ${n})`);
+  return html.replace(tag, `<script src="${prefixo}${NUCLEO.arquivo}"></script>\n${tag}`);
+}
 // acrescenta a ponte para o portal no fim de uma página de módulo
 function ligarAoPortal(html, modulo) {
   const i = html.lastIndexOf("</body>"); if (i < 0) throw new Error("página sem </body>: " + modulo);
@@ -84,14 +118,19 @@ function ligarAoPortal(html, modulo) {
 // semLegado: deixa de fora os apps legados (o portal os abre pelo artefato publicado à parte)
 export function montarPlataforma(destinoBase = path.join(RAIZ, "dist"), { semLegado = false } = {}) {
   const destino = path.join(destinoBase, "plataforma");
-  const r = montar(PLATAFORMA.portal, destinoBase, "plataforma");   // portal na raiz (apaga a pasta antes)
+  const r = montar(PLATAFORMA.portal, destinoBase, "plataforma", { nucleoCompartilhado: true });   // portal na raiz (apaga a pasta antes)
+  const nuc = empacotarNucleo();
+  fs.writeFileSync(path.join(destino, NUCLEO.arquivo), nuc);
   const legados = semLegado ? {} : PLATAFORMA.legados;
   const presentes = [...PLATAFORMA.modulos, ...Object.keys(legados)];
   const idx = path.join(destino, "index.html");
-  fs.writeFileSync(idx, fs.readFileSync(idx, "utf8").replace("</head>", `<meta name="eita-modulos" content="${presentes.join(",")}">\n</head>`));
+  fs.writeFileSync(idx, carregarNucleo(fs.readFileSync(idx, "utf8").replace("</head>", `<meta name="eita-modulos" content="${presentes.join(",")}">\n</head>`), "portal", ""));
   fs.copyFileSync(path.join(RAIZ, PLATAFORMA.ponte), path.join(destino, "ponte.js"));
-  const partes = [{ nome: "portal", bytes: r.bytes }];
-  for (const m of PLATAFORMA.modulos) { const x = montar(m, destino, m); partes.push({ nome: m, bytes: x.bytes }); }
+  const partes = [{ nome: "núcleo", bytes: Buffer.byteLength(nuc) }, { nome: "portal", bytes: r.bytes }];
+  for (const m of PLATAFORMA.modulos) {
+    const x = montar(m, destino, m, { nucleoCompartilhado: true }); partes.push({ nome: m, bytes: x.bytes });
+    const f = path.join(destino, m, "index.html"); fs.writeFileSync(f, carregarNucleo(fs.readFileSync(f, "utf8"), m, "../"));
+  }
   for (const [m, L] of Object.entries(legados)) {
     for (const a of L.arquivos) fs.cpSync(path.join(RAIZ, L.pasta, a), path.join(destino, m, a), { recursive: true });
     partes.push({ nome: m + " (legado)", bytes: fs.statSync(path.join(destino, m, "index.html")).size });
