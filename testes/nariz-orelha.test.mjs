@@ -278,3 +278,10 @@ test("cor: amostra mediana num disco e diferença CIELAB para a base, com as dir
   assert.ok(C.compararCor(base, base).igual);
   assert.equal(C.ZONAS_COR.nariz[0].id, "base"); assert.equal(C.ZONAS_COR.orelha[0].id, "base");
 });
+
+test("cabeçalho da página mostra a versão do código (VERSAO)", () => {
+  const html = fs.readFileSync(new URL("../modulos/nariz-orelha/index.html", import.meta.url), "utf8");
+  const m = html.match(/Próteses nasais e auriculares · v([\d.]+)/);
+  assert.ok(m, "subtítulo com a versão não encontrado");
+  assert.equal(m[1], P.VERSAO);
+});
