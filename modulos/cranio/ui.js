@@ -238,19 +238,31 @@ async function abrirSTL(arq) {
     if (daFicha && NOMES_U[daFicha]) sel.value = daFicha;
     else if (!S3.unidadeEscolhida && provavel && provavel !== sel.value) { sel.value = provavel; avisoU = ` Unidade ajustada para <b>${NOMES_U[provavel]}</b> pelo tamanho do modelo; se não for, troque a unidade e abra o arquivo de novo.`; }
     else if (provavel && provavel !== sel.value) avisoU = ` <b>Atenção:</b> pelo tamanho, o arquivo parece estar em ${NOMES_U[provavel]}, não em ${NOMES_U[sel.value]}. Confira a unidade.`;
-    const u = sel.value, { pos } = O.prepararScan(bruto, parseFloat(u) || 1);
+    const u = sel.value; let { pos } = O.prepararScan(bruto, parseFloat(u) || 1), avisoI = "";
+    // scan bruto (tronco, braços, mãos, mesa, ruído): fica só a cabeça (pontos.js, isolarCabeca), recentrada. Com uma
+    // ficha deste scan salva antes de existir o recorte, o arquivo fica inteiro (os pontos dela estão nesse referencial)
+    S3.isolado = null;
+    const fichaDoScan = S3.pendente && S3.pendente.scan && S3.pendente.scan.nome === arq.name ? S3.pendente.scan : null;
+    if (!fichaDoScan || fichaDoScan.isolado) {
+      let iso = null; try { iso = C.pontos.isolarCabeca(pos); } catch (e) { console.error(e); }
+      if (C.pontos.precisaIsolar(pos, iso)) {
+        S3.isolado = { removidos: iso.removidos, triangulos: iso.triangulos, raio: iso.raio };
+        pos = O.prepararScan(iso.pos, 1).pos;
+        avisoI = ` <b>Cabeça isolada</b> do scan: ${iso.removidos.toLocaleString("pt-BR")} de ${iso.triangulos.toLocaleString("pt-BR")} triângulos (tronco, mãos, apoio e ruído) ficaram de fora. Confira no modelo se sobrou só a cabeça.`;
+      }
+    }
     mostrarVista("3d"); iniciar3D();
     S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; S3.posPrep = pos; S3.al = null; S3.correcao = null; S3.detec = null; S3.conferencia = null; limparPerfil();
     trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano(); $("correcaoInfo").textContent = ""; esvaziar(grupoAvisos); $("conferencia").hidden = true;
     ["btn-arm-mark", "btn-clear-marks", "btn-auto-pontos"].forEach((id) => ($(id).disabled = false));
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
     $("scanInfo").innerHTML = `<b>${esc(arq.name)}</b>: ${(pos.length / 9).toLocaleString("pt-BR")} triângulos, ${[0, 1, 2].map((q) => fmt(S3.caixa.max[q] - S3.caixa.min[q], 0)).join(" × ")} mm. Marque os 5 pontos e alinhe.`;
-    status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.${avisoU}`, !!avisoU && avisoU.includes("Atenção"));
+    status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.${avisoU}${avisoI}`, !!avisoU && avisoU.includes("Atenção"));
     const want = S3.pendente && S3.pendente.scan && S3.pendente.scan.nome;
     if (S3.pendente && want === arq.name) { CASCA.ocupado(false); await UI.espera(30); aplicarOrtese(S3.pendente); }
     else {
       if (want) status(`Scan aberto, mas a ficha aberta é do scan <b>${esc(want)}</b>: os pontos e o plano da ficha não foram aplicados.`, true);
-      CASCA.ocupado(false); await pontosAutomaticos(avisoU);
+      CASCA.ocupado(false); await pontosAutomaticos(avisoU + avisoI);
     }
   } catch (e) { console.error(e); status("Não consegui ler o STL: " + esc(e.message), true); }
   CASCA.ocupado(false); atualizarEstado();
@@ -1035,7 +1047,7 @@ function coletarOrtese() {
     if (S3.pendente) return Object.assign({}, S3.pendente, { entradas: lerEntradas(), versoes: S3.versoes });
     return S3.versoes.length ? { scan: null, alinhamento: null, planoZ: null, entradas: lerEntradas(), edicoes: [], earMan: null, analisado: false, gerada: false, resultado: null, versoes: S3.versoes } : null;
   }
-  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade }, alinhamento: S3.alinhamento, correcao: $("correcao").checked, semSaliencias: $("semSaliencias").checked, contorno: CRO.contorno ? { pontos: CRO.contorno.pts.map((q) => Object.assign({}, q)), superior: CRO.contorno.sup ? CRO.contorno.sup.map((q) => Object.assign({}, q)) : null, deslocSup: numOf("contorno-sup-desloc", 0), usar: $("contornoUsar").checked } : null }, retrato(), { versoes: S3.versoes });
+  return Object.assign({ scan: { nome: S3.arquivo, unidade: S3.unidade, isolado: !!S3.isolado }, alinhamento: S3.alinhamento, correcao: $("correcao").checked, semSaliencias: $("semSaliencias").checked, contorno: CRO.contorno ? { pontos: CRO.contorno.pts.map((q) => Object.assign({}, q)), superior: CRO.contorno.sup ? CRO.contorno.sup.map((q) => Object.assign({}, q)) : null, deslocSup: numOf("contorno-sup-desloc", 0), usar: $("contornoUsar").checked } : null }, retrato(), { versoes: S3.versoes });
 }
 function coletar() {
   if (!S.fichaId) S.fichaId = E.novoIdFicha("c");

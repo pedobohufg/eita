@@ -93,7 +93,7 @@ test("unidade provável do STL pelo tamanho (cabeça de ~10 a ~40 cm)", () => {
   assert.equal(V.unidadeProvavel(cab), "1");
   assert.equal(V.unidadeProvavel(cab.map((v) => v / 10)), "10");
   assert.equal(V.unidadeProvavel(cab.map((v) => v / 1000)), "1000");
-  assert.equal(V.unidadeProvavel(cab.map((v) => v * 100)), null);
+  assert.equal(V.unidadeProvavel(cab.map((v) => v * 100)), null);   // 20 m: nem cabeça nem cena
 });
 
 test("assimetria por altura: acha o nível de maior CVAI (cabeça sintética, achatamento acima do plano)", () => {
@@ -165,4 +165,36 @@ test("conferência do scan (E3c-4): dedo encostado na cabeça vira saliência ma
   const limpo = P.semSaliencias(com, al.zRef, sal, an), an2 = O.analisar(limpo.pos, al.zRef);
   assert.ok(limpo.removidos > 0); assert.equal(P.detectarSaliencias(an2).filter((q) => !q.talvezOrelha).length, 0, "sem o dedo, nada marcado");
   assert.ok(Math.abs(O.amostrarGrade(an2.rho, 220, 25) - r0) < 1.5, "a calota volta ao lugar");
+});
+
+// Scan bruto (14/11/2026): a cabeça sintética dentro de uma cena — mesa, "tronco" (esfera grande), "braço" (cilindro
+// encostado na nuca) e ruído solto — girada e deslocada. isolarCabeca devolve só a cabeça (com o começo do pescoço).
+test("scan bruto: a cabeça é isolada da cena (mesa, tronco, braço e ruído)", async () => {
+  const P = await import("../modulos/cranio/pontos.js"), { carregarCabeca } = await import("./apoio/pipeline-cranio.mjs"), { pos: cab } = carregarCabeca();
+  const tris = []; let sd = 7; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+  const quad = (a, b, c, d) => tris.push(...a, ...b, ...c, ...a, ...c, ...d);
+  for (let i = -20; i < 20; i++) for (let j = -20; j < 20; j++) quad([i * 20, j * 20, -260], [i * 20 + 20, j * 20, -260], [i * 20 + 20, j * 20 + 20, -260], [i * 20, j * 20 + 20, -260]);   // mesa 800 × 800
+  const esf = (c, R, n) => { const p = (i, j) => { const t = Math.PI * i / n, f = 2 * Math.PI * j / (2 * n); return [c[0] + R * Math.sin(t) * Math.cos(f), c[1] + R * Math.sin(t) * Math.sin(f), c[2] + R * Math.cos(t)]; }; for (let i = 0; i < n; i++) for (let j = 0; j < 2 * n; j++) quad(p(i, j), p(i + 1, j), p(i + 1, j + 1), p(i, j + 1)); };
+  esf([0, 10, -250], 125, 40);                                                         // tronco (esfera maior que uma cabeça)
+  for (let k = 0; k < 40; k++) { const z = -60, x0 = -200 + k * 6, r = 22; for (let j = 0; j < 16; j++) { const f = (q) => [x0 + (q[0] ? 6 : 0), -95 + r * Math.cos(2 * Math.PI * (j + q[1]) / 16), z + r * Math.sin(2 * Math.PI * (j + q[1]) / 16)]; quad(f([0, 0]), f([1, 0]), f([1, 1]), f([0, 1])); } }   // braço
+  for (let k = 0; k < 400; k++) { const c = [rnd() * 700 - 350, rnd() * 700 - 350, rnd() * 400 - 200]; if (Math.hypot(c[0], c[1], c[2]) < 150) continue; tris.push(c[0], c[1], c[2], c[0] + 6, c[1], c[2], c[0], c[1] + 6, c[2] + 3); }   // ruído
+  const cena0 = new Float32Array(cab.length + tris.length); cena0.set(cab); cena0.set(tris, cab.length);
+  const [ca, sa] = [Math.cos(0.7), Math.sin(0.7)], cena = new Float32Array(cena0.length);
+  for (let i = 0; i < cena0.length; i += 3) { const x = cena0[i], y = cena0[i + 1], z = cena0[i + 2]; cena[i] = x * ca - z * sa + 300; cena[i + 1] = y - 120; cena[i + 2] = x * sa + z * ca - 700; }
+  const iso = P.isolarCabeca(cena);
+  assert.ok(iso && iso.raio > 60 && iso.raio < 85, "raio da calota: " + (iso && iso.raio));
+  assert.ok(iso.cobertura > 0.6, "cobertura " + iso.cobertura);
+  assert.equal(P.precisaIsolar(cena, iso), true);
+  // o centro achado é o da cabeça (a origem da cabeça sintética, levada à cena)
+  assert.ok(Math.hypot(iso.centro[0] - 300, iso.centro[1] + 120, iso.centro[2] + 700) < 25, "centro " + iso.centro);
+  // ficou a cabeça: quase todos os triângulos são dela, e quase toda a calota (acima do plano) ficou
+  const nCab = cab.length / 9; let daCabeca = 0, calota = 0, calotaTot = 0;
+  const chave = (p, o) => Math.round(p[o] * 50) + "," + Math.round(p[o + 1] * 50) + "," + Math.round(p[o + 2] * 50), dentro = new Set();
+  for (let o = 0; o < iso.pos.length; o += 9) dentro.add(chave(iso.pos, o));
+  for (let t = 0; t < nCab; t++) { const tem = dentro.has(chave(cena, t * 9)); if (tem) daCabeca++; if (cab[t * 9 + 2] > 0) { calotaTot++; if (tem) calota++; } }
+  assert.ok(calota > 0.995 * calotaTot, `calota inteira: ${calota}/${calotaTot}`);
+  assert.ok(daCabeca > 0.93 * (iso.pos.length / 9), `só a cabeça: ${daCabeca} de ${iso.pos.length / 9}`);
+  // um scan que já é só a cabeça fica como está
+  assert.equal(P.precisaIsolar(cab, P.isolarCabeca(cab)), false);
+  assert.equal(V.unidadeProvavel(cena), "1", "cena maior que a cabeça: milímetros");
 });

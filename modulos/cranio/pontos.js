@@ -214,6 +214,84 @@ export function detectarPontos(pos, o) {
     plano: { n: n.map((v) => +v.toFixed(5)), d: +dDe(n).toFixed(3) }, erroEspelho: +sag.c.toFixed(2), corte: +ct.fracao.toFixed(3), nasio: r.nasio };
 }
 
+/* Isolar a cabeça num scan bruto (14/11/2026). Os scans do escâner de mão chegam com tronco, braços, as mãos de quem
+   segura o bebê, a mesa, panos e ruído solto (cenas de 0,3 a 1,2 m); a análise e os pontos automáticos supõem só a
+   cabeça. A calota é a única parte da cena que é quase uma esfera de 50 a 95 mm de raio:
+   1) votação (Hough) com 20 mil pontos amostrados por área: cada ponto vota no centro p − R·n (normal para dentro ou
+      para fora, R de 50 a 95 mm de 5 em 5, células de 8 mm); vale a célula mais votada em relação a R²;
+   2) esfera por mínimos quadrados nos pontos a menos de 14 → 6 mm dela, com a normal radial (12 voltas);
+   3) ficam os triângulos a menos de 1,6 R do centro (calota, rosto, orelhas e começo do pescoço) e, entre eles, o
+      componente conexo com mais área sobre a esfera (o resto — mão solta, pano, ruído — sai).
+   pos em mm. → { pos, centro, raio, cobertura (área sobre a esfera ÷ área da esfera), removidos, triangulos } ou null.
+   Quem chama decide se usa: ver precisaIsolar. */
+export function isolarCabeca(pos, o) {
+  o = o || {};
+  if (pos.length < 9 * 200) return null;
+  const nt = pos.length / 9, C = new Float32Array(nt * 3), N = new Float32Array(nt * 3), A = new Float32Array(nt);
+  let tot = 0;
+  for (let t = 0; t < nt; t++) {
+    const p = t * 9, ux = pos[p + 3] - pos[p], uy = pos[p + 4] - pos[p + 1], uz = pos[p + 5] - pos[p + 2], vx = pos[p + 6] - pos[p], vy = pos[p + 7] - pos[p + 1], vz = pos[p + 8] - pos[p + 2];
+    const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx, l = Math.hypot(cx, cy, cz);
+    A[t] = l / 2; tot += A[t];
+    if (l > 0) { N[t * 3] = cx / l; N[t * 3 + 1] = cy / l; N[t * 3 + 2] = cz / l; }
+    for (let q = 0; q < 3; q++) C[t * 3 + q] = (pos[p + q] + pos[p + 3 + q] + pos[p + 6 + q]) / 3;
+  }
+  // amostra por área (sorteio fixo)
+  const ns = o.amostras || 20000, acc = new Float64Array(nt); let s0 = 0; for (let t = 0; t < nt; t++) { s0 += A[t]; acc[t] = s0; }
+  let sd = 12345; const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647), ids = new Uint32Array(ns);
+  for (let i = 0; i < ns; i++) { const r = rnd() * tot; let lo = 0, hi = nt - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (acc[m] < r) lo = m + 1; else hi = m; } ids[i] = lo; }
+  // votação (Hough): centro = p − R·n, para os dois sentidos da normal; célula de 8 mm
+  const H = 8; let melhor = null;
+  for (const sinal of [1, -1]) for (let R = 50; R <= 95; R += 5) {
+    const votos = new Map();
+    for (let i = 0; i < ns; i++) { const t = ids[i] * 3; const k = `${Math.round((C[t] - sinal * R * N[t]) / H)},${Math.round((C[t + 1] - sinal * R * N[t + 1]) / H)},${Math.round((C[t + 2] - sinal * R * N[t + 2]) / H)}`; votos.set(k, (votos.get(k) || 0) + 1); }
+    for (const [k, v] of votos) { const nota = v / (R * R); if (!melhor || nota > melhor.nota) { const c = k.split(",").map((x) => +x * H); melhor = { nota, v, R, c, sinal }; } }
+  }
+  // ajuste: esfera por mínimos quadrados nos pontos próximos, com a normal apontando para fora
+  let c = melhor.c.slice(), R = melhor.R; const sg = melhor.sinal;
+  for (let it = 0; it < 12; it++) {
+    let sx = 0, sy = 0, sz = 0, sr = 0, n = 0; const pts = [];
+    for (let i = 0; i < ns; i++) {
+      const t = ids[i] * 3, dx = C[t] - c[0], dy = C[t + 1] - c[1], dz = C[t + 2] - c[2], d = Math.hypot(dx, dy, dz);
+      if (Math.abs(d - R) > Math.max(6, 14 - it) || sg * (dx * N[t] + dy * N[t + 1] + dz * N[t + 2]) / d < 0.75) continue;
+      pts.push([C[t], C[t + 1], C[t + 2]]);
+    }
+    if (pts.length < 50) break;
+    // esfera algébrica: |p|² = 2 c·p + (R² − |c|²)
+    const M = [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], b = [0, 0, 0, 0];
+    for (const p of pts) { const v = [2 * p[0], 2 * p[1], 2 * p[2], 1], y = p[0] * p[0] + p[1] * p[1] + p[2] * p[2]; for (let i = 0; i < 4; i++) { b[i] += v[i] * y; for (let j = 0; j < 4; j++) M[i][j] += v[i] * v[j]; } }
+    for (let i = 0; i < 4; i++) { let pv = i; for (let r = i + 1; r < 4; r++) if (Math.abs(M[r][i]) > Math.abs(M[pv][i])) pv = r; [M[i], M[pv]] = [M[pv], M[i]]; [b[i], b[pv]] = [b[pv], b[i]]; for (let r = i + 1; r < 4; r++) { const f = M[r][i] / M[i][i]; b[r] -= f * b[i]; for (let j = i; j < 4; j++) M[r][j] -= f * M[i][j]; } }
+    const x = [0, 0, 0, 0]; for (let i = 3; i >= 0; i--) { let s = b[i]; for (let j = i + 1; j < 4; j++) s -= M[i][j] * x[j]; x[i] = s / M[i][i]; }
+    const Rn = Math.sqrt(Math.max(1, x[3] + x[0] * x[0] + x[1] * x[1] + x[2] * x[2]));
+    if (!(Rn > 40 && Rn < 110)) break;
+    c = [x[0], x[1], x[2]]; R = Rn;
+  }
+  if (!(R >= 45 && R <= 105)) return null;
+  // recorte: triângulos a menos de k·R do centro; fica o componente conexo com mais área sobre a esfera
+  const lim = (o.alcance || 1.6) * R, fica = [];
+  for (let t = 0; t < nt; t++) if (Math.hypot(C[t * 3] - c[0], C[t * 3 + 1] - c[1], C[t * 3 + 2] - c[2]) < lim) fica.push(t);
+  const map = new Map(), vid = new Uint32Array(fica.length * 3);
+  fica.forEach((t, i) => { for (let q = 0; q < 3; q++) { const p = t * 9 + q * 3, k = `${Math.round(pos[p] * 500)},${Math.round(pos[p + 1] * 500)},${Math.round(pos[p + 2] * 500)}`; let id = map.get(k); if (id === undefined) { id = map.size; map.set(k, id); } vid[i * 3 + q] = id; } });
+  const pai = new Uint32Array(map.size); for (let i = 0; i < pai.length; i++) pai[i] = i;
+  const f = (x) => { while (pai[x] !== x) { pai[x] = pai[pai[x]]; x = pai[x]; } return x; };
+  for (let i = 0; i < fica.length; i++) { const a = f(vid[i * 3]); pai[f(vid[i * 3 + 1])] = a; pai[f(vid[i * 3 + 2])] = a; }
+  const peso = new Map();
+  fica.forEach((t, i) => { const d = Math.hypot(C[t * 3] - c[0], C[t * 3 + 1] - c[1], C[t * 3 + 2] - c[2]); if (Math.abs(d - R) < 10) { const r = f(vid[i * 3]); peso.set(r, (peso.get(r) || 0) + A[t]); } });
+  let raiz = -1, pm = 0; for (const [r, w] of peso) if (w > pm) { pm = w; raiz = r; }
+  const sel = fica.filter((t, i) => f(vid[i * 3]) === raiz), out = new Float32Array(sel.length * 9);
+  sel.forEach((t, i) => out.set(pos.subarray(t * 9, t * 9 + 9), i * 9));
+  return { pos: out, centro: c.map((x) => +x.toFixed(2)), raio: +R.toFixed(2), cobertura: pm / (4 * Math.PI * R * R), removidos: nt - sel.length, triangulos: nt };
+}
+
+// Vale isolar? Só quando o arquivo é claramente mais que uma cabeça: maior dimensão acima de 300 mm, ou mais de um
+// quarto dos triângulos fora da cabeça achada (um scan já recortado, com o pescoço, fica como está).
+export function precisaIsolar(pos, iso) {
+  if (!iso || !(iso.cobertura > 0.45)) return false;
+  let mn = [1e30, 1e30, 1e30], mx = [-1e30, -1e30, -1e30];
+  for (let i = 0; i < pos.length; i += 3) for (let q = 0; q < 3; q++) { const v = pos[i + q]; if (v < mn[q]) mn[q] = v; if (v > mx[q]) mx[q] = v; }
+  return Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) > 300 || iso.removidos > 0.25 * iso.triangulos;
+}
+
 // Correção do pescoço (E3c-4): tira da malha os triângulos do corte plano (a maior área com a mesma normal, quando
 // passa de 2,5% da área), que não são a cabeça — em geral é onde o bebê foi segurado —, e as abas esticadas que o
 // scanner cria ligando a cabeça à mão (triângulos com aresta acima de 6× a típica e muito finos). A análise da órtese completa

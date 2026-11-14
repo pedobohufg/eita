@@ -185,6 +185,9 @@ export function unidadeProvavel(pos) {
   if (D >= 60 && D <= 600) return "1";
   if (D >= 6 && D <= 60) return "10";
   if (D >= 0.06 && D <= 0.6) return "1000";
+  // cena maior que a cabeça (scan bruto, com tronco e mesa; a cabeça é isolada depois): até 3 m
+  if (D > 600 && D <= 3000) return "1";
+  if (D > 0.6 && D <= 3) return "1000";
   return null;
 }
 
