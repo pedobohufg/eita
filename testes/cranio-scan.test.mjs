@@ -198,3 +198,27 @@ test("scan bruto: a cabeça é isolada da cena (mesa, tronco, braço e ruído)",
   assert.equal(P.precisaIsolar(cab, P.isolarCabeca(cab)), false);
   assert.equal(V.unidadeProvavel(cena), "1", "cena maior que a cabeça: milímetros");
 });
+
+// Um clique de ajuda (14/11/2026): com a ponta do nariz indicada, pontosPeloNariz devolve os 5 pontos; o modelo alinhado
+// por eles fica de frente e em pé, qualquer que seja a posição do scan, mesmo com o clique alguns mm fora da ponta.
+test("pontos pela ponta do nariz: cabeça girada e deslocada volta de frente e em pé", async () => {
+  const P = await import("../modulos/cranio/pontos.js"), { carregarCabeca } = await import("./apoio/pipeline-cranio.mjs"), { pos: cab, meta } = carregarCabeca();
+  let nz = null; for (let i = 0; i < cab.length; i += 3) if (Math.abs(cab[i]) < 2 && (!nz || cab[i + 1] > nz[1])) nz = [cab[i], cab[i + 1], cab[i + 2]];
+  const ang = [0.9, -0.6, 2.1], t = [40, -90, 310];
+  const [ca, sa, cb, sb, cc, sc] = [Math.cos(ang[0]), Math.sin(ang[0]), Math.cos(ang[1]), Math.sin(ang[1]), Math.cos(ang[2]), Math.sin(ang[2])];
+  const R = [[cb * cc, -cb * sc, sb], [ca * sc + sa * sb * cc, ca * cc - sa * sb * sc, -sa * cb], [sa * sc - ca * sb * cc, sa * cc + ca * sb * sc, ca * cb]];
+  const mover = (p) => [0, 1, 2].map((i) => R[i][0] * p[0] + R[i][1] * p[1] + R[i][2] * p[2] + t[i]);
+  const gir = new Float32Array(cab.length); for (let i = 0; i < cab.length; i += 3) gir.set(mover([cab[i], cab[i + 1], cab[i + 2]]), i);
+  for (const fora of [[0, 0, 0], [3, 0, 2], [-2, 0, -3]]) {
+    const r = P.pontosPeloNariz(gir, mover([nz[0] + fora[0], nz[1] + fora[1], nz[2] + fora[2]]));
+    assert.ok(r && r.nasio, "pontos e násio achados");
+    const al = O.alinharPorPontos(gir, r.pontos), V0 = (k) => O.pontoAlinhado(al, mover(meta.pontos_mm[k]));
+    const un = (a, b) => { const d = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], l = Math.hypot(...d); return d.map((v) => v / l); };
+    const frente = un(V0("anterior"), V0("posterior")), lado = un(V0("right"), V0("left")), narizA = O.pontoAlinhado(al, mover(nz));
+    const grausDe = (v, q) => Math.acos(Math.min(1, v[q])) * 180 / Math.PI;
+    assert.ok(grausDe(frente, 1) < 10, `frente a ${grausDe(frente, 1).toFixed(1)}° (clique fora ${fora})`);
+    assert.ok(grausDe(lado, 0) < 6, `lado a ${grausDe(lado, 0).toFixed(1)}°`);
+    assert.ok(Math.abs(narizA[0]) < 4 && narizA[1] > 60 && narizA[2] < al.zRef, `nariz na frente, no meio e abaixo do plano: ${narizA.map((v) => v.toFixed(1))}`);
+  }
+  assert.equal(P.pontosPeloNariz(gir, mover([0, 0, 0])), null, "clique dentro da cabeça não vale");
+});

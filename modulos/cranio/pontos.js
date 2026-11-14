@@ -93,7 +93,9 @@ function erroEspelho(P, G, n, passo, grosso) {
 }
 
 // 3) pontos no quadro (n = lateral D, a = frente, s = cima); contorno sagital no plano n·p = d
-function pontosNoQuadro(pos, Vtx, n, a, s, d, corte) {
+// x (pontosPeloNariz): { nariz (ponta do nariz), centro e raio da esfera da calota } — o násio é procurado logo acima do
+// nariz e o opistocrânio só na calota (gola, ombro e mão atrás do pescoço ficam de fora)
+function pontosNoQuadro(pos, Vtx, n, a, s, d, corte, x) {
   const seg = [];
   for (let o = 0; o < pos.length; o += 9) {
     const V = [0, 3, 6].map((k) => [pos[o + k], pos[o + k + 1], pos[o + k + 2]]), e = V.map((v) => dot(v, n) - d), pts = [];
@@ -110,11 +112,16 @@ function pontosNoQuadro(pos, Vtx, n, a, s, d, corte) {
   let hTesta = null; for (const h of hs) if (h >= meio && (hTesta == null || perf.get(h).a > perf.get(hTesta).a)) hTesta = h;
   // opistocrânio: o ponto mais posterior da metade de cima do contorno (fora do corte plano do pescoço)
   const foraDoCorte = (q) => !corte || Math.abs(dot(sub(q.p, corte.centro), corte.normal)) > 4;
-  const post = S.filter((q) => q.s >= meio && foraDoCorte(q)).reduce((m, q) => (!m || q.a < m.a ? q : m), null);
+  const naCalota = x ? (q) => Math.hypot(q.p[0] - x.centro[0], q.p[1] - x.centro[1], q.p[2] - x.centro[2]) < 1.2 * x.raio && q.s >= dot(x.centro, s) - 0.35 * x.raio : (q) => q.s >= meio;
+  const post = S.filter((q) => naCalota(q) && foraDoCorte(q)).reduce((m, q) => (!m || q.a < m.a ? q : m), null);
   if (!post) return null;
   // násio: entre 45 e 5 mm abaixo do opistocrânio, a primeira reentrância (de cima para baixo) do perfil da frente
   // seguida de uma saliência (nariz) de ≥ 1 mm em até 25 mm
   let hNasio = null;
+  if (x && x.nariz) {   // com a ponta do nariz: o ponto mais recuado do perfil de 5 a 30 mm acima dela
+    const hN = Math.round(dot(x.nariz, s)); let m = null;
+    for (let h = hN + 5; h <= hN + 30; h++) if (perf.has(h) && (!m || perf.get(h).a < m.a)) { m = perf.get(h); hNasio = h; }
+  } else
   for (const h of hs) {
     if (!perf.has(h) || h > post.s - 5 || h < post.s - 45) continue;
     const aq = perf.get(h).a, acima = perf.get(h + 1), abaixo = perf.get(h - 1); if (!acima || !abaixo) continue;
@@ -126,17 +133,22 @@ function pontosNoQuadro(pos, Vtx, n, a, s, d, corte) {
   if (!glab) for (let h = Math.round(post.s - 8); h >= Math.round(post.s - 14) && !glab; h--) if (perf.has(h)) glab = perf.get(h);
   if (!glab) return null;
   const sG = glab.s;
+  // com o nariz, o quadro já está quase na horizontal: o opistocrânio é o ponto mais posterior da calota a até 12 mm
+  // da altura da glabela (o mais posterior de toda a metade de cima podia cair na nuca ou na gola e inclinar o plano)
+  let postN = null;
+  if (x && x.nariz) postN = S.filter((q) => Math.abs(q.s - sG) <= 12 && q.a < aMed && Math.hypot(q.p[0] - x.centro[0], q.p[1] - x.centro[1], q.p[2] - x.centro[2]) < 1.3 * x.raio).reduce((m, q) => (!m || q.a < m.a ? q : m), null);
+  const postF = postN || post;
   const vert = S.reduce((m, q) => (!m || q.s > m.s ? q : m), null);
   let dir = null, esq = null;
-  for (let i = 0; i < Vtx.length; i += 3) { const v = [Vtx[i], Vtx[i + 1], Vtx[i + 2]]; if (dot(v, s) < sG + 10) continue; const x = dot(v, n); if (!dir || x > dir.x) dir = { v, x }; if (!esq || x < esq.x) esq = { v, x }; }
+  for (let i = 0; i < Vtx.length; i += 3) { const v = [Vtx[i], Vtx[i + 1], Vtx[i + 2]]; if (dot(v, s) < sG + 10) continue; if (x && Math.hypot(v[0] - x.centro[0], v[1] - x.centro[1], v[2] - x.centro[2]) > 1.3 * x.raio) continue; const xl = dot(v, n); if (!dir || xl > dir.x) dir = { v, x: xl }; if (!esq || xl < esq.x) esq = { v, x: xl }; }
   if (!post || !vert || !dir || !esq) return null;
   // vértice para o alinhamento (z = vértice − meio dos eúrios): o ponto do contorno logo acima do meio dos eúrios na
   // direção perpendicular à linha glabela–opistocrânio, para que essa linha fique horizontal. O ponto mais alto do
   // quadro provisório não serve: os eúrios costumam ficar atrás do meio da cabeça e o "para cima" inclinava a face
   // para cima (no scan dos gêmeos, 33°)
-  const meioLat = escala([0, 1, 2].map((q) => dir.v[q] + esq.v[q]), 0.5), u = norm(sub(glab.p, post.p)), sup = norm(semComp(s, u));
+  const meioLat = escala([0, 1, 2].map((q) => dir.v[q] + esq.v[q]), 0.5), u = norm(sub(glab.p, postF.p)), sup = norm(semComp(s, u));
   const topo = S.filter((q) => dot(sub(q.p, meioLat), sup) > 20).reduce((m, q) => { const e = Math.abs(dot(sub(q.p, meioLat), u)); return !m || e < m.e ? { q, e } : m; }, null);
-  return { anterior: glab.p, posterior: post.p, right: dir.v, left: esq.v, vertex: topo ? topo.q.p : vert.p, maisAlto: vert.p, nasio: hNasio != null };
+  return { anterior: glab.p, posterior: postF.p, right: dir.v, left: esq.v, vertex: topo ? topo.q.p : vert.p, maisAlto: vert.p, nasio: hNasio != null };
 }
 
 // Pontos sugeridos → { pontos: { anterior, posterior, left, right, vertex } (no referencial de pos), plano: { n, d },
@@ -290,6 +302,49 @@ export function precisaIsolar(pos, iso) {
   let mn = [1e30, 1e30, 1e30], mx = [-1e30, -1e30, -1e30];
   for (let i = 0; i < pos.length; i += 3) for (let q = 0; q < 3; q++) { const v = pos[i + q]; if (v < mn[q]) mn[q] = v; if (v > mx[q]) mx[q] = v; }
   return Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) > 300 || iso.removidos > 0.25 * iso.triangulos;
+}
+
+/* Pontos de referência a partir de um clique na ponta do nariz (14/11/2026). Nos scans brutos a orientação automática
+   erra muito (sem o corte plano do pescoço, roupa, gola e mãos enganam as pistas de "para cima" e de frente: acertou a
+   frente em 2 de 6 scans reais). Com o nariz indicado sobra pouco a decidir:
+   1) esfera da calota (isolarCabeca): centro c e raio R; a direção c → nariz aponta para a frente e para baixo;
+   2) plano sagital: passa pelo nariz; a normal gira em torno do eixo c → nariz (busca em 1 dimensão pelo menor erro de
+      espelho, só com os pontos a menos de 1,25 R do centro), depois refino da inclinação e do deslocamento;
+   3) no plano: "para cima" é o lado da calota; a frente fica 28° acima da direção do nariz (o nariz fica abaixo do
+      centro da calota; nos scans reais, 26° a 29°);
+   4) pontos: násio = o ponto mais recuado do perfil logo acima do nariz; glabela 12 mm acima; opistocrânio = o mais
+      posterior da calota a até 12 mm da altura da glabela; eúrios e vértice como em detectarPontos.
+   pos = scan preparado (mm), já só com a cabeça; nariz = [x, y, z] no mesmo referencial. → como detectarPontos, ou null. */
+export function pontosPeloNariz(pos, nariz, o) {
+  o = o || {};
+  const esf = o.esfera || isolarCabeca(pos); if (!esf) return null;
+  const c = esf.centro, R = esf.raio;
+  if (Math.hypot(nariz[0] - c[0], nariz[1] - c[1], nariz[2] - c[2]) < 0.6 * R) return null;   // clique dentro da cabeça?
+  const T = triangulos(pos), P = [], Pc = [];
+  // o clique vai para a ponta: o ponto mais saliente (na direção centro → clique) a até 6 mm dele
+  { const f = norm(sub(nariz, c)), raioC = o.raioDoClique == null ? 6 : o.raioDoClique; let m = dot(nariz, f), q = nariz; for (let t = 0; t < T.nt; t++) { const p = [T.C[t * 3], T.C[t * 3 + 1], T.C[t * 3 + 2]]; if (Math.hypot(p[0] - nariz[0], p[1] - nariz[1], p[2] - nariz[2]) < raioC && dot(p, f) > m) { m = dot(p, f); q = p; } } nariz = q; }
+  const f0 = norm(sub(nariz, c));
+  // simetria: rosto, testa, têmporas e orelhas (a menos de 100° da direção do nariz; nuca, gola e mãos atrás ficam
+  // fora), com o erro de cada ponto limitado a 5 mm (o que não tem par do outro lado — mão, pano — pesa pouco)
+  for (const t of amostrar(T, o.amostras || 12000)) { const p = [T.C[t * 3], T.C[t * 3 + 1], T.C[t * 3 + 2]], v = sub(p, c), d = Math.hypot(v[0], v[1], v[2]); if (d < 1.3 * R) { if (dot(v, f0) > d * Math.cos((o.cone || 100) * GRAU)) P.push(p); if (Math.abs(d - R) < 0.13 * R) Pc.push(escala(v, 1 / d)); } }
+  if (P.length < 400) return null;
+  const G = grade(P, 4);
+  const erro = (n, d, passo) => { let e = 0, k = 0; for (let i = 0; i < P.length; i += passo) { const p = P[i], m = 2 * (dot(p, n) - d); e += G.perto(p[0] - m * n[0], p[1] - m * n[1], p[2] - m * n[2], o.teto || 5); k++; } return e / k; };
+  const e1 = semComp(Math.abs(f0[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0], f0), e2 = cruz(f0, e1);
+  const normal = (ang, incl) => norm([0, 1, 2].map((q) => Math.cos(incl * GRAU) * (Math.cos(ang * GRAU) * e1[q] + Math.sin(ang * GRAU) * e2[q]) + Math.sin(incl * GRAU) * f0[q]));
+  let m = null;
+  for (let ang = 0; ang < 180; ang += 3) for (const incl of [-6, 0, 6]) for (const off of [-3, 0, 3]) { const n = normal(ang, incl), e = erro(n, dot(n, nariz) + off, 3); if (!m || e < m.e) m = { e, ang, incl, off }; }
+  for (const st of [2, 1, 0.5]) { let b = m; for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) for (const k of [-1, 0, 1]) { const ang = m.ang + i * st, incl = m.incl + j * st, off = m.off + k * st, n = normal(ang, incl), e = erro(n, dot(n, nariz) + off, st > 1 ? 2 : 1); if (e < b.e) b = { e, ang, incl, off }; } m = b; }
+  let nS = normal(m.ang, m.incl); const dS = dot(nS, nariz) + m.off;
+  // no plano: f = direção do nariz (para a frente e para baixo); g = perpendicular, do lado da calota
+  const kc = Pc.reduce((u, v) => u.map((w, q) => w + v[q]), [0, 0, 0]), f = semComp(f0, nS); let g = cruz(nS, f); if (dot(g, kc) < 0) g = escala(g, -1);
+  const INCL = 28 * GRAU; let a = norm([0, 1, 2].map((q) => Math.cos(INCL) * f[q] + Math.sin(INCL) * g[q])), s = norm([0, 1, 2].map((q) => -Math.sin(INCL) * f[q] + Math.cos(INCL) * g[q]));
+  let n = norm(cruz(a, s)); const dDe = (v) => dS * Math.sign(dot(v, nS)), x = { nariz, centro: c, raio: R };
+  const r = pontosNoQuadro(pos, pos, n, a, s, dDe(n), null, x);
+  if (!r) return null;
+  const arred = (p) => p.map((v) => +v.toFixed(4));
+  return { pontos: { anterior: arred(r.anterior), posterior: arred(r.posterior), left: arred(r.left), right: arred(r.right), vertex: arred(r.vertex) },
+    plano: { n: n.map((v) => +v.toFixed(5)), d: +dDe(n).toFixed(3) }, erroEspelho: +m.e.toFixed(2), corte: 0, nasio: r.nasio, nariz: arred(nariz) };
 }
 
 // Correção do pescoço (E3c-4): tira da malha os triângulos do corte plano (a maior área com a mesma normal, quando

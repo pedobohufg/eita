@@ -248,13 +248,13 @@ async function abrirSTL(arq) {
       if (C.pontos.precisaIsolar(pos, iso)) {
         S3.isolado = { removidos: iso.removidos, triangulos: iso.triangulos, raio: iso.raio };
         pos = O.prepararScan(iso.pos, 1).pos;
-        avisoI = ` <b>Cabeça isolada</b> do scan: ${iso.removidos.toLocaleString("pt-BR")} de ${iso.triangulos.toLocaleString("pt-BR")} triângulos (tronco, mãos, apoio e ruído) ficaram de fora. Confira no modelo se sobrou só a cabeça.`;
+        avisoI = ` <b>Cabeça isolada</b> do scan: ${iso.removidos.toLocaleString("pt-BR")} de ${iso.triangulos.toLocaleString("pt-BR")} triângulos (tronco, mãos, apoio e ruído) ficaram de fora. Confira no modelo se sobrou só a cabeça e se o rosto ficou de frente; se não, use <b>Indicar a ponta do nariz</b>.`;
       }
     }
     mostrarVista("3d"); iniciar3D();
     S3.arquivo = arq.name; S3.unidade = u; S3.alinhado = false; S3.alinhamento = null; S3.zRef0 = null; S3.posPrep = pos; S3.al = null; S3.correcao = null; S3.detec = null; S3.conferencia = null; limparPerfil();
     trocarMalha(pos, true); limparPontos(); resetCRO(); ajustarFaixaPlano(); $("correcaoInfo").textContent = ""; esvaziar(grupoAvisos); $("conferencia").hidden = true;
-    ["btn-arm-mark", "btn-clear-marks", "btn-auto-pontos"].forEach((id) => ($(id).disabled = false));
+    ["btn-arm-mark", "btn-clear-marks", "btn-auto-pontos", "btn-nariz"].forEach((id) => ($(id).disabled = false)); armarNariz(false);
     $("doScan").hidden = false; $("vazio3d").hidden = true; ETP.liberar(["s4", "s5"]); croHabilitar(true);
     $("scanInfo").innerHTML = `<b>${esc(arq.name)}</b>: ${(pos.length / 9).toLocaleString("pt-BR")} triângulos, ${[0, 1, 2].map((q) => fmt(S3.caixa.max[q] - S3.caixa.min[q], 0)).join(" × ")} mm. Marque os 5 pontos e alinhe.`;
     status(`Scan <b>${esc(arq.name)}</b> aberto. Marque os 5 pontos de referência e toque em <b>Alinhar aos eixos anatômicos</b>.${avisoU}${avisoI}`, !!avisoU && avisoU.includes("Atenção"));
@@ -305,10 +305,32 @@ async function pontosAutomaticos(prefixo) {
   return true;
 }
 $("btn-auto-pontos").onclick = () => { if (!doisCliquesSeAlinhado()) return; pontosAutomaticos(); };
+// um clique de ajuda (pontos.js, pontosPeloNariz): com a ponta do nariz indicada, o plano do meio, o "para cima" e os
+// 5 pontos saem dela — para os scans em que a detecção automática troca a frente com a nuca ou deixa o modelo torto
+function armarNariz(liga) { S3.armadoNariz = liga; $("btn-nariz").textContent = liga ? "Duplo clique na ponta do nariz…" : "Indicar a ponta do nariz"; }
+$("btn-nariz").onclick = () => {
+  if (!S3.posPrep) return;
+  if (S3.armadoNariz) { armarNariz(false); status("Indicação do nariz cancelada."); return; }
+  S3.armado = false; $("btn-arm-mark").textContent = "Marcar na malha"; armarNariz(true); mostrarVista("3d");
+  status("Gire o modelo até ver o rosto e dê <b>duplo clique na ponta do nariz</b>. Os pontos atuais serão trocados e o modelo, realinhado.");
+};
+async function pontosPeloNariz(pTela) {
+  armarNariz(false);
+  const nariz = paraBruto(pTela);
+  CASCA.ocupado(true, "Alinhando pelo nariz…"); await UI.espera(30);
+  let r = null; try { r = C.pontos.pontosPeloNariz(S3.posPrep, nariz); } catch (e) { console.error(e); }
+  CASCA.ocupado(false);
+  if (!r) { status("Não consegui alinhar por esse ponto: confira se o duplo clique foi na ponta do nariz e tente de novo, ou marque os 5 pontos na malha.", true); return false; }
+  definirPontosBrutos(r.pontos); S3.pontosAuto = Object.assign({}, r.pontos); S3.detec = r; listarPontos();
+  alinhar(); extrairMedidas(true);
+  status(`Modelo alinhado pela ponta do nariz (simetria do rosto: erro médio ${fmt(r.erroEspelho, 1)} mm); medidas extraídas no plano glabela–opistocrânio. <b>Confira</b> as vistas de frente, de lado e de cima: o rosto deve ficar de frente e em pé. Qualquer ponto pode ser marcado de novo.`);
+  atualizarEstado();
+  return true;
+}
 function doisCliquesSeAlinhado() { return !S3.alinhado || doisCliques("autoPontos", $("btn-auto-pontos"), "Confirmar: trocar os pontos", "Os pontos atuais serão trocados pelos automáticos e o modelo, realinhado (a análise de pressão recomeça). Toque de novo para confirmar."); }
 $("btn-arm-mark").onclick = () => {
   if (!S3.pos) return;
-  S3.armado = !S3.armado; const k = $("landmark-select").value;
+  S3.armado = !S3.armado; armarNariz(false); const k = $("landmark-select").value;
   $("btn-arm-mark").textContent = S3.armado ? "Duplo clique na malha…" : "Marcar na malha";
   status(S3.armado ? `Dê duplo clique na malha sobre o ponto <b>${PONTOS[k].nome}</b>.` : "Marcação cancelada.");
   if (S3.armado) mostrarVista("3d");
@@ -818,6 +840,7 @@ function ligarCliques() {
   const acerto = (e) => { const r = el.getBoundingClientRect(); rc.setFromCamera(new T.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera); return malha ? rc.intersectObject(malha, false)[0] : null; };
   el.addEventListener("dblclick", (e) => {
     if (CRO.contorno && CRO.contorno.editando && !S3.armado && malha) { const h = acerto(e); if (h) inserirPontoDoContorno(h.point); return; }
+    if (S3.armadoNariz && malha) { const h = acerto(e); if (h) pontosPeloNariz([h.point.x, h.point.y, h.point.z]); return; }
     if (!S3.armado || !malha) return;
     const h = acerto(e); if (!h) return;
     const k = $("landmark-select").value; marcarPonto(k, [h.point.x, h.point.y, h.point.z]); if (S3.pontosAuto) { delete S3.pontosAuto[k]; listarPontos(); }
@@ -1345,7 +1368,7 @@ $("expPdf").onclick = async () => {
   } catch (e) { console.error(e); CASCA.ocupado(false); status("Erro ao gerar o relatório: " + esc(e.message), true); }
 };
 window.__eitaRelatorio = gerarPDF; // usado nos testes
-window.__eitaCranio = { S, S3, CRO, readParams,   // usado nos testes (só leitura)
+window.__eitaCranio = { S, S3, CRO, readParams, pontosPeloNariz,   // usado nos testes (só leitura)
   contornoNaTela: (i, c) => { c = c || "pts"; const q = CRO.contorno[c][i], p = pontoDoContorno3D(q.th, hDe(c, q)).project(camera), r = desenhista.domElement.getBoundingClientRect(); return [r.left + (p.x + 1) / 2 * r.width, r.top + (1 - p.y) / 2 * r.height]; } };
 
 /* ------------------------------------------------------------------ início */

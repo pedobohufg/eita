@@ -171,6 +171,16 @@ async def main():
             v = await pn.evaluate("window.__eitaCranio.S3.pontos.vertex")
             ok(v and v[2] > 60, f"vértice marcado por duplo clique (z = {v and round(v[2], 1)} mm)")
             ok("realinhar" in await pn.text_content("#status"), "ponto corrigido sobre os automáticos: pede para realinhar")
+            # um clique de ajuda: o botão arma o duplo clique; com a ponta do nariz (o ponto mais à frente da linha do meio
+            # do modelo alinhado), os pontos são refeitos e o modelo continua de frente e em pé
+            await clicar(pn, "btn-nariz")
+            ok("nariz" in await pn.text_content("#btn-nariz") and await pn.evaluate("window.__eitaCranio.S3.armadoNariz") is True, "indicar o nariz: botão armado")
+            nz = await pn.evaluate("(() => { const p = window.__eitaCranio.S3.pos; let m = null; for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i]) < 3 && (!m || p[i + 1] > m[1])) m = [p[i], p[i + 1], p[i + 2]]; return m; })()")
+            antes = await pn.evaluate("window.__eitaCranio.S3.pos.slice(0, 9)")
+            ok(await pn.evaluate(f"window.__eitaCranio.pontosPeloNariz({json.dumps(nz)})") is True, "pontos refeitos a partir da ponta do nariz")
+            await esperar_texto(pn, "status", "alinhado pela ponta do nariz")
+            nz2 = await pn.evaluate("(() => { const p = window.__eitaCranio.S3.pos; let m = null; for (let i = 0; i < p.length; i += 3) if (Math.abs(p[i]) < 3 && (!m || p[i + 1] > m[1])) m = [p[i], p[i + 1], p[i + 2]]; return m; })()")
+            ok(await pn.evaluate("window.__eitaCranio.S3.alinhado && !window.__eitaCranio.S3.armadoNariz") and abs(nz2[0]) < 4 and abs(nz2[1] - nz[1]) < 8 and abs(nz2[2] - nz[2]) < 20, f"modelo de frente e em pé depois do nariz (nariz em y {round(nz2[1], 1)} × {round(nz[1], 1)}, z {round(nz2[2], 1)} × {round(nz[2], 1)})")
             base = {"formato": "EITA! Crânio base", "exportado": "2026-11-01T10:00:00.000Z", "fichas": [dict(FICHA, id="ts-02", nome="Outro")], "protocolos": {"Serviço X": {"cro-c0": "2,5"}}}
             await pn.set_input_files("#dbImp", files=[{"name": "base_antiga.json", "mimeType": "application/json", "buffer": json.dumps(base).encode()}])
             await esperar_texto(pn, "status", "versão antiga")
