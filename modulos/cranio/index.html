@@ -288,7 +288,8 @@ table.perf .bar{display:inline-block;height:8px;border-radius:3px;vertical-align
     <div class="row" style="margin-top:2px"><button type="button" id="btn-cro-ic-auto">Usar alvo pela idade</button></div>
     <details class="av"><summary>Avançado: intensidade da correção</summary>
       <label class="ctl dec" id="row-cro-relief" title="Percentual do desvio que a órtese corrige. 100% = corrige tudo até o alvo.">Fator de correção (%)<input type="text" inputmode="decimal" id="cro-relief" value="100"></label>
-      <label class="ctl dec" id="row-cro-relief-max" title="Limite da folga criada nas áreas de alívio.">Alívio máximo (mm)<input type="text" inputmode="decimal" id="cro-relief-max" value="6"></label>
+      <label class="ctl dec" id="row-cro-relief-max" title="Limite da folga criada nas áreas de alívio.">Alívio máximo (mm)<input type="text" inputmode="decimal" id="cro-relief-max" value="10"></label>
+      <label class="ctl" id="row-cro-target" title="Envelope simétrico: a face interna é o contorno externo da cabeça e do seu espelho; o lado achatado ganha vazio até igualar o outro lado e nada é empurrado. Média dos lados: o vazio vai só até a média (metade da assimetria), como na versão antiga.">Forma-alvo<select id="cro-target"><option value="envelope" selected>Envelope simétrico</option><option value="media">Média dos lados (versão antiga)</option></select></label>
       <label class="ctl dec" id="row-cro-comp-max" title="Só no modo Ativo.">Compressão máxima (mm)<input type="text" inputmode="decimal" id="cro-comp-max" value="1,5"></label>
     </details>
     <div class="row"><button class="primary" id="btn-cro-analyze" type="button" disabled>Analisar pressão</button></div>

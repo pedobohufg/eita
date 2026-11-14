@@ -76,7 +76,7 @@ test("fichas antigas: ficha e base da versão completa → ficha unificada", () 
   assert.deepEqual(FX.mesclarProtocolos({ A: { x: 1 } }, { A: { x: 2 }, B: { y: 1 } }), { A: { x: 1 }, B: { y: 1 } }, "os protocolos deste navegador prevalecem");
   assert.throws(() => FX.converterFichaAntiga({ formato: "EITA! CRÂNIO ficha" }));
   // campos criados na E3c-4: numa ficha antiga completa, valem os equivalentes ao comportamento antigo
-  assert.deepEqual(FX.completarEntradas({ "cro-type": "band", "cro-bandtop": "60" }), { "cro-type": "band", "cro-bandtop": "60", "cro-bandtop-back": "60", "cro-hole-zone": "all", "cro-front-arc": "0", "cro-cheek-wall": "off", "cro-cheek-foam": "0", "cro-ear-back": "0" });
+  assert.deepEqual(FX.completarEntradas({ "cro-type": "band", "cro-bandtop": "60" }), { "cro-type": "band", "cro-bandtop": "60", "cro-bandtop-back": "60", "cro-hole-zone": "all", "cro-front-arc": "0", "cro-cheek-wall": "off", "cro-cheek-foam": "0", "cro-ear-back": "0", "cro-target": "media" });
   assert.deepEqual(FX.completarEntradas({ "cro-indic": "brachy" }), { "cro-indic": "brachy" }, "sem os campos da casca: fica o padrão da página");
   assert.equal(f.ortese.entradas["cro-bandtop-back"], undefined, "a ficha de teste não tem cro-type");
 });

@@ -541,29 +541,67 @@ export function reservaDeCrescimento(d, ph, P) {
   return v;
 }
 
+/* Forma-alvo simétrica (P.alvo 'envelope'; padrão do protocolo Lab.EITA). O desvio da análise é METADE da diferença
+   entre um lado e o espelho (alvo = média dos dois lados). No modo passivo a casca não empurra o lado proeminente,
+   então com o alvo na média o lado achatado só podia crescer até a média e a face interna saía assimétrica (metade da
+   assimetria ficava). Com 'envelope' o lado achatado ganha também a outra metade: a face interna vira o envelope
+   externo da cabeça e do seu espelho (mais forro e reserva), simétrica, e nunca entra na cabeça. Vale só para a parte
+   de plagiocefalia do desvio (a de braquicefalia já é o alvo inteiro) e respeita as correções manuais que anulam ou
+   reduzem o desvio no ponto. Abaixo do plano some aos poucos (de −8° a −24°), para a borda de baixo não fazer gancho.
+   → mm a somar ao alívio, antes do limite reliefMax. */
+const cacheSaliencia = new WeakMap();
+function salienciaDaOrelha(an) {
+  let g = cacheSaliencia.get(an.rsNoEar);
+  if (!g) { const N = an.rho.length, d = new Float32Array(N); for (let i = 0; i < N; i++) d[i] = an.rho[i] - an.rsNoEar[i]; g = suavizarGrade(d, 3); cacheSaliencia.set(an.rsNoEar, g); }
+  return g;
+}
+function alivioAteOEspelho(an, th, ph, P, d, atenua, pertoOrelha, dmSemOrelha) {
+  if (P.alvo !== 'envelope' || P.mode === 'active' || !an.usePl || !an.devMirror) return 0;
+  const dm0 = amostrarGrade(an.devMirror, th, ph), dm = dm0 + (pertoOrelha || 0) * ((dmSemOrelha || 0) - dm0);   // perto das orelhas, sem elas
+  if (!(dm < 0)) return 0;
+  const db = amostrarGrade(an.devBase, th, ph) * atenua;
+  const edicao = !pertoOrelha && db < -0.05 ? limitar(d / db, 0, 1) : 1;   // correção manual (anular, contato) reduz na mesma proporção
+  return P.relief * (-dm) * atenua * edicao * degrauSuave((ph + 24) / 16);
+}
+
 export function raioInterno(an, th, ph, P) {
   let r = amostrarGrade(an.rho, th, ph);
-  let d = amostrarGrade(an.dev, th, ph);
+  let d = amostrarGrade(an.dev, th, ph), atenua = 1, pertoOrelha = 0, dmSemOrelha = 0;
   // com contorno editado (E3c-4): a casca acompanha o crânio sem as orelhas (a orelha inclinada para trás fazia a
   // casca atrás dela se afastar da cabeça) e, onde há orelha deste lado ou do espelho, o mapa de desvio (que compara
   // os dois lados) não vale — a orelha de um lado contra a pele do outro virava alívio ou contato falso
   if (P.contorno && an.rsNoEar && P.zonasOrelha) {
     // só perto das orelhas (o "sem orelha" também achata outras saliências estreitas, como a bochecha)
     let perto = 0;
-    for (const z of P.zonasOrelha) { const dz = diferencaAzimute(th, z.az); if (dz < z.w + 30 && ph < z.phTop) perto = Math.max(perto, degrauSuave((z.w + 30 - dz) / 10)); }
+    // a zona acaba aos poucos também para cima (8° ≈ 10 mm): o corte seco em phTop deixava um degrau na face interna
+    for (const z of P.zonasOrelha) { const dz = diferencaAzimute(th, z.az); if (dz < z.w + 30 && ph < z.phTop) perto = Math.max(perto, degrauSuave((z.w + 30 - dz) / 10) * degrauSuave((z.phTop - ph) / 8)); }
     if (perto > 0) {
-      const re = amostrarGrade(an.rsNoEar, th, ph), m = 360 - th, orelha = Math.max(r - re, amostrarGrade(an.rho, m, ph) - amostrarGrade(an.rsNoEar, m, ph));
-      r = r + (re - r) * perto; if (orelha > 0.5) d *= 1 - perto * Math.min(1, (orelha - 0.5) / 1.5);
+      const m = 360 - th;
+      // forma-alvo: o "crânio sem orelha" é uma abertura morfológica e sai em degraus (patamares) onde a cabeça tem um
+      // canto, como a quina do achatamento; usa-se a saliência da orelha suavizada, tirada do raio da cabeça
+      const semOrelha = P.alvo === 'envelope' ? (t) => amostrarGrade(an.rho, t, ph) - Math.max(0, amostrarGrade(salienciaDaOrelha(an), t, ph)) : (t) => amostrarGrade(an.rsNoEar, t, ph);
+      const re = semOrelha(th), reM = semOrelha(m), orelha = Math.max(r - re, amostrarGrade(an.rho, m, ph) - reM);
+      r = r + (re - r) * perto;
+      if (P.alvo === 'envelope') {
+        // forma-alvo: perto das orelhas a parte de plagiocefalia do desvio passa a comparar os dois lados SEM as orelhas
+        // (em vez de anular o desvio onde há orelha, o que cortava o alívio em degraus no lado achatado atrás dela)
+        dmSemOrelha = 0.5 * (re - reM);
+        if (an.usePl) d += perto * (dmSemOrelha - amostrarGrade(an.devMirror, th, ph)) * limitar((ph + 16) / 8, 0, 1);
+        pertoOrelha = perto;
+      } else if (orelha > 0.5) { atenua = 1 - perto * Math.min(1, (orelha - 0.5) / 1.5); d *= atenua; }
     }
   }
   let add = 0;
-  if (d < 0) add = Math.min(P.reliefMax, P.relief * (-d));              // alívio (vazio) na área achatada
+  if (d < 0) add = Math.min(P.reliefMax, P.relief * (-d) + alivioAteOEspelho(an, th, ph, P, d, atenua, pertoOrelha, dmSemOrelha));   // alívio (vazio) na área achatada
   else if (P.mode === 'active') add = -Math.min(P.compMax, P.relief * d); // compressão opcional na área proeminente
   // borda assentada (com contorno editado, E3c-4): o alívio e a reserva de crescimento somem nos 15 mm junto da borda
   // de baixo, que encosta na cabeça (só o forro); sem isso a borda atrás da orelha e no occipício abria para fora
   let assento = 1;
-  if (P.bordaInferior) assento = degrauSuave((ph - P.bordaInferior(th)) * GRAU * r / 15);
-  let gap = P.c0 + (add + reservaDeCrescimento(d, ph, P)) * assento;
+  const reserva = reservaDeCrescimento(d, ph, P);
+  // com a forma-alvo o alívio pode passar de 10 mm: a subida a partir da borda assentada alarga com ele (2,5 mm de
+  // rampa por mm de vazio, nunca menos que os 15 mm), para a borda de baixo não fazer gancho
+  if (P.bordaInferior) assento = degrauSuave((ph - P.bordaInferior(th)) * GRAU * r / (P.alvo === 'envelope' ? Math.max(15, 2.5 * (add + reserva)) : 15));
+  let gap = P.c0 + (add + reserva) * assento;
   if (P.cheekClear != null) { const low = limitar((-ph - 6) / 10, 0, 1); gap = gap * (1 - low) + P.cheekClear * low; }
   if (P.parede) { const w = P.parede(th, ph); if (w) return (r + gap) * (1 - w.peso) + w.r * w.peso; }
   return r + gap;

@@ -33,6 +33,7 @@ export function completarEntradas(e) {
   if (o["cro-cheek-wall"] == null) o["cro-cheek-wall"] = "off";   // apoio copiando o rosto e descida curta atrás da orelha
   if (o["cro-cheek-foam"] == null) o["cro-cheek-foam"] = "0";
   if (o["cro-ear-back"] == null) o["cro-ear-back"] = "0";
+  if (o["cro-target"] == null) o["cro-target"] = "media";   // forma-alvo antiga: vazio só até a média dos dois lados
   return o;
 }
 // Valores dos campos da página antiga (todos os cro-* de projeto): base para fichas e predefinições que só citam
@@ -42,14 +43,15 @@ export const PADRAO_ANTIGO = Object.freeze({ "cro-indic": "auto", "cro-age": "",
   "cro-res": "normal", "cro-split": "coronal", "cro-grow-src": "age", "cro-grow-m": "4", "cro-grow-rate": "0,8", "cro-grow-contact": "30", "cro-grow-vertex": "2", "cro-ear-mode": "auto", "cro-ear-clear": "8",
   "cro-ear-az-r": "100", "cro-ear-az-l": "100", "cro-ear-w-r": "24", "cro-ear-w-l": "24", "cro-ear-top-r": "14", "cro-ear-top-l": "14", "cro-hf": "4", "cro-occ-w": "50", "cro-cheek-depth": "32",
   "cro-cheek-gap": "6", "cro-cheek-clear": "1,5", "cro-mast-depth": "24", "cro-mast-gap": "4", "cro-hole-d": "4", "cro-pitch": "10", "cro-margin": "8", "cro-split-pos": "-35", "cro-gap": "2", "cro-hole-zone": "all", "cro-front-arc": "0",
-  "cro-cheek-wall": "off", "cro-cheek-foam": "0", "cro-ear-back": "0" });
+  "cro-cheek-wall": "off", "cro-cheek-foam": "0", "cro-ear-back": "0", "cro-target": "media" });
 // Protocolo do laboratório (E3c-4; padrão da página desde então): faixa de topo aberto inclinado (40° na frente,
 // 70° atrás), borda frontal na altura da glabela até ±40° (acima dos olhos), borda de trás baixa, apoio pré-auricular, sem aba atrás da orelha, peça inteira com fenda lateral E e
 // furos só na frente e atrás. A superfície interna segue a cabeça (folga de 2 mm + reserva de crescimento), menos nos
 // apoios da bochecha, que são lisos com 3 mm para espuma; atrás da orelha a borda desce numa curva de 35°.
+// Forma-alvo (14/11/2026): envelope simétrico da cabeça e do seu espelho, com até 10 mm de vazio no lado achatado.
 export const PROTOCOLO_LABEITA = Object.freeze({ "cro-type": "band", "cro-bandtop": "40", "cro-bandtop-back": "70", "cro-hf": "0", "cro-front-arc": "40", "cro-hb": "-30", "cro-occ-drop": "10", "cro-cheek": "on", "cro-cheek-depth": "45",
   "cro-mast": "off", "cro-split": "lateralL", "cro-gap": "2", "cro-hole-zone": "ap", "cro-c0": "2",
-  "cro-cheek-wall": "on", "cro-cheek-foam": "3", "cro-ear-back": "35" });
+  "cro-cheek-wall": "on", "cro-cheek-foam": "3", "cro-ear-back": "35", "cro-target": "envelope", "cro-relief-max": "10" });
 
 // Ficha antiga → ficha da plataforma (sem medições: a página antiga não as guardava na ficha).
 // O id é mantido (importar de novo atualiza a mesma ficha); `origem` registra de onde veio.

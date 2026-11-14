@@ -217,3 +217,35 @@ test("contorno editável (E3c-4): borda de cima pelo contorno superior", () => {
   const topoZ = (T) => { let m = -1e9; for (let k = 0; k < T.length; k += 3) { const th = ((Math.atan2(T[k], T[k + 1]) / O.GRAU) + 360) % 360; if (O.diferencaAzimute(th, 0) < 2) m = Math.max(m, T[k + 2]); } return m; };
   const dz = topoZ(b.tris) - topoZ(c.tris); assert.ok(dz > 8 && dz < 12, `desceu ${dz.toFixed(1)} mm`);
 });
+
+// Forma-alvo simétrica (14/11/2026): no modo passivo, com alvo 'envelope', a face interna é o envelope da cabeça e do
+// seu espelho — igual dos dois lados — e nunca entra na cabeça; com o alvo antigo ('media' ou sem o parâmetro) o lado
+// achatado só ganha metade da assimetria e a casca sai assimétrica.
+test("forma-alvo: envelope simétrico da cabeça e do espelho; sem a opção, casca idêntica à de antes", () => {
+  const an = O.analisar(pos, meta.zRef); O.definirIndicacao(an, { mode: "plagio" });
+  // sem reserva de crescimento (ela é maior no lado achatado que no proeminente — 100% × 30% — e soma até 2,2 mm aqui)
+  const base = Object.assign({}, CENARIOS.A.P, { reliefMax: 15, growMonths: 0, growVertex: 0 }), env = Object.assign({}, base, { alvo: "envelope" });
+  let maxEnv = 0, maxMedia = 0, minFolga = 1e9, maxAssim = 0;
+  for (let ph = 4; ph <= 60; ph += 4) for (let th = 120; th <= 176; th += 4) {   // parieto-occipital, longe das orelhas
+    const a = O.raioInterno(an, th, ph, env), b = O.raioInterno(an, 360 - th, ph, env);
+    maxEnv = Math.max(maxEnv, Math.abs(a - b));
+    maxMedia = Math.max(maxMedia, Math.abs(O.raioInterno(an, th, ph, base) - O.raioInterno(an, 360 - th, ph, base)));
+    maxAssim = Math.max(maxAssim, Math.abs(O.amostrarGrade(an.rho, th, ph) - O.amostrarGrade(an.rho, 360 - th, ph)));
+    for (const t of [th, 360 - th]) minFolga = Math.min(minFolga, O.raioInterno(an, t, ph, env) - O.amostrarGrade(an.rho, t, ph));
+  }
+  assert.ok(maxAssim > 8, "a cabeça sintética é assimétrica: " + maxAssim);
+  assert.ok(maxEnv < 0.5, "face interna simétrica: " + maxEnv);
+  assert.ok(maxMedia > 0.4 * maxAssim, "com a média, metade da assimetria fica na casca: " + maxMedia);
+  assert.ok(minFolga >= base.c0 - 1e-6, "nunca entra na cabeça: " + minFolga);
+  // o limite de alívio continua valendo
+  const lim = Object.assign({}, env, { reliefMax: 3, growMonths: 0, growVertex: 0 });
+  for (let th = 120; th <= 240; th += 5) assert.ok(O.raioInterno(an, th, 20, lim) - O.amostrarGrade(an.rho, th, 20) <= lim.c0 + 3 + 1e-6);
+  // modo ativo e alvo 'media' não mudam
+  const g0 = O.gerarOrtese(an, meta.zRef, base, pos), g1 = O.gerarOrtese(an, meta.zRef, Object.assign({}, base, { alvo: "media" }), pos);
+  assert.deepEqual(Array.from(g1.tris.slice(0, 3000)), Array.from(g0.tris.slice(0, 3000))); assert.equal(g1.tris.length, g0.tris.length);
+  const at = Object.assign({}, base, { mode: "active" });
+  for (let th = 0; th < 360; th += 15) assert.equal(O.raioInterno(an, th, 20, Object.assign({}, at, { alvo: "envelope" })), O.raioInterno(an, th, 20, at));
+  // casca pelo envelope: fechada, sem defeitos e sem interferência
+  const ge = O.gerarOrtese(an, meta.zRef, env, pos);
+  assert.deepEqual(ge.stats.mesh, { pinch: 0, dropped: 0 }); assert.ok(ge.stats.interference.mm < 0);
+});
