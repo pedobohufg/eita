@@ -130,6 +130,9 @@ O módulo CRÂNIO da plataforma (E3b) foi migrado da "Calculadora de Assimetria 
 - **Ainda por ver nos casos reais:** orelhas (em 2 dos 6 uma delas não é achada ou sai fora do lugar), abas da bochecha compridas e afastadas, borda de trás sobre a gola/roupa. O plano de referência pelas orelhas (trágus) e o ínion continuam sendo o próximo passo.
 - **Testes:** `cranio-scan.test.mjs` (cabeça sintética girada e deslocada, clique na ponta e a 3–4 mm dela: frente a menos de 10° e lado a menos de 6° dos verdadeiros; clique dentro da cabeça → null); `teste_cranio_scan.py` (botão armado, pontos refeitos, modelo de frente).
 
+## Publicação de 14/11/2026
+- Plataforma republicada (versão `1794669986-eae3`) em modo **patch**, só com `cranio/app.js` e `cranio/index.html`. Não foi em modo "replace": o artefato publicado tem o rodapé com a logo do MCTI (`assets/logo-mcti.png` e a faixa `.apoio` em cada página, de 13/11/2026) que **não está no `main` do repositório**; um "replace" com o `dist/plataforma/` do repositório apagaria esse rodapé. O `cranio/index.html` publicado é o que estava no ar mais as mudanças desta etapa; o `cranio/app.js` é o da montagem do ramo `cranio-forma-alvo` (o que estava no ar era idêntico ao da montagem do `main`). Pendência: trazer o rodapé do MCTI para o repositório.
+
 ## Achados da leitura (para a E3c-2 e a E3c-3)
 - **Convenções do `CROCore`:** grade (θ, φ) de 180 × 76 (2° × 2°, φ de −60° a 90°); θ = 0° anterior, +90° direita; origem (0, 0, zRef) no plano glabela–opistocrânio. O alinhamento (bloco 1) usa os 5 pontos: z = vértice − meio dos eúrios, y = anterior − posterior, origem no meio glabela–opistocrânio em x/y e no centro da caixa em z; o plano axial vai para zRef. Na E3c-2 o alinhamento sai do three.js para uma função pura.
 - **Unidade do STL:** o padrão da página é **metros** (×1000), não mm.
